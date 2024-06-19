@@ -1,40 +1,36 @@
-use bimap::BiMap;
+use crate::clients::Client;
+use crate::id::Clock;
+use std::collections::HashMap;
 
-pub(crate) type Client = u64;
-pub(crate) type ClientId = String;
-
-pub(crate) struct ClientMap {
-  pub(crate) map: BiMap<ClientId, Client>
+pub(crate) struct ClientState {
+    pub(crate) clients: HashMap<Client, Clock>,
 }
 
-impl ClientMap {
-  pub(crate) fn new() -> ClientMap {
-    ClientMap {
-      map: BiMap::new()
+impl ClientState {
+    pub(crate) fn new() -> ClientState {
+        ClientState {
+            clients: HashMap::new(),
+        }
     }
-  }
 
-  pub(crate) fn insert(&mut self, client_id: ClientId, client: Client) {
-    self.map.insert(client_id, client);
-  }
-
-  pub(crate) fn get_by_client_id(&self, client_id: &ClientId) -> Option<&Client> {
-    self.map.get_by_left(client_id)
-  }
-
-  pub(crate) fn get_by_client(&self, client: &Client) -> Option<&ClientId> {
-    self.map.get_by_right(client)
-  }
-
-  pub(crate) fn get_or_insert(&mut self, client_id: ClientId) -> Client {
-    match self.get_by_client_id(&client_id) {
-      Some(client) => *client,
-      None => {
-        let client = self.map.len() as u64;
-        self.insert(client_id, client);
-        client
-      }
+    pub(crate) fn update(&mut self, client: Client, clock: Clock) {
+        let current = *self.clients.entry(client).or_default();
+        self.clients.insert(client, clock.max(current));
     }
-  }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_client_state() {
+        let mut state = ClientState::new();
+        state.update(1, 1);
+        assert_eq!(state.clients.get(&1), Some(&1));
+        state.update(1, 2);
+        assert_eq!(state.clients.get(&1), Some(&2));
+        state.update(2, 1);
+        assert_eq!(state.clients.get(&2), Some(&1));
+    }
+}

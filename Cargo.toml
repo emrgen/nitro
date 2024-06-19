@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 bimap = "0.6.3"
+log = "0.4.21"

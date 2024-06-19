@@ -87,10 +87,16 @@ pub(crate) struct DecoderV1 {
 
 impl DecoderV1 {
   pub(crate) fn new(buf: Vec<u8>) -> Self {
-    Self {
+    let mut d = Self {
       buf,
       pos: 0,
+    };
+
+    if d.u8().unwrap() != VERSION {
+      panic!("decoder: invalid version");
     }
+
+    d
   }
 
   fn ensure_capacity(&mut self, size: usize) {
@@ -154,5 +160,29 @@ impl Decoder for DecoderV1 {
 
   fn item(&mut self) -> Result<ItemRef, String> {
     todo!()
+  }
+}
+
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_encoder_v1() {
+    let mut encoder = EncoderV1::new(0);
+    encoder.u8(1);
+    encoder.u32(2);
+    encoder.u64(3);
+    encoder.string("hello");
+    encoder.bytes(&[1, 2, 3, 4]);
+
+    let buf = encoder.buffer();
+    let mut decoder = DecoderV1::new(buf);
+    assert_eq!(decoder.u8().unwrap(), 1);
+    assert_eq!(decoder.u32().unwrap(), 2);
+    assert_eq!(decoder.u64().unwrap(), 3);
+    assert_eq!(decoder.string().unwrap(), "hello");
+    assert_eq!(decoder.bytes().unwrap(), vec![1, 2, 3, 4]);
   }
 }

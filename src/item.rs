@@ -2,10 +2,10 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::rc::Rc;
 use crate::doc::Doc;
-use crate::id::Id;
+use crate::id::{Id, WithId};
 use crate::store::ItemStore;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ItemRef {
   pub(crate) doc: Doc,
   pub(crate) item: Rc<Item>,
@@ -25,6 +25,12 @@ impl ItemRef {
 
   pub(crate) fn borrow_mut(&mut self) -> &mut Item {
     Rc::make_mut(&mut self.item)
+  }
+}
+
+impl WithId for ItemRef {
+  fn id(&self) -> Id {
+    self.item.data.id
   }
 }
 
@@ -48,7 +54,7 @@ impl Ord for ItemRef {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Item {
   pub(crate) data: ItemData,
   pub(crate) parent: Option<ItemRef>,
@@ -93,7 +99,7 @@ impl Deref for Item {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ItemData {
   pub(crate) id: Id,
   pub(crate) parent_id: Option<Id>,
@@ -108,12 +114,47 @@ pub(crate) struct ItemData {
 }
 
 pub(crate) enum ItemKey {
-  Number(i32),
+  Number(usize),
   String(String),
 }
 
 #[derive(Debug, Clone)]
-enum Content {
-  Text(String),
-  Type(String),
+pub(crate) enum Content {
+  Binary(Vec<u8>),
+  String(String),
+  Embed(Any),
+  Doc(DocOpts),
+  None,
+}
+
+impl Default for Content {
+  fn default() -> Self {
+    Self::None
+  }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DocOpts {
+  pub(crate) guid: String,
+  pub(crate) opts: Any,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Any {
+  True,
+  False,
+  Float32(f32),
+  Float64(f64),
+  Int8(i8),
+  Int16(i16),
+  Int32(i32),
+  Int64(i64),
+  Uint8(u8),
+  Uint16(u16),
+  Uint32(u32),
+  Uint64(u64),
+  String(String),
+  Binary(Vec<u8>),
+  Array(Vec<Any>),
+  Map(Vec<(String, Any)>),
 }

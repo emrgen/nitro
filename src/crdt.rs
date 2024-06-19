@@ -2,7 +2,7 @@ use crate::id::Id;
 use crate::item::{Item, ItemData, ItemRef};
 use crate::store::{ItemStore};
 
-pub fn integrate<S: ItemStore>(store: S, item: ItemData, parent: ItemRef) {
+pub fn integrate(store: ItemStore, item: ItemData, parent: ItemRef) {
   // get rw lock for the parent,
   // let mut left = item.left_id.and_then(|id| store.get(id));
   // let mut right = item.right_id.and_then(|id| store.get(id));

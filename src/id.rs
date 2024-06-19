@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::ops::Add;
 use crate::hash::calculate_hash;
 use crate::state::ClientMap;
 
@@ -14,6 +15,10 @@ impl Id {
     Id { client, start, end }
   }
 
+  pub(crate) fn size(&self) -> u64 {
+    self.end - self.start + 1
+  }
+
   pub(crate) fn eq_opt(a: Option<&Id>, b: Option<&Id>) -> bool {
     match (a, b) {
       (Some(a), Some(b)) => a.client == b.client && a.compare_without_client(b) == std::cmp::Ordering::Equal,
@@ -22,9 +27,6 @@ impl Id {
     }
   }
 
-  pub(crate) fn size(&self) -> u64 {
-    self.end - self.start + 1
-  }
 
   pub(crate) fn equals(&self, other: &Id) -> bool {
     self.client == other.client && self.start == other.start && self.end == other.end
@@ -60,6 +62,36 @@ impl Id {
       std::cmp::Ordering::Equal
     }
   }
+
+  pub(crate) fn split(&self, at: u64) -> (Id, Id) {
+    if at < self.start || at > self.end {
+      panic!("Cannot split Id at {}", at)
+    }
+
+    (Id::new(self.client, self.start, at - 1), Id::new(self.client, at, self.end))
+  }
+}
+
+impl WithId for Id {
+  fn id(&self) -> Id {
+    *self
+  }
+}
+
+impl Add<Id> for Id {
+  type Output = Id;
+
+  fn add(self, other: Id) -> Id {
+    if (self.client != other.client) || (self.end + 1 != other.start) {
+      panic!("Cannot add non-adjacent Ids")
+    }
+
+    Id::new(self.client, self.start.min(other.start), self.end.max(other.end))
+  }
+}
+
+pub(crate) trait WithId {
+  fn id(&self) -> Id;
 }
 
 impl std::fmt::Debug for Id {
@@ -112,13 +144,13 @@ mod tests {
     let id7 = Id::new(2, 2, 2);
 
     assert_eq!(id1.compare(&id2, &clients), std::cmp::Ordering::Equal);
-    assert_eq!(id1.compare(&id3, &clients), std::cmp::Ordering::Less);
+    assert_eq!(id1.compare(&id3, &clients), std::cmp::Ordering::Equal);
     assert_eq!(id1.compare(&id4, &clients), std::cmp::Ordering::Less);
     assert_eq!(id1.compare(&id5, &clients), std::cmp::Ordering::Less);
     assert_eq!(id1.compare(&id6, &clients), std::cmp::Ordering::Less);
     assert_eq!(id1.compare(&id7, &clients), std::cmp::Ordering::Less);
 
-    assert_eq!(id3.compare(&id1, &clients), std::cmp::Ordering::Greater);
+    assert_eq!(id3.compare(&id1, &clients), std::cmp::Ordering::Equal);
     assert_eq!(id4.compare(&id1, &clients), std::cmp::Ordering::Greater);
     assert_eq!(id5.compare(&id1, &clients), std::cmp::Ordering::Greater);
 

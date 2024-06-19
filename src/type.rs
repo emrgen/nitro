@@ -1,3 +1,4 @@
+use crate::item::{ItemKey, ItemRef};
 use crate::list::NList;
 use crate::map::NMap;
 use crate::string::NString;
@@ -14,30 +15,43 @@ impl Type {
   pub(crate) fn field(&self) -> Option<String> {
     match self {
       Type::List(n) => n.field(),
-      // Type::Map(n) => n.field(),
-      // Type::Text(n) => n.field(),
-      // Type::String(n) => n.field(),
-      _ => None,
+      _ => panic!("field: not implemented")
     }
   }
 
   pub(crate) fn size(&self) -> usize {
     match self {
       Type::List(n) => n.size(),
-      // Type::Map(n) => n.size(),
-      // Type::Text(n) => n.size(),
-      // Type::String(n) => n.size(),
-      _ => 0,
+      _ => panic!("size: not implemented")
     }
   }
 
   pub(crate) fn append(&mut self, item: Type) {
     match self {
-      Type::List(n) => n.append(item),
-      // Type::Map(n) => n.append(item),
-      // Type::Text(n) => n.append(item),
-      // Type::String(n) => n.append(item),
-      _ => (),
+      Type::List(n) => n.append(item.into_item_ref()),
+      _ => panic!("append: not implemented")
+    }
+  }
+
+  pub(crate) fn prepend(&mut self, item: Type) {
+    match self {
+      Type::List(n) => n.prepend(item.into_item_ref()),
+      _ => panic!("prepend: not implemented")
+    }
+  }
+
+  pub(crate) fn insert(&mut self, key: &ItemKey, item: Type) {
+    match self {
+      Type::List(n) => n.insert(key, item.into_item_ref()),
+      _ => panic!("insert: not implemented")
+    }
+  }
+
+  fn into_item_ref(self) -> ItemRef {
+    match self {
+      Type::List(n) => n.into_item(),
+      // Type::Map(n) => Type::Map(n),
+      _ => panic!("into_inner: not implemented")
     }
   }
 }

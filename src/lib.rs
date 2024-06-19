@@ -13,6 +13,7 @@ mod string;
 mod atom;
 mod proxy;
 mod r#move;
+mod codec;
 
 pub use crdt::*;
 

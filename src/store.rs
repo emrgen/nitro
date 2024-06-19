@@ -1,19 +1,21 @@
-use crate::clients::{Client, ClientId, ClientMap};
-use crate::delete::DeleteItem;
-use crate::id::{Clock, Id, WithId};
-use crate::item::{ItemData, ItemRef};
-
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
-use crate::state::ClientState;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, RwLock, Weak};
+
+use crate::clients::{Client, ClientId, ClientMap};
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
+use crate::diff::Diff;
+use crate::id::{Clock, Id, Split, WithId};
+use crate::item::{ItemData, ItemRef};
+use crate::state::ClientState;
 
 pub(crate) type StoreRef = Arc<RwLock<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RwLock<DocStore>>;
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct DocStore {
+    pub(crate) guid: String,
     pub(crate) client: Client,
     pub(crate) clock: Clock,
 
@@ -30,6 +32,10 @@ impl DocStore {
         self.clock = clock;
 
         self.client
+    }
+
+    pub(crate) fn update_guid(&mut self, guid: String) {
+        self.guid = guid;
     }
 
     pub(crate) fn take(&mut self, size: Clock) -> Id {
@@ -57,6 +63,18 @@ impl DocStore {
     pub(crate) fn client(&mut self, client_id: ClientId) -> Client {
         self.clients.get_or_insert(client_id)
     }
+
+    pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
+        let items = self.items.diff(state.clone());
+        let deletes = self.deleted_items.diff(state.clone());
+        Diff::from(
+            guid,
+            self.clients.clone(),
+            self.state.clone(),
+            items,
+            deletes,
+        )
+    }
 }
 
 #[derive(Default, Debug, Clone)]
@@ -75,6 +93,47 @@ pub(crate) struct PendingStore {
 pub(crate) type ItemDataStore = ClientStore<ItemData>;
 pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
 pub(crate) type ItemStore = ClientStore<ItemRef>;
+
+impl IdDiff for DeleteItemStore {
+    type Target = DeleteItemStore;
+
+    fn diff(&self, state: ClientState) -> DeleteItemStore {
+        let mut diff = DeleteItemStore::default();
+
+        for (client, store) in self.items.iter() {
+            let clock = state.get(client).unwrap_or(&0);
+            let items = store.diff(*clock);
+            if items.size() > 0 {
+                diff.items.insert(*client, items);
+            }
+        }
+
+        diff
+    }
+}
+
+impl IdDiff for ItemStore {
+    type Target = ItemDataStore;
+
+    fn diff(&self, state: ClientState) -> ItemDataStore {
+        let mut diff = ItemDataStore::default();
+
+        for (client, store) in self.items.iter() {
+            let clock = state.get(client).unwrap_or(&0);
+            let items = store.diff(*clock);
+            if items.size() > 0 {
+                diff.items.insert(*client, items);
+            }
+        }
+
+        diff
+    }
+}
+
+trait IdDiff {
+    type Target;
+    fn diff(&self, state: ClientState) -> Self::Target;
+}
 
 #[derive(Default, Clone, Debug)]
 pub struct ClientStore<T: WithId + Clone + Encode + Decode> {
@@ -143,6 +202,10 @@ impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
     pub(crate) fn contains(&self, value: &Id) -> bool {
         self.data.contains_key(value)
     }
+
+    pub(crate) fn size(&self) -> usize {
+        self.data.len()
+    }
 }
 
 impl<T: Encode + Clone + WithId + Decode> Encode for IdStore<T> {
@@ -166,10 +229,50 @@ impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
     }
 }
 
+pub(crate) trait IdClockDIff {
+    type Target;
+    fn diff(&self, clock: Clock) -> Self::Target;
+}
+
+impl IdClockDIff for IdStore<ItemRef> {
+    type Target = IdStore<ItemData>;
+
+    fn diff(&self, clock: Clock) -> Self::Target {
+        let mut items = IdStore::default();
+        for (id, item) in self.data.iter() {
+            let data = item.borrow().data.clone();
+            if id.start > clock {
+                items.insert(data)
+            } else if id.end > clock && id.start < clock {
+                let (_, r) = data.split(clock);
+                items.insert(r);
+            }
+        }
+
+        items
+    }
+}
+
+impl IdClockDIff for IdStore<DeleteItem> {
+    type Target = IdStore<DeleteItem>;
+
+    fn diff(&self, clock: Clock) -> Self::Target {
+        let mut items = IdStore::default();
+        for (id, item) in self.data.iter() {
+            if id.start > clock {
+                items.insert(item.clone());
+            }
+        }
+
+        items
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::id::Id;
+
+    use super::*;
 
     #[test]
     fn test_id_store() {

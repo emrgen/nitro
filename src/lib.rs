@@ -1,3 +1,5 @@
+pub use crdt::*;
+
 mod atom;
 mod clients;
 mod codec;
@@ -17,6 +19,4 @@ mod store;
 mod string;
 mod text;
 mod tx;
-mod r#type;
-
-pub use crdt::*;
+mod types;

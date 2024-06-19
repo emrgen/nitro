@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
 use crate::clients::Client;
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::id::Clock;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ClientState {
@@ -14,6 +15,10 @@ impl ClientState {
         ClientState {
             clients: HashMap::new(),
         }
+    }
+
+    pub(crate) fn get(&self, client: &Client) -> Option<&Clock> {
+        self.clients.get(client)
     }
 
     pub(crate) fn update(&mut self, client: Client, clock: Clock) {

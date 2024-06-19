@@ -1,6 +1,5 @@
 use crate::id::Id;
 use crate::item::{Content, ItemData, ItemRef};
-use crate::map::NMap;
 use crate::store::WeakStoreRef;
 
 pub(crate) struct NString {

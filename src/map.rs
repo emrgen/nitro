@@ -1,11 +1,7 @@
-use crate::delete::DeleteItem;
 use crate::id::Id;
-use crate::item::ItemKind::String;
 use crate::item::{ItemData, ItemKey, ItemKind, ItemRef};
-use crate::list::NList;
-use crate::r#type::Type;
 use crate::store::WeakStoreRef;
-use std::collections::HashMap;
+use crate::types::Type;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct NMap {
@@ -26,7 +22,7 @@ impl NMap {
 
     pub fn set(&mut self, key: &ItemKey, value: ItemRef) {
         let item = self.item.borrow();
-        item.set(key, value);
+        // item.set(key, value);
     }
 
     pub fn get(&self, key: ItemKey) -> Option<Type> {

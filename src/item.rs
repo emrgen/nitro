@@ -1,14 +1,13 @@
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
-use crate::delete::DeleteItem;
-use crate::doc::Doc;
-use crate::id::{Id, WithId};
-use crate::store::{ClientStore, DocStore, WeakStoreRef};
-use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
+
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
+use crate::id::{Clock, Id, Split, WithId};
+use crate::store::{DocStore, WeakStoreRef};
 
 type ItemRefInner = Rc<Item>;
 
@@ -199,6 +198,33 @@ pub(crate) struct ItemData {
 
     pub(crate) field: Option<String>,
     pub(crate) content: Content,
+}
+
+impl Split for ItemData {
+    fn split(&self, at: Clock) -> (Self, Self) {
+        let mut left = self.clone();
+        let mut right = self.clone();
+
+        // split id
+        let (lid, rid) = self.id.split(at);
+        left.id = lid;
+        right.id = rid;
+
+        left.right_id = Some(right.id.head());
+        right.left_id = Some(left.id.tail());
+
+        // split content
+        match &self.content {
+            Content::String(s) => {
+                let (l, r) = s.split_at(at as usize);
+                left.content = Content::String(l.to_string());
+                right.content = Content::String(r.to_string());
+            }
+            _ => {}
+        }
+
+        (left, right)
+    }
 }
 
 impl From<ItemData> for Item {

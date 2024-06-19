@@ -1,16 +1,16 @@
+use std::sync::Arc;
+
 use crate::atom::NAtom;
-use crate::clients::{Client, ClientId};
+use crate::clients::ClientId;
 use crate::diff::Diff;
 use crate::id::Clock;
 use crate::item::Content;
 use crate::list::NList;
 use crate::map::NMap;
-use crate::r#type::Type;
-use crate::store::{DocStore, StoreRef};
+use crate::state::ClientState;
+use crate::store::StoreRef;
 use crate::string::NString;
 use crate::text::NText;
-use std::string;
-use std::sync::{Arc, RwLock, Weak};
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocOpts {
@@ -51,6 +51,11 @@ impl Doc {
         doc.root = Some(doc.map());
 
         doc
+    }
+
+    pub fn diff(&self, state: ClientState) -> Diff {
+        let store = self.store.read().unwrap();
+        store.diff(self.opts.guid.clone(), state)
     }
 
     pub(crate) fn from_diff(diff: &Diff, opts: DocOpts) -> Self {

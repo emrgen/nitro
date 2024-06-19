@@ -24,6 +24,22 @@ impl Diff {
         }
     }
 
+    pub(crate) fn from(
+        guid: String,
+        clients: ClientMap,
+        state: ClientState,
+        items: ItemDataStore,
+        deletes: DeleteItemStore,
+    ) -> Diff {
+        Diff {
+            guid,
+            clients,
+            state,
+            items,
+            deletes,
+        }
+    }
+
     pub(crate) fn from_deleted_items(guid: String, deleted_items: DeleteItemStore) -> Diff {
         Diff {
             guid,

@@ -1,11 +1,19 @@
+use std::cmp::Ordering;
+use std::ops::Add;
+
 use crate::clients::{Client, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::hash::calculate_hash;
-use std::cmp::Ordering;
-use std::ops::Add;
 
 pub(crate) type Clock = u32;
+
+pub(crate) trait Split
+where
+    Self: Sized,
+{
+    fn split(&self, at: Clock) -> (Self, Self);
+}
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Id {
@@ -124,6 +132,12 @@ pub(crate) trait WithId {
     fn id(&self) -> Id;
 }
 
+impl Split for Id {
+    fn split(&self, at: Clock) -> (Id, Id) {
+        self.split(at)
+    }
+}
+
 impl std::fmt::Debug for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Id({:?}, {:?}, {:?})", self.client, self.start, self.end)
@@ -159,8 +173,9 @@ impl std::hash::Hash for Id {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::clients::ClientMap;
+
+    use super::*;
 
     #[test]
     fn test_compare() {

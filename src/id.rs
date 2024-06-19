@@ -1,9 +1,11 @@
 use crate::clients::{Client, ClientMap};
+use crate::codec::decoder::Decoder;
+use crate::codec::encoder::Encoder;
 use crate::hash::calculate_hash;
 use std::cmp::Ordering;
 use std::ops::Add;
 
-pub(crate) type Clock = u64;
+pub(crate) type Clock = u32;
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Id {
@@ -13,7 +15,7 @@ pub(crate) struct Id {
 }
 
 impl Id {
-    pub(crate) fn new(client: u64, start: Clock, end: Clock) -> Id {
+    pub(crate) fn new(client: Client, start: Clock, end: Clock) -> Id {
         Id { client, start, end }
     }
 
@@ -75,6 +77,20 @@ impl Id {
             Id::new(self.client, self.start, at - 1),
             Id::new(self.client, at, self.end),
         )
+    }
+
+    pub fn encode<T: Encoder>(&self, e: &mut T) {
+        e.u32(self.client);
+        e.u32(self.start);
+        e.u32(self.size());
+    }
+
+    pub fn decode<T: Decoder>(e: &mut T) -> Id {
+        let client = e.u32().unwrap();
+        let start = e.u32().unwrap();
+        let size = e.u32().unwrap();
+
+        Id::new(client, start, start + size - 1)
     }
 }
 

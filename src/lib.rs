@@ -2,6 +2,8 @@ mod atom;
 mod clients;
 mod codec;
 mod crdt;
+mod delete;
+mod diff;
 mod doc;
 mod hash;
 mod id;
@@ -14,6 +16,7 @@ mod state;
 mod store;
 mod string;
 mod text;
+mod tx;
 mod r#type;
 
 pub use crdt::*;

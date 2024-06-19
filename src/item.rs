@@ -1,6 +1,6 @@
 use crate::doc::Doc;
 use crate::id::{Id, WithId};
-use crate::store::ItemStore;
+use crate::store::{ClientStore, Store};
 use std::cmp::Ordering;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -82,11 +82,11 @@ impl Item {
         self.data.field.clone()
     }
 
-    pub(crate) fn left_origin(&mut self, store: &ItemStore) -> Option<ItemRef> {
+    pub(crate) fn left_origin(&mut self, store: &Store) -> Option<ItemRef> {
         self.data.left_id.and_then(|id| store.find(id))
     }
 
-    pub(crate) fn right_origin(&mut self, store: &ItemStore) -> Option<ItemRef> {
+    pub(crate) fn right_origin(&mut self, store: &Store) -> Option<ItemRef> {
         self.data.right_id.and_then(|id| store.find(id))
     }
 }
@@ -111,6 +111,12 @@ pub(crate) struct ItemData {
 
     pub(crate) field: Option<String>,
     pub(crate) content: Content,
+}
+
+impl WithId for ItemData {
+    fn id(&self) -> Id {
+        self.id
+    }
 }
 
 pub(crate) enum ItemKey {

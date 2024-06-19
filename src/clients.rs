@@ -1,9 +1,10 @@
 use crate::codec::encoder::Encoder;
 use bimap::BiMap;
 
-pub type Client = u64;
+pub type Client = u32;
 pub type ClientId = String;
 
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ClientMap {
     pub(crate) map: BiMap<ClientId, Client>,
 }
@@ -29,7 +30,7 @@ impl ClientMap {
         match self.get_by_client_id(&client_id) {
             Some(client) => *client,
             None => {
-                let client = self.map.len() as u64;
+                let client = self.map.len() as Client;
                 self.insert(client_id, client);
                 client
             }
@@ -37,10 +38,10 @@ impl ClientMap {
     }
 
     pub(crate) fn encode<T: Encoder>(&self, encoder: &mut T) {
-        encoder.u32(self.map.len() as u32);
+        encoder.u32(self.map.len() as Client);
         for (client_id, client) in self.map.iter() {
             encoder.string(client_id);
-            encoder.u64(*client);
+            encoder.u32(*client);
         }
     }
 }

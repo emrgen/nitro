@@ -1,13 +1,14 @@
+use log::log;
+
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::doc::Doc;
 use crate::item::ItemData;
-use crate::store::{PendingStore, ReadyStore};
-use log::log;
+use crate::store::{PendingStore, ReadyStore, WeakStoreRef};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Tx {
-    doc: Doc,
+    store: WeakStoreRef,
     diff: Diff,
     ready: ReadyStore,
     pending: PendingStore,
@@ -15,9 +16,9 @@ pub(crate) struct Tx {
 }
 
 impl Tx {
-    pub(crate) fn new(doc: Doc, diff: Diff) -> Tx {
+    pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Tx {
         Tx {
-            doc,
+            store,
             diff,
             ready: ReadyStore::default(),
             pending: PendingStore::default(),

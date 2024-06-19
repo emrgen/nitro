@@ -1,6 +1,5 @@
 pub use crdt::*;
 
-mod atom;
 mod clients;
 mod codec;
 mod crdt;
@@ -10,13 +9,15 @@ mod doc;
 mod hash;
 mod id;
 mod item;
-mod list;
-mod map;
-mod r#move;
-mod proxy;
+mod natom;
+mod nlist;
+mod nmap;
+mod nmove;
+mod nproxy;
+mod nroot;
+mod nstring;
+mod ntext;
 mod state;
 mod store;
-mod string;
-mod text;
 mod tx;
 mod types;

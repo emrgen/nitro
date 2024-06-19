@@ -1,21 +1,23 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-use crate::atom::NAtom;
 use crate::clients::ClientId;
 use crate::diff::Diff;
 use crate::id::Clock;
 use crate::item::Content;
-use crate::list::NList;
-use crate::map::NMap;
+use crate::natom::NAtom;
+use crate::nlist::NList;
+use crate::nmap::NMap;
+use crate::nstring::NString;
+use crate::ntext::NText;
 use crate::state::ClientState;
-use crate::store::StoreRef;
-use crate::string::NString;
-use crate::text::NText;
+use crate::store::{DocStore, StoreRef};
+use crate::tx::Tx;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocOpts {
     pub(crate) guid: String,
     pub(crate) client_id: ClientId,
+    pub(crate) crated_by: ClientId,
 }
 
 impl Default for DocOpts {
@@ -23,6 +25,7 @@ impl Default for DocOpts {
         Self {
             guid: "".to_string(),
             client_id: "".to_string(),
+            crated_by: "".to_string(),
         }
     }
 }
@@ -36,11 +39,12 @@ pub(crate) struct Doc {
 
 impl Doc {
     pub(crate) fn new(opts: DocOpts) -> Self {
-        let store = StoreRef::default();
-        store
-            .write()
-            .unwrap()
-            .update_client(opts.client_id.clone(), 0);
+        let mut store = DocStore::default();
+        store.update_client(opts.crated_by.clone(), 0);
+        let root_id = store.take(1);
+        let store = Arc::new(RwLock::new(store));
+        let root = NMap::new(root_id, Arc::downgrade(&store));
+        store.write().unwrap().insert(root.item_ref());
 
         let mut doc = Self {
             opts,
@@ -48,7 +52,7 @@ impl Doc {
             ..Doc::default()
         };
 
-        doc.root = Some(doc.map());
+        doc.root = Some(root);
 
         doc
     }
@@ -58,26 +62,16 @@ impl Doc {
         store.diff(self.opts.guid.clone(), state)
     }
 
-    pub(crate) fn from_diff(diff: &Diff, opts: DocOpts) -> Self {
-        let store = StoreRef::default();
-        store
-            .write()
-            .unwrap()
-            .update_client(opts.client_id.clone(), 1);
-        let mut doc = Doc {
-            opts,
-            store,
-            ..Doc::default()
-        };
-
+    pub(crate) fn from_diff(diff: Diff, opts: DocOpts) -> Self {
+        let mut doc = Self::new(opts);
         doc.apply(diff);
+
         doc
     }
 
-    pub(crate) fn apply(&mut self, diff: &Diff) {
-        // create a new tx
-        // Tx::new();
-        // let mut store = self.store.write().unwrap();
+    pub(crate) fn apply(&mut self, diff: Diff) {
+        let mut tx = Tx::new(Arc::downgrade(&self.store), diff);
+        tx.commit();
     }
 
     pub fn list(&self) -> NList {

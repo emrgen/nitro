@@ -15,7 +15,6 @@ pub(crate) type WeakStoreRef = Weak<RwLock<DocStore>>;
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct DocStore {
-    pub(crate) guid: String,
     pub(crate) client: Client,
     pub(crate) clock: Clock,
 
@@ -34,10 +33,6 @@ impl DocStore {
         self.client
     }
 
-    pub(crate) fn update_guid(&mut self, guid: String) {
-        self.guid = guid;
-    }
-
     pub(crate) fn take(&mut self, size: Clock) -> Id {
         let id = Id::new(self.client, self.clock, self.clock + size - 1);
         self.clock += size;
@@ -50,6 +45,10 @@ impl DocStore {
 
     pub(crate) fn insert(&mut self, item: ItemRef) {
         self.items.insert(item);
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.items.remove(id);
     }
 
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
@@ -151,10 +150,16 @@ impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
         store.insert(item);
     }
 
+    pub(crate) fn remove(&mut self, id: &Id) {
+        if let Some(store) = self.items.get_mut(&id.client) {
+            store.remove(id);
+        }
+    }
+
     pub(crate) fn replace(&mut self, item: T, items: (T, T)) {
         let id = item.id();
         let store = self.items.get_mut(&id.client).unwrap();
-        store.remove(item);
+        store.remove(&item.id());
 
         store.insert(items.0);
         store.insert(items.1);
@@ -195,8 +200,8 @@ impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
         self.data.get(value).cloned()
     }
 
-    pub(crate) fn remove(&mut self, value: T) -> Option<T> {
-        self.data.remove(&value.id())
+    pub(crate) fn remove(&mut self, value: &Id) -> Option<T> {
+        self.data.remove(value)
     }
 
     pub(crate) fn contains(&self, value: &Id) -> bool {
@@ -229,12 +234,12 @@ impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
     }
 }
 
-pub(crate) trait IdClockDIff {
+pub(crate) trait IdClockDiff {
     type Target;
     fn diff(&self, clock: Clock) -> Self::Target;
 }
 
-impl IdClockDIff for IdStore<ItemRef> {
+impl IdClockDiff for IdStore<ItemRef> {
     type Target = IdStore<ItemData>;
 
     fn diff(&self, clock: Clock) -> Self::Target {
@@ -253,7 +258,7 @@ impl IdClockDIff for IdStore<ItemRef> {
     }
 }
 
-impl IdClockDIff for IdStore<DeleteItem> {
+impl IdClockDiff for IdStore<DeleteItem> {
     type Target = IdStore<DeleteItem>;
 
     fn diff(&self, clock: Clock) -> Self::Target {

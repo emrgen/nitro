@@ -1,9 +1,9 @@
-use crate::atom::NAtom;
 use crate::item::{ItemKey, ItemKind, ItemRef};
-use crate::list::NList;
-use crate::map::NMap;
-use crate::string::NString;
-use crate::text::NText;
+use crate::natom::NAtom;
+use crate::nlist::NList;
+use crate::nmap::NMap;
+use crate::nstring::NString;
+use crate::ntext::NText;
 
 pub(crate) enum Type {
     List(NList),

@@ -1,6 +1,6 @@
 use crate::id::Id;
 use crate::item::{ItemData, ItemRef};
-use crate::proxy::NProxy;
+use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 
 pub(crate) struct NMove {

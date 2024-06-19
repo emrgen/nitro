@@ -1,7 +1,6 @@
 use crate::id::Id;
 use crate::item::{ItemData, ItemRef};
 use crate::store::WeakStoreRef;
-use crate::string::NString;
 
 pub(crate) struct NText {
     pub(crate) item: ItemRef,

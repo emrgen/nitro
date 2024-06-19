@@ -1,4 +1,4 @@
-use crate::item::ItemRef;
+use crate::item::{ItemData, ItemRef};
 
 pub trait Decoder {
     fn u8(&mut self) -> Result<u8, String>;
@@ -6,5 +6,11 @@ pub trait Decoder {
     fn u64(&mut self) -> Result<u64, String>;
     fn string(&mut self) -> Result<String, String>;
     fn bytes(&mut self) -> Result<Vec<u8>, String>;
-    fn item(&mut self) -> Result<ItemRef, String>;
+    fn item(&mut self) -> Result<ItemData, String>;
+}
+
+pub trait Decode {
+    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String>
+    where
+        Self: Sized;
 }

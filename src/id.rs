@@ -1,6 +1,6 @@
 use crate::clients::{Client, ClientMap};
-use crate::codec::decoder::Decoder;
-use crate::codec::encoder::Encoder;
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
 use crate::hash::calculate_hash;
 use std::cmp::Ordering;
 use std::ops::Add;
@@ -78,19 +78,23 @@ impl Id {
             Id::new(self.client, at, self.end),
         )
     }
+}
 
-    pub fn encode<T: Encoder>(&self, e: &mut T) {
+impl Encode for Id {
+    fn encode<T: Encoder>(&self, e: &mut T) {
         e.u32(self.client);
         e.u32(self.start);
         e.u32(self.size());
     }
+}
 
-    pub fn decode<T: Decoder>(e: &mut T) -> Id {
-        let client = e.u32().unwrap();
-        let start = e.u32().unwrap();
-        let size = e.u32().unwrap();
+impl Decode for Id {
+    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+        let client = d.u32()?;
+        let start = d.u32()?;
+        let size = d.u32()?;
 
-        Id::new(client, start, start + size - 1)
+        Ok(Id::new(client, start, start + size - 1))
     }
 }
 

@@ -1,4 +1,5 @@
-use crate::codec::encoder::Encoder;
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
 use bimap::BiMap;
 
 pub type Client = u32;
@@ -36,12 +37,27 @@ impl ClientMap {
             }
         }
     }
+}
 
-    pub(crate) fn encode<T: Encoder>(&self, encoder: &mut T) {
+impl Encode for ClientMap {
+    fn encode<E: Encoder>(&self, encoder: &mut E) {
         encoder.u32(self.map.len() as Client);
         for (client_id, client) in self.map.iter() {
             encoder.string(client_id);
             encoder.u32(*client);
         }
+    }
+}
+
+impl Decode for ClientMap {
+    fn decode<D: Decoder>(decoder: &mut D) -> Result<ClientMap, String> {
+        let len = decoder.u32()? as usize;
+        let mut map = BiMap::new();
+        for _ in 0..len {
+            let client_id = decoder.string()?;
+            let client = decoder.u32()?;
+            map.insert(client_id, client);
+        }
+        Ok(ClientMap { map })
     }
 }

@@ -1,3 +1,5 @@
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
 use crate::doc::Doc;
 use crate::id::{Id, WithId};
 use crate::store::{ClientStore, Store};
@@ -25,6 +27,18 @@ impl ItemRef {
 
     pub(crate) fn borrow_mut(&mut self) -> &mut Item {
         Rc::make_mut(&mut self.item)
+    }
+}
+
+impl Encode for ItemRef {
+    fn encode<E: Encoder>(&self, e: &mut E) {
+        self.borrow().data.encode(e);
+    }
+}
+
+impl Decode for ItemRef {
+    fn decode<D: Decoder>(d: &mut D) -> Result<ItemRef, String> {
+        Err("ItemRef decode not implemented".to_string())
     }
 }
 
@@ -101,6 +115,7 @@ impl Deref for Item {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemData {
+    pub(crate) kind: ItemKind,
     pub(crate) id: Id,
     pub(crate) parent_id: Option<Id>,
     pub(crate) left_id: Option<Id>,
@@ -111,6 +126,37 @@ pub(crate) struct ItemData {
 
     pub(crate) field: Option<String>,
     pub(crate) content: Content,
+}
+
+impl Encode for ItemData {
+    fn encode<E: Encoder>(&self, e: &mut E) {
+        e.item(self)
+    }
+}
+
+impl Decode for ItemData {
+    fn decode<D: Decoder>(d: &mut D) -> Result<ItemData, String> {
+        let item = d.item()?;
+        Ok(item)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ItemKind {
+    Doc,
+    Map,
+    List,
+    Text,
+    String,
+    Atom,
+    Proxy,
+    Move,
+}
+
+impl Default for ItemKind {
+    fn default() -> Self {
+        Self::Atom
+    }
 }
 
 impl WithId for ItemData {

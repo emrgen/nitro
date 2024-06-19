@@ -3,6 +3,8 @@ use crate::delete::DeleteItem;
 use crate::id::{Id, WithId};
 use crate::item::{ItemData, ItemRef};
 
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
 use std::collections::{BTreeMap, HashMap};
 
 #[derive(Default, Debug, Clone)]
@@ -44,11 +46,11 @@ pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
 pub(crate) type ItemStore = ClientStore<ItemRef>;
 
 #[derive(Default, Clone, Debug)]
-pub struct ClientStore<T: WithId + Clone> {
+pub struct ClientStore<T: WithId + Clone + Encode + Decode> {
     items: HashMap<Client, IdStore<T>>,
 }
 
-impl<T: WithId + Clone + Default> ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
     pub(crate) fn find(&self, id: Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
@@ -69,12 +71,32 @@ impl<T: WithId + Clone + Default> ClientStore<T> {
     }
 }
 
+impl<T: WithId + Clone + Default + Encode + Decode> Encode for ClientStore<T> {
+    fn encode<E: Encoder>(&self, e: &mut E) {
+        for (client, store) in self.items.iter() {
+            e.u32(*client);
+            store.encode(e);
+        }
+    }
+}
+
+impl<T: WithId + Clone + Default + Encode + Decode> Decode for ClientStore<T> {
+    fn decode<D: Decoder>(d: &mut D) -> Result<ClientStore<T>, String> {
+        let mut items = HashMap::new();
+        while let Ok(client) = d.u32() {
+            let store = IdStore::decode(d)?;
+            items.insert(client, store);
+        }
+        Ok(ClientStore { items })
+    }
+}
+
 #[derive(Default, Debug, Clone)]
-pub(crate) struct IdStore<T: WithId + Clone> {
+pub(crate) struct IdStore<T: WithId + Clone + Encode + Decode> {
     data: BTreeMap<Id, T>,
 }
 
-impl<T: WithId + Clone> IdStore<T> {
+impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
         self.data.insert(value.id(), value);
     }
@@ -89,6 +111,27 @@ impl<T: WithId + Clone> IdStore<T> {
 
     pub(crate) fn contains(&self, value: &Id) -> bool {
         self.data.contains_key(value)
+    }
+}
+
+impl<T: Encode + Clone + WithId + Decode> Encode for IdStore<T> {
+    fn encode<E: Encoder>(&self, e: &mut E) {
+        e.u32(self.data.len() as u32);
+        for (_, value) in self.data.iter() {
+            value.encode(e);
+        }
+    }
+}
+
+impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
+    fn decode<D: Decoder>(d: &mut D) -> Result<IdStore<T>, String> {
+        let len = d.u32()? as usize;
+        let mut data = BTreeMap::new();
+        for _ in 0..len {
+            let value = T::decode(d)?;
+            data.insert(value.id(), value);
+        }
+        Ok(IdStore { data })
     }
 }
 

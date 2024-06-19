@@ -1,5 +1,6 @@
 use crate::clients::Client;
-use crate::codec::encoder::Encoder;
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
 use crate::id::Clock;
 use std::collections::HashMap;
 
@@ -19,13 +20,28 @@ impl ClientState {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.max(current));
     }
+}
 
-    pub(crate) fn encode<T: Encoder>(&self, encoder: &mut T) {
-        encoder.u32(self.clients.len() as u32);
-        for (client, clock) in self.clients.iter() {
-            encoder.u32(*client);
-            encoder.u32(*clock);
+impl Encode for ClientState {
+    fn encode<E: Encoder>(&self, e: &mut E) {
+        e.u32(self.clients.len() as u32);
+        for (client, clock) in &self.clients {
+            e.u32(*client);
+            e.u32(*clock);
         }
+    }
+}
+
+impl Decode for ClientState {
+    fn decode<D: Decoder>(d: &mut D) -> Result<ClientState, String> {
+        let len = d.u32()? as usize;
+        let mut clients = HashMap::new();
+        for _ in 0..len {
+            let client = d.u32()?;
+            let clock = d.u32()?;
+            clients.insert(client, clock);
+        }
+        Ok(ClientState { clients })
     }
 }
 

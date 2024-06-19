@@ -1,6 +1,6 @@
 use crate::codec::decoder::Decoder;
 use crate::codec::encoder::Encoder;
-use crate::item::ItemRef;
+use crate::item::{ItemData, ItemRef};
 
 const VERSION: u8 = 1;
 const BUF_STEP: usize = 1024;
@@ -66,7 +66,7 @@ impl Encoder for EncoderV1 {
         self.buf.extend_from_slice(value);
     }
 
-    fn item(&mut self, value: ItemRef) {}
+    fn item(&mut self, value: &ItemData) {}
 
     fn decoder(self) -> Box<dyn Decoder> {
         Box::new(DecoderV1::new(self.buf))
@@ -157,7 +157,7 @@ impl Decoder for DecoderV1 {
         Ok(value)
     }
 
-    fn item(&mut self) -> Result<ItemRef, String> {
+    fn item(&mut self) -> Result<ItemData, String> {
         todo!()
     }
 }

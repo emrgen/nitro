@@ -6,6 +6,7 @@ use crate::store::{DeleteItemStore, ItemDataStore};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Diff {
+    pub(crate) guid: String,
     pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
     pub(crate) items: ItemDataStore,
@@ -13,8 +14,9 @@ pub(crate) struct Diff {
 }
 
 impl Diff {
-    pub(crate) fn new() -> Diff {
+    pub(crate) fn new(guid: String) -> Diff {
         Diff {
+            guid,
             clients: ClientMap::new(),
             state: ClientState::new(),
             items: ItemDataStore::default(),
@@ -22,8 +24,9 @@ impl Diff {
         }
     }
 
-    pub(crate) fn from_deleted_items(deleted_items: DeleteItemStore) -> Diff {
+    pub(crate) fn from_deleted_items(guid: String, deleted_items: DeleteItemStore) -> Diff {
         Diff {
+            guid,
             clients: ClientMap::new(),
             state: ClientState::new(),
             items: ItemDataStore::default(),
@@ -31,8 +34,9 @@ impl Diff {
         }
     }
 
-    pub(crate) fn from_items(items: ItemDataStore) -> Diff {
+    pub(crate) fn from_items(guid: String, items: ItemDataStore) -> Diff {
         Diff {
+            guid,
             clients: ClientMap::new(),
             state: ClientState::new(),
             items,
@@ -43,6 +47,7 @@ impl Diff {
 
 impl Encode for Diff {
     fn encode<E: Encoder>(&self, e: &mut E) {
+        e.string(&self.guid);
         self.clients.encode(e);
         self.state.encode(e);
         self.items.encode(e);
@@ -52,12 +57,14 @@ impl Encode for Diff {
 
 impl Decode for Diff {
     fn decode<D: Decoder>(d: &mut D) -> Result<Diff, String> {
+        let guid = d.string()?;
         let clients = ClientMap::decode(d)?;
         let state = ClientState::decode(d)?;
         let items = ItemDataStore::decode(d)?;
         let deletes = DeleteItemStore::decode(d)?;
 
         Ok(Diff {
+            guid,
             clients,
             state,
             items,

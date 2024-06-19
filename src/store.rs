@@ -1,20 +1,43 @@
-use crate::clients::Client;
+use crate::clients::{Client, ClientId, ClientMap};
 use crate::delete::DeleteItem;
-use crate::id::{Id, WithId};
+use crate::id::{Clock, Id, WithId};
 use crate::item::{ItemData, ItemRef};
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
+use crate::state::ClientState;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, RwLock, Weak};
+
+pub(crate) type StoreRef = Arc<RwLock<DocStore>>;
+pub(crate) type WeakStoreRef = Weak<RwLock<DocStore>>;
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct Store {
+pub(crate) struct DocStore {
+    pub(crate) client: Client,
+    pub(crate) clock: Clock,
+
+    pub(crate) clients: ClientMap,
+    pub(crate) state: ClientState,
     pub(crate) items: ItemStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
 }
 
-impl Store {
+impl DocStore {
+    pub(crate) fn update_client(&mut self, client: ClientId, clock: Clock) -> Client {
+        self.client = self.clients.get_or_insert(client);
+        self.clock = clock;
+
+        self.client
+    }
+
+    pub(crate) fn take(&mut self, size: Clock) -> Id {
+        let id = Id::new(self.client, self.clock, self.clock + size - 1);
+        self.clock += size;
+        id
+    }
+
     pub(crate) fn find(&self, id: Id) -> Option<ItemRef> {
         self.items.find(id)
     }
@@ -23,8 +46,16 @@ impl Store {
         self.items.insert(item);
     }
 
+    pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
+        self.deleted_items.insert(item);
+    }
+
     pub(crate) fn replace(&mut self, item: ItemRef, items: (ItemRef, ItemRef)) {
         self.items.replace(item, items);
+    }
+
+    pub(crate) fn client(&mut self, client_id: ClientId) -> Client {
+        self.clients.get_or_insert(client_id)
     }
 }
 

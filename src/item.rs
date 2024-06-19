@@ -1,32 +1,49 @@
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
 use crate::doc::Doc;
 use crate::id::{Id, WithId};
-use crate::store::{ClientStore, Store};
+use crate::store::{ClientStore, DocStore, WeakStoreRef};
+use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
+type ItemRefInner = Rc<Item>;
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemRef {
-    pub(crate) doc: Doc,
-    pub(crate) item: Rc<Item>,
+    pub(crate) store: WeakStoreRef,
+    pub(crate) item: ItemRefInner,
 }
 
 impl ItemRef {
-    pub(crate) fn new(doc: Doc, item: Item) -> Self {
-        Self {
-            doc,
-            item: Rc::new(item),
-        }
+    pub(crate) fn new(item: ItemRefInner, store: WeakStoreRef) -> Self {
+        Self { item, store }
     }
 
-    pub(crate) fn borrow(&self) -> Rc<Item> {
-        Rc::clone(&self.item)
+    pub(crate) fn borrow(&self) -> &Item {
+        panic!("")
     }
 
     pub(crate) fn borrow_mut(&mut self) -> &mut Item {
-        Rc::make_mut(&mut self.item)
+        panic!("")
+    }
+
+    pub(crate) fn delete(&self) {
+        {
+            let store = self.store.upgrade().unwrap();
+            let mut store = store.write().unwrap();
+            let id = store.take(1);
+            let delete_item = DeleteItem::new(id, self.id().clone());
+            store.insert_delete(delete_item);
+        }
+
+        // let mut item = self.item.clone();
+        // item.delete()
+
+        // self.item.borrow_mut().flags |= 0x1
     }
 }
 
@@ -70,14 +87,19 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Item {
-    pub(crate) data: ItemData,
-    pub(crate) parent: Option<ItemRef>,
-    pub(crate) left: Option<ItemRef>,
-    pub(crate) right: Option<ItemRef>,
-    pub(crate) start: Option<ItemRef>,
-    pub(crate) target: Option<ItemRef>,
-    pub(crate) mover: Option<ItemRef>,
+    pub(crate) data: ItemData,          // data for the item
+    pub(crate) parent: Option<ItemRef>, // parent link
+    pub(crate) left: Option<ItemRef>,   // left link
+    pub(crate) right: Option<ItemRef>,  // right link
+    pub(crate) start: Option<ItemRef>,  // linked children start
+    pub(crate) end: Option<ItemRef>,    // linked children end
+    pub(crate) target: Option<ItemRef>, // indirect item ref (proxy, mover)
+    pub(crate) mover: Option<ItemRef>,  // mover ref (proxy)
+    pub(crate) movers: Option<ItemRef>, // linked movers
+    pub(crate) flags: u8,
 }
+
+impl Item {}
 
 impl Item {
     pub(crate) fn new(data: ItemData) -> Self {
@@ -87,21 +109,71 @@ impl Item {
             left: None,
             right: None,
             start: None,
+            end: None,
             target: None,
             mover: None,
+            movers: None,
+            flags: 0,
         }
+    }
+
+    pub(crate) fn is_moved(&self) -> bool {
+        self.flags & 0x02 == 0x02
+    }
+
+    pub(crate) fn is_deleted(&self) -> bool {
+        self.flags & 0x01 == 0x01
     }
 
     pub(crate) fn field(&self) -> Option<String> {
         self.data.field.clone()
     }
 
-    pub(crate) fn left_origin(&mut self, store: &Store) -> Option<ItemRef> {
+    pub(crate) fn left_origin(&mut self, store: &DocStore) -> Option<ItemRef> {
         self.data.left_id.and_then(|id| store.find(id))
     }
 
-    pub(crate) fn right_origin(&mut self, store: &Store) -> Option<ItemRef> {
+    pub(crate) fn right_origin(&mut self, store: &DocStore) -> Option<ItemRef> {
         self.data.right_id.and_then(|id| store.find(id))
+    }
+
+    pub(crate) fn delete(&mut self) {
+        self.flags |= 0x01;
+    }
+
+    pub(crate) fn set(&mut self, key: &ItemKey, _ref: ItemRef) {}
+
+    pub(crate) fn as_map(&self) -> Option<HashMap<String, ItemRef>> {
+        let items = self.items();
+        let mut map = HashMap::new();
+
+        for item in items {
+            if let Some(field) = item.borrow().field() {
+                map.insert(field, item);
+            }
+        }
+
+        Some(map)
+    }
+    pub(crate) fn insert_after(&mut self, item: ItemRef) {}
+    pub(crate) fn insert_before(&mut self, item: ItemRef) {}
+    pub(crate) fn items(&self) -> Vec<ItemRef> {
+        self.all_items()
+            .into_iter()
+            .filter(|item| {
+                return item.borrow().is_moved() || item.borrow().is_deleted();
+            })
+            .collect()
+    }
+    pub(crate) fn all_items(&self) -> Vec<ItemRef> {
+        let mut items: Vec<ItemRef> = vec![];
+        let mut item = self.start.clone();
+        while item.is_some() {
+            items.push(item.clone().unwrap());
+            item = item.unwrap().borrow().right.clone();
+        }
+
+        items
     }
 }
 
@@ -113,6 +185,7 @@ impl Deref for Item {
     }
 }
 
+// item data is encoded and saved into persistent storage
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemData {
     pub(crate) kind: ItemKind,
@@ -126,6 +199,18 @@ pub(crate) struct ItemData {
 
     pub(crate) field: Option<String>,
     pub(crate) content: Content,
+}
+
+impl From<ItemData> for Item {
+    fn from(data: ItemData) -> Self {
+        Self::new(data)
+    }
+}
+
+impl From<ItemData> for Rc<Item> {
+    fn from(data: ItemData) -> Self {
+        Rc::new(Item::new(data))
+    }
 }
 
 impl Encode for ItemData {
@@ -143,7 +228,7 @@ impl Decode for ItemData {
 
 #[derive(Debug, Clone)]
 pub(crate) enum ItemKind {
-    Doc,
+    Root,
     Map,
     List,
     Text,
@@ -165,9 +250,31 @@ impl WithId for ItemData {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(crate) enum ItemKey {
     Number(usize),
     String(String),
+}
+
+impl ItemKey {
+    pub(crate) fn as_string(&self) -> String {
+        match self {
+            Self::String(s) => s.clone(),
+            Self::Number(n) => n.to_string(),
+        }
+    }
+}
+
+impl From<String> for ItemKey {
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
+}
+
+impl From<usize> for ItemKey {
+    fn from(n: usize) -> Self {
+        Self::Number(n)
+    }
 }
 
 #[derive(Debug, Clone)]

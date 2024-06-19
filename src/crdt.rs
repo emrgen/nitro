@@ -1,8 +1,8 @@
 use crate::id::Id;
 use crate::item::{Item, ItemData, ItemRef};
-use crate::store::{ClientStore, Store};
+use crate::store::{ClientStore, DocStore};
 
-pub fn integrate(store: Store, item: ItemData, parent: ItemRef) {
+pub fn integrate(store: DocStore, item: ItemData, parent: ItemRef) {
     // get rw lock for the parent,
     // let mut left = item.left_id.and_then(|id| store.get(id));
     // let mut right = item.right_id.and_then(|id| store.get(id));

@@ -7,7 +7,7 @@ use crate::item::ItemData;
 use crate::store::{PendingStore, ReadyStore, WeakStoreRef};
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Tx {
+pub(crate) struct Transaction {
     store: WeakStoreRef,
     diff: Diff,
     ready: ReadyStore,
@@ -15,9 +15,9 @@ pub(crate) struct Tx {
     ops: Vec<TxOp>,
 }
 
-impl Tx {
-    pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Tx {
-        Tx {
+impl Transaction {
+    pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Transaction {
+        Transaction {
             store,
             diff,
             ready: ReadyStore::default(),

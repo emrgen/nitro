@@ -1,8 +1,6 @@
-use crate::doc::Doc;
 use crate::id::Id;
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
-use std::rc::Rc;
 
 pub(crate) struct NAtom {
     pub(crate) item: ItemRef,

@@ -27,15 +27,21 @@ impl NMove {
     pub(crate) fn create_pair(target_id: Id, store: WeakStoreRef) -> (NMove, NProxy) {
         let (mover_id, proxy_id) = {
             let store = store.upgrade().unwrap();
-            let mut store = store.write().unwrap();
-            let mover_id = store.take(1);
-            let proxy_id = store.take(1);
+            let mut store = store.borrow_mut();
+
+            let mover_id = store.next_id();
+            let proxy_id = store.next_id();
 
             (mover_id, proxy_id)
         };
 
         let proxy = NProxy::new(proxy_id, mover_id, target_id, store.clone());
         let mover = NMove::new(mover_id, proxy_id, store.clone());
+
+        let store = store.upgrade().unwrap();
+        let mut store = store.borrow_mut();
+        store.insert(mover.item_ref());
+        store.insert(proxy.item_ref());
 
         (mover, proxy)
     }

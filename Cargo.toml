@@ -6,3 +6,8 @@ edition = "2021"
 [dependencies]
 bimap = "0.6.3"
 log = "0.4.21"
+
+[dependencies.uuid]
+version = "1.8.0"
+features = ["v4"]
+

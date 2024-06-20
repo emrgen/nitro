@@ -1,6 +1,7 @@
+use bimap::BiMap;
+
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
-use bimap::BiMap;
 
 pub type Client = u32;
 pub type ClientId = String;
@@ -15,20 +16,20 @@ impl ClientMap {
         ClientMap { map: BiMap::new() }
     }
 
-    pub(crate) fn insert(&mut self, client_id: ClientId, client: Client) {
+    fn insert(&mut self, client_id: ClientId, client: Client) {
         self.map.insert(client_id, client);
     }
 
-    pub(crate) fn get_by_client_id(&self, client_id: &ClientId) -> Option<&Client> {
+    pub(crate) fn get_client(&self, client_id: &ClientId) -> Option<&Client> {
         self.map.get_by_left(client_id)
     }
 
-    pub(crate) fn get_by_client(&self, client: &Client) -> Option<&ClientId> {
+    pub(crate) fn get_client_id(&self, client: &Client) -> Option<&ClientId> {
         self.map.get_by_right(client)
     }
 
     pub(crate) fn get_or_insert(&mut self, client_id: ClientId) -> Client {
-        match self.get_by_client_id(&client_id) {
+        match self.get_client(&client_id) {
             Some(client) => *client,
             None => {
                 let client = self.map.len() as Client;

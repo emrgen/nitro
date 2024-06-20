@@ -1,15 +1,16 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
-use crate::delete::DeleteItem;
 use crate::id::{Clock, Id, Split, WithId};
 use crate::store::{DocStore, WeakStoreRef};
 
-type ItemRefInner = Rc<Item>;
+type ItemRefInner = Rc<RefCell<Item>>;
+type WeakItemRefInner = Weak<RefCell<Item>>;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemRef {
@@ -22,27 +23,30 @@ impl ItemRef {
         Self { item, store }
     }
 
-    pub(crate) fn borrow(&self) -> &Item {
-        panic!("")
-    }
-
-    pub(crate) fn borrow_mut(&mut self) -> &mut Item {
-        panic!("")
+    pub(crate) fn kind(&self) -> ItemKind {
+        self.item.borrow().kind.clone()
     }
 
     pub(crate) fn delete(&self) {
         {
-            let store = self.store.upgrade().unwrap();
-            let mut store = store.write().unwrap();
-            let id = store.take(1);
-            let delete_item = DeleteItem::new(id, self.id().clone());
-            store.insert_delete(delete_item);
+            // let store = self.store.upgrade().unwrap();
+            // let mut store = store.write().unwrap();
+            // let id = store.next_id_range(1);
+            // let delete_item = DeleteItem::new(id, self.id().range(self.size).unwrap());
+            // store.insert_delete(delete_item);
         }
-
         // let mut item = self.item.clone();
         // item.delete()
 
         // self.item.borrow_mut().flags |= 0x1
+    }
+}
+
+impl Deref for ItemRef {
+    type Target = ItemRefInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
     }
 }
 
@@ -60,7 +64,7 @@ impl Decode for ItemRef {
 
 impl WithId for ItemRef {
     fn id(&self) -> Id {
-        self.item.data.id
+        self.borrow().data.id
     }
 }
 
@@ -68,7 +72,11 @@ impl Eq for ItemRef {}
 
 impl PartialEq<Self> for ItemRef {
     fn eq(&self, other: &Self) -> bool {
-        self.item.id.compare_without_client(&other.item.id) == Ordering::Equal
+        self.item
+            .borrow()
+            .id
+            .compare_without_client(&other.item.borrow().id)
+            == Ordering::Equal
     }
 }
 
@@ -80,7 +88,7 @@ impl PartialOrd<Self> for ItemRef {
 
 impl Ord for ItemRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.item.data.id.cmp(&other.item.data.id)
+        self.item.borrow().data.id.cmp(&other.item.borrow().data.id)
     }
 }
 
@@ -148,7 +156,7 @@ impl Item {
 
         for item in items {
             if let Some(field) = item.borrow().field() {
-                map.insert(field, item);
+                map.insert(field, item.clone());
             }
         }
 
@@ -200,30 +208,87 @@ pub(crate) struct ItemData {
     pub(crate) content: Content,
 }
 
+impl ItemData {
+    pub(crate) fn new(kind: ItemKind, id: Id) -> Self {
+        Self {
+            kind,
+            id,
+            parent_id: None,
+            left_id: None,
+            right_id: None,
+            target_id: None,
+            mover_id: None,
+            field: None,
+            content: Content::None,
+        }
+    }
+
+    pub(crate) fn with_content(mut self, content: Content) -> Self {
+        self.content = content;
+        self
+    }
+
+    pub(crate) fn with_field(mut self, field: String) -> Self {
+        self.field = Some(field);
+        self
+    }
+
+    pub(crate) fn with_parent(mut self, parent: Id) -> Self {
+        self.parent_id = Some(parent);
+        self
+    }
+
+    pub(crate) fn with_left(mut self, left: Id) -> Self {
+        self.left_id = Some(left);
+        self
+    }
+
+    pub(crate) fn with_right(mut self, right: Id) -> Self {
+        self.right_id = Some(right);
+        self
+    }
+
+    pub(crate) fn with_target(mut self, target: Id) -> Self {
+        self.target_id = Some(target);
+        self
+    }
+
+    pub(crate) fn with_mover(mut self, mover: Id) -> Self {
+        self.mover_id = Some(mover);
+        self
+    }
+}
+
 impl Split for ItemData {
-    fn split(&self, at: Clock) -> (Self, Self) {
+    fn split(&self, at: Clock) -> Result<(Self, Self), String> {
         let mut left = self.clone();
         let mut right = self.clone();
 
-        // split id
-        let (lid, rid) = self.id.split(at);
-        left.id = lid;
-        right.id = rid;
-
-        left.right_id = Some(right.id.head());
-        right.left_id = Some(left.id.tail());
-
-        // split content
-        match &self.content {
-            Content::String(s) => {
-                let (l, r) = s.split_at(at as usize);
-                left.content = Content::String(l.to_string());
-                right.content = Content::String(r.to_string());
-            }
-            _ => {}
+        if self.kind != ItemKind::String {
+            return Err("Cannot split root item".to_string());
         }
 
-        (left, right)
+        let size = match &self.content {
+            Content::String(s) => s.len(),
+            _ => return Err("Cannot split non-string item".to_string()),
+        };
+
+        // split id
+        let (left_range, right_range) = self.id.range(size as u32).split(at)?;
+        left.id = left_range.start_id();
+        right.id = right_range.start_id();
+
+        left.right_id = Some(right_range.start_id());
+        right.left_id = Some(left_range.end_id());
+
+        // split content if it is a string
+        if let Content::String(s) = &self.content {
+            let (l, r) = s.split_at(at as usize);
+            left.content = Content::String(l.to_string());
+            right.content = Content::String(r.to_string());
+        }
+
+        Ok((left, right))
     }
 }
 
@@ -233,9 +298,9 @@ impl From<ItemData> for Item {
     }
 }
 
-impl From<ItemData> for Rc<Item> {
+impl From<ItemData> for ItemRefInner {
     fn from(data: ItemData) -> Self {
-        Rc::new(Item::new(data))
+        Rc::new(RefCell::new(Item::new(data)))
     }
 }
 
@@ -252,7 +317,7 @@ impl Decode for ItemData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ItemKind {
     Root,
     Map,

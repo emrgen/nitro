@@ -1,6 +1,5 @@
-use crate::id::Id;
 use crate::item::{Item, ItemData, ItemRef};
-use crate::store::{ClientStore, DocStore};
+use crate::store::DocStore;
 
 pub fn integrate(store: DocStore, item: ItemData, parent: ItemRef) {
     // get rw lock for the parent,

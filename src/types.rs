@@ -77,7 +77,8 @@ impl From<NString> for Type {
 
 impl From<ItemRef> for Type {
     fn from(item: ItemRef) -> Self {
-        match item.borrow().kind {
+        let kind = item.borrow().kind.clone();
+        match kind {
             ItemKind::List => Self::List(item.into()),
             ItemKind::Map => Self::Map(item.into()),
             ItemKind::Text => Self::Text(item.into()),

@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 use crate::clients::{Client, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
@@ -12,97 +12,40 @@ pub(crate) trait Split
 where
     Self: Sized,
 {
-    fn split(&self, at: Clock) -> (Self, Self);
+    fn split(&self, at: Clock) -> Result<(Self, Self), String>;
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Id {
     pub(crate) client: Client,
-    pub(crate) start: Clock,
-    pub(crate) end: Clock,
+    pub(crate) clock: Clock,
 }
 
 impl Id {
-    pub(crate) fn new(client: Client, start: Clock, end: Clock) -> Id {
-        Id { client, start, end }
+    pub(crate) fn new(client: Client, clock: Clock) -> Id {
+        Id { client, clock }
     }
 
-    pub(crate) fn size(&self) -> Clock {
-        self.end - self.start + 1
+    pub(crate) fn compare_without_client(&self, other: &Id) -> Ordering {
+        self.clock.cmp(&other.clock)
     }
 
-    pub(crate) fn eq_opt(a: Option<&Id>, b: Option<&Id>) -> bool {
-        match (a, b) {
-            (Some(a), Some(b)) => {
-                a.client == b.client && a.compare_without_client(b) == std::cmp::Ordering::Equal
-            }
-            (None, None) => true,
-            _ => false,
-        }
-    }
-
-    pub(crate) fn equals(&self, other: &Id) -> bool {
-        self.client == other.client && self.start == other.start && self.end == other.end
-    }
-
-    pub(crate) fn head(&self) -> Id {
-        Id::new(self.client, self.start, self.start)
-    }
-
-    pub(crate) fn tail(&self) -> Id {
-        Id::new(self.client, self.end, self.end)
-    }
-
-    // Compare two Ids, considering the client field if they are different
-    pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> std::cmp::Ordering {
+    pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> Ordering {
         if self.client != other.client {
-            let client = clients.get_by_client(&self.client).unwrap();
-            let other_client = clients.get_by_client(&other.client).unwrap();
+            let client = clients.get_client_id(&self.client).unwrap();
+            let other_client = clients.get_client_id(&other.client).unwrap();
             return calculate_hash(client).cmp(&calculate_hash(other_client));
         }
 
         self.compare_without_client(other)
     }
 
-    // Compare two Ids without considering the client field
-    // e.g. [1...3] < [2..2] < [1...3] will help to find [1...3] using [2..2]
-    pub fn compare_without_client(&self, other: &Id) -> std::cmp::Ordering {
-        if self.end < other.start {
-            std::cmp::Ordering::Less
-        } else if other.end < self.start {
-            std::cmp::Ordering::Greater
-        } else {
-            std::cmp::Ordering::Equal
-        }
+    pub(crate) fn next(&self) -> Id {
+        Id::new(self.client, self.clock + 1)
     }
 
-    pub(crate) fn split(&self, at: Clock) -> (Id, Id) {
-        if at < self.start || at > self.end {
-            panic!("Cannot split Id at {}", at)
-        }
-
-        (
-            Id::new(self.client, self.start, at - 1),
-            Id::new(self.client, at, self.end),
-        )
-    }
-}
-
-impl Encode for Id {
-    fn encode<T: Encoder>(&self, e: &mut T) {
-        e.u32(self.client);
-        e.u32(self.start);
-        e.u32(self.size());
-    }
-}
-
-impl Decode for Id {
-    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
-        let client = d.u32()?;
-        let start = d.u32()?;
-        let size = d.u32()?;
-
-        Ok(Id::new(client, start, start + size - 1))
+    pub(crate) fn range(&self, size: u32) -> IdRange {
+        IdRange::new(self.client, self.clock, self.clock + size - 1)
     }
 }
 
@@ -112,15 +55,184 @@ impl WithId for Id {
     }
 }
 
-impl Add<Id> for Id {
+impl From<(Client, Clock)> for Id {
+    fn from((client, clock): (Client, Clock)) -> Self {
+        Id::new(client, clock)
+    }
+}
+
+impl From<IdRange> for Id {
+    fn from(value: IdRange) -> Self {
+        Id::new(value.client, value.start)
+    }
+}
+
+impl Sub<Clock> for Id {
     type Output = Id;
 
-    fn add(self, other: Id) -> Id {
+    fn sub(self, rhs: Clock) -> Self::Output {
+        Id::new(self.client, self.clock - rhs)
+    }
+}
+
+impl Add<Clock> for Id {
+    type Output = Id;
+
+    fn add(self, rhs: Clock) -> Self::Output {
+        Id::new(self.client, self.clock + rhs)
+    }
+}
+
+impl Add<Clock> for &Id {
+    type Output = Id;
+
+    fn add(self, rhs: Clock) -> Self::Output {
+        Id::new(self.client, self.clock + rhs)
+    }
+}
+
+impl PartialEq<Self> for Id {
+    fn eq(&self, other: &Self) -> bool {
+        self.client == other.client && self.clock == other.clock
+    }
+}
+
+impl Eq for Id {}
+
+impl PartialOrd<Self> for Id {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Id {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.compare(other, &ClientMap::new())
+    }
+}
+
+impl Encode for Id {
+    fn encode<T: Encoder>(&self, e: &mut T) {
+        e.u32(self.client);
+        e.u32(self.clock);
+    }
+}
+
+impl Decode for Id {
+    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+        let client = d.u32()?;
+        let clock = d.u32()?;
+
+        Ok(Id::new(client, clock))
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct IdRange {
+    pub(crate) client: Client,
+    pub(crate) start: Clock,
+    pub(crate) end: Clock,
+}
+
+impl IdRange {
+    pub(crate) fn new(client: Client, start: Clock, end: Clock) -> IdRange {
+        IdRange { client, start, end }
+    }
+
+    pub(crate) fn size(&self) -> Clock {
+        self.end - self.start + 1
+    }
+
+    pub(crate) fn eq_opt(a: Option<&IdRange>, b: Option<&IdRange>) -> bool {
+        match (a, b) {
+            (Some(a), Some(b)) => {
+                a.client == b.client && a.compare_without_client(b) == std::cmp::Ordering::Equal
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn equals(&self, other: &IdRange) -> bool {
+        self.client == other.client && self.start == other.start && self.end == other.end
+    }
+
+    pub(crate) fn start_id(&self) -> Id {
+        Id::new(self.client, self.start)
+    }
+
+    pub(crate) fn end_id(&self) -> Id {
+        Id::new(self.client, self.end)
+    }
+
+    // Compare two Ids, considering the client field if they are different
+    pub(crate) fn compare(&self, other: &IdRange, clients: &ClientMap) -> std::cmp::Ordering {
+        if self.client != other.client {
+            let client = clients.get_client_id(&self.client).unwrap();
+            let other_client = clients.get_client_id(&other.client).unwrap();
+            return calculate_hash(client).cmp(&calculate_hash(other_client));
+        }
+
+        self.compare_without_client(other)
+    }
+
+    // Compare two Ids without considering the client field
+    // e.g. [1...3] < [2..2] < [1...3] will help to find [1...3] using [2..2]
+    pub fn compare_without_client(&self, other: &IdRange) -> std::cmp::Ordering {
+        if self.end < other.start {
+            std::cmp::Ordering::Less
+        } else if other.end < self.start {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Equal
+        }
+    }
+
+    pub(crate) fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
+        if at <= self.start || at > self.end {
+            return Err("Cannot split IdRange at invalid position".to_string());
+        }
+
+        Ok((
+            IdRange::new(self.client, self.start, at - 1),
+            IdRange::new(self.client, at, self.end),
+        ))
+    }
+}
+
+impl Encode for IdRange {
+    fn encode<T: Encoder>(&self, e: &mut T) {
+        e.u32(self.client);
+        e.u32(self.start);
+        e.u32(self.size());
+    }
+}
+
+impl Decode for IdRange {
+    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+        let client = d.u32()?;
+        let start = d.u32()?;
+        let size = d.u32()?;
+
+        Ok(IdRange::new(client, start, start + size - 1))
+    }
+}
+
+impl WithId for IdRange {
+    fn id(&self) -> Id {
+        self.clone().into()
+    }
+}
+
+impl Add<IdRange> for IdRange {
+    type Output = IdRange;
+
+    fn add(self, other: IdRange) -> IdRange {
         if (self.client != other.client) || (self.end + 1 != other.start) {
             panic!("Cannot add non-adjacent Ids")
         }
 
-        Id::new(
+        IdRange::new(
             self.client,
             self.start.min(other.start),
             self.end.max(other.end),
@@ -132,39 +244,45 @@ pub(crate) trait WithId {
     fn id(&self) -> Id;
 }
 
-impl Split for Id {
-    fn split(&self, at: Clock) -> (Id, Id) {
+impl Split for IdRange {
+    fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
         self.split(at)
     }
 }
 
-impl std::fmt::Debug for Id {
+impl std::fmt::Debug for IdRange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "Id({:?}, {:?}, {:?})", self.client, self.start, self.end)
     }
 }
 
-impl PartialEq<Self> for Id {
+impl From<Id> for IdRange {
+    fn from(value: Id) -> Self {
+        IdRange::new(value.client, value.clock, value.clock)
+    }
+}
+
+impl PartialEq<Self> for IdRange {
     fn eq(&self, other: &Self) -> bool {
         self.compare_without_client(other) == std::cmp::Ordering::Equal
     }
 }
 
-impl Eq for Id {}
+impl Eq for IdRange {}
 
-impl PartialOrd<Self> for Id {
+impl PartialOrd<Self> for IdRange {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(std::cmp::Ord::cmp(self, other))
     }
 }
 
-impl Ord for Id {
+impl Ord for IdRange {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.compare_without_client(other)
     }
 }
 
-impl std::hash::Hash for Id {
+impl std::hash::Hash for IdRange {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.client.hash(state);
         self.start.hash(state);
@@ -180,16 +298,16 @@ mod tests {
     #[test]
     fn test_compare() {
         let mut clients = ClientMap::new();
-        clients.insert("client1".to_string(), 1);
-        clients.insert("client2".to_string(), 2);
+        clients.get_or_insert("client1".to_string());
+        clients.get_or_insert("client2".to_string());
 
-        let id1 = Id::new(1, 1, 1);
-        let id2 = Id::new(1, 1, 1);
-        let id3 = Id::new(1, 1, 2);
-        let id4 = Id::new(1, 2, 2);
-        let id5 = Id::new(2, 1, 1);
-        let id6 = Id::new(2, 1, 2);
-        let id7 = Id::new(2, 2, 2);
+        let id1 = IdRange::new(0, 1, 1);
+        let id2 = IdRange::new(0, 1, 1);
+        let id3 = IdRange::new(0, 1, 2);
+        let id4 = IdRange::new(0, 2, 2);
+        let id5 = IdRange::new(1, 1, 1);
+        let id6 = IdRange::new(1, 1, 2);
+        let id7 = IdRange::new(1, 2, 2);
 
         assert_eq!(id1.compare(&id2, &clients), std::cmp::Ordering::Equal);
         assert_eq!(id1.compare(&id3, &clients), std::cmp::Ordering::Equal);

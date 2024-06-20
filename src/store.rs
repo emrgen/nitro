@@ -1,23 +1,25 @@
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, RwLock, Weak};
+use std::cell::RefCell;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::rc::{Rc, Weak};
 
 use crate::clients::{Client, ClientId, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
-use crate::id::{Clock, Id, Split, WithId};
+use crate::id::{Clock, Id, IdRange, Split, WithId};
 use crate::item::{ItemData, ItemRef};
 use crate::state::ClientState;
 
-pub(crate) type StoreRef = Arc<RwLock<DocStore>>;
-pub(crate) type WeakStoreRef = Weak<RwLock<DocStore>>;
+pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
+pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct DocStore {
     pub(crate) client: Client,
     pub(crate) clock: Clock,
 
+    pub(crate) id_map: IdRangeMap,
     pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
     pub(crate) items: ItemStore,
@@ -33,9 +35,17 @@ impl DocStore {
         self.client
     }
 
-    pub(crate) fn take(&mut self, size: Clock) -> Id {
-        let id = Id::new(self.client, self.clock, self.clock + size - 1);
+    pub(crate) fn next_id(&mut self) -> Id {
+        let id = Id::new(self.client, self.clock + 1);
+        self.clock += 1;
+
+        id
+    }
+
+    pub(crate) fn next_id_range(&mut self, size: Clock) -> IdRange {
+        let id = IdRange::new(self.client, self.clock, self.clock + size - 1);
         self.clock += size;
+
         id
     }
 
@@ -64,8 +74,8 @@ impl DocStore {
     }
 
     pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
-        let items = self.items.diff(state.clone());
-        let deletes = self.deleted_items.diff(state.clone());
+        let items = self.items.diff(state.clone(), &self.id_map);
+        let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
         Diff::from(
             guid,
             self.clients.clone(),
@@ -93,15 +103,44 @@ pub(crate) type ItemDataStore = ClientStore<ItemData>;
 pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
 pub(crate) type ItemStore = ClientStore<ItemRef>;
 
+#[derive(Default, Debug, Clone)]
+pub(crate) struct IdRangeMap {
+    pub(crate) map: BTreeSet<IdRange>,
+}
+
+impl IdRangeMap {
+    pub(crate) fn insert(&mut self, id: IdRange) {
+        self.map.insert(id);
+    }
+
+    pub(crate) fn has(&self, id: &Id) -> bool {
+        self.map.contains(&id.range(1))
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.map.remove(&id.range(1));
+    }
+
+    pub(crate) fn get(&self, id: &Id) -> Option<&IdRange> {
+        self.map.get(&id.range(1))
+    }
+
+    pub(crate) fn replace(&mut self, id: IdRange, with: (IdRange, IdRange)) {
+        self.map.remove(&id);
+        self.insert(with.0);
+        self.insert(with.1);
+    }
+}
+
 impl IdDiff for DeleteItemStore {
     type Target = DeleteItemStore;
 
-    fn diff(&self, state: ClientState) -> DeleteItemStore {
+    fn diff(&self, state: ClientState, id_map: &IdRangeMap) -> DeleteItemStore {
         let mut diff = DeleteItemStore::default();
 
         for (client, store) in self.items.iter() {
             let clock = state.get(client).unwrap_or(&0);
-            let items = store.diff(*clock);
+            let items = store.diff(*clock, id_map);
             if items.size() > 0 {
                 diff.items.insert(*client, items);
             }
@@ -114,12 +153,12 @@ impl IdDiff for DeleteItemStore {
 impl IdDiff for ItemStore {
     type Target = ItemDataStore;
 
-    fn diff(&self, state: ClientState) -> ItemDataStore {
+    fn diff(&self, state: ClientState, id_map: &IdRangeMap) -> ItemDataStore {
         let mut diff = ItemDataStore::default();
 
         for (client, store) in self.items.iter() {
             let clock = state.get(client).unwrap_or(&0);
-            let items = store.diff(*clock);
+            let items = store.diff(*clock, id_map);
             if items.size() > 0 {
                 diff.items.insert(*client, items);
             }
@@ -131,7 +170,7 @@ impl IdDiff for ItemStore {
 
 trait IdDiff {
     type Target;
-    fn diff(&self, state: ClientState) -> Self::Target;
+    fn diff(&self, state: ClientState, id_map: &IdRangeMap) -> Self::Target;
 }
 
 #[derive(Default, Clone, Debug)]
@@ -236,21 +275,28 @@ impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
 
 pub(crate) trait IdClockDiff {
     type Target;
-    fn diff(&self, clock: Clock) -> Self::Target;
+    fn diff(&self, clock: Clock, id_map: &IdRangeMap) -> Self::Target;
 }
 
 impl IdClockDiff for IdStore<ItemRef> {
     type Target = IdStore<ItemData>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: Clock, id_map: &IdRangeMap) -> Self::Target {
         let mut items = IdStore::default();
         for (id, item) in self.data.iter() {
             let data = item.borrow().data.clone();
-            if id.start > clock {
-                items.insert(data)
-            } else if id.end > clock && id.start < clock {
-                let (_, r) = data.split(clock);
-                items.insert(r);
+            // collect items that are newer than the given clock
+            if id.clock > clock {
+                items.insert(data);
+            } else if let Some(range) = id_map.get(id) {
+                // if id falls within a range split the item and collect the right side
+                if id.clock > clock {
+                    items.insert(data);
+                } else if range.start < clock && clock <= range.end {
+                    if let Ok((_, r)) = data.split(clock) {
+                        items.insert(r);
+                    }
+                }
             }
         }
 
@@ -261,10 +307,10 @@ impl IdClockDiff for IdStore<ItemRef> {
 impl IdClockDiff for IdStore<DeleteItem> {
     type Target = IdStore<DeleteItem>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: Clock, _id_map: &IdRangeMap) -> Self::Target {
         let mut items = IdStore::default();
         for (id, item) in self.data.iter() {
-            if id.start > clock {
+            if id.clock > clock {
                 items.insert(item.clone());
             }
         }
@@ -275,18 +321,62 @@ impl IdClockDiff for IdStore<DeleteItem> {
 
 #[cfg(test)]
 mod tests {
-    use crate::id::Id;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     use super::*;
 
     #[test]
     fn test_id_store() {
         let mut store = IdStore::default();
-        assert!(!store.contains(&Id::new(1, 1, 1)));
-        store.insert(Id::new(1, 1, 1));
-        assert!(store.contains(&Id::new(1, 1, 1)));
+        assert!(!store.contains(&Id::new(1, 1,)));
+        store.insert(Id::new(1, 1));
+        assert!(store.contains(&Id::new(1, 1)));
 
-        store.insert(Id::new(1, 5, 8));
-        assert!(store.contains(&Id::new(1, 6, 6)));
+        store.insert(Id::new(1, 5));
+        assert!(store.contains(&Id::new(1, 6,)));
+    }
+
+    #[test]
+    fn test_is_range_map() {
+        let mut map = IdRangeMap::default();
+
+        map.insert(Id::new(1, 1).into());
+        map.insert(Id::new(1, 2).into());
+        map.insert(Id::new(1, 3).range(5));
+        map.insert(Id::new(1, 8).range(2));
+
+        assert_eq!(map.get(&Id::new(1, 1)).unwrap(), &Id::new(1, 1).into());
+        assert_eq!(map.get(&Id::new(1, 2)).unwrap(), &Id::new(1, 2).into());
+
+        assert_eq!(map.get(&Id::new(1, 3)).unwrap(), &Id::new(1, 3).into());
+        assert_eq!(map.get(&Id::new(1, 4)).unwrap(), &Id::new(1, 3).into());
+        assert_eq!(map.get(&Id::new(1, 6)).unwrap(), &Id::new(1, 3).into());
+
+        assert_eq!(map.get(&Id::new(1, 8)).unwrap(), &Id::new(1, 8).into());
+        assert_eq!(map.get(&Id::new(1, 9)).unwrap(), &Id::new(1, 8).into());
+    }
+
+    #[test]
+    fn test_rc() {
+        struct Person {
+            name: String,
+        }
+
+        impl Person {
+            fn new(name: &str) -> Person {
+                Person {
+                    name: name.to_string(),
+                }
+            }
+        }
+
+        let p = Rc::new(RefCell::new(Person::new("John")));
+        let p1 = p.clone();
+        let p2 = p.clone();
+
+        p1.borrow_mut().name.push_str("ny");
+
+        assert_eq!(p.borrow().name, "Johnny");
     }
 }

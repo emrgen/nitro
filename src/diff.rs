@@ -17,10 +17,7 @@ impl Diff {
     pub(crate) fn new(guid: String) -> Diff {
         Diff {
             guid,
-            clients: ClientMap::new(),
-            state: ClientState::new(),
-            items: ItemDataStore::default(),
-            deletes: DeleteItemStore::default(),
+            ..Default::default()
         }
     }
 
@@ -43,20 +40,16 @@ impl Diff {
     pub(crate) fn from_deleted_items(guid: String, deleted_items: DeleteItemStore) -> Diff {
         Diff {
             guid,
-            clients: ClientMap::new(),
-            state: ClientState::new(),
-            items: ItemDataStore::default(),
             deletes: deleted_items,
+            ..Default::default()
         }
     }
 
     pub(crate) fn from_items(guid: String, items: ItemDataStore) -> Diff {
         Diff {
             guid,
-            clients: ClientMap::new(),
-            state: ClientState::new(),
             items,
-            deletes: DeleteItemStore::default(),
+            ..Default::default()
         }
     }
 }

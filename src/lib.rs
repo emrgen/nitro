@@ -1,6 +1,6 @@
 pub use crdt::*;
 
-mod clients;
+mod bimapid;
 mod codec;
 mod crdt;
 mod delete;

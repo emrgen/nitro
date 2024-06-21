@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::clients::Client;
+use crate::bimapid::{ClientId, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::id::Clock;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ClientState {
-    pub(crate) clients: HashMap<Client, Clock>,
+    pub(crate) clients: HashMap<ClientId, Clock>,
 }
 
 impl ClientState {
@@ -17,13 +17,34 @@ impl ClientState {
         }
     }
 
-    pub(crate) fn get(&self, client: &Client) -> Option<&Clock> {
+    pub(crate) fn get(&self, client: &ClientId) -> Option<&Clock> {
         self.clients.get(client)
     }
 
-    pub(crate) fn update(&mut self, client: Client, clock: Clock) {
+    pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.max(current));
+    }
+
+    pub(crate) fn adjust(
+        &self,
+        other: &ClientState,
+        before: &ClientMap,
+        after: &ClientMap,
+    ) -> Self {
+        let mut adjust = ClientState::new();
+
+        for (client, client_id) in after.entries() {
+            let before_client_state = self.get(client_id).unwrap_or(&0);
+
+            let other_client_id = before.get_client_id(client).unwrap();
+            let after_client_state = other.get(other_client_id).unwrap_or(&0);
+
+            let client_state = before_client_state.max(after_client_state);
+            adjust.update(*client_id, *client_state);
+        }
+
+        adjust
     }
 }
 

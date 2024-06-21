@@ -27,12 +27,12 @@ impl NMap {
 
     pub(crate) fn size(&self) -> usize {
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
         map.len()
     }
 
     fn field(&self) -> Option<String> {
-        self.borrow().field()
+        self.borrow().field(self.item_ref().store.clone())
     }
 
     pub(crate) fn content(&self) -> Content {
@@ -56,20 +56,22 @@ impl Deref for NMap {
 impl NMap {
     pub(crate) fn get(&self, key: String) -> Option<Type> {
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
 
         let item = map.get(&key);
         item.map(|item| item.clone().into())
     }
 
-    pub(crate) fn set(&self, field: String, item: Type) {
+    pub(crate) fn set(&self, field: impl Into<String>, item: Type) {
         let item_ref = item.clone().item_ref();
-        item_ref.borrow_mut().data.field = Some(field.clone());
+        let store = item_ref.store.upgrade().unwrap();
+        let field_id = store.borrow_mut().get_field_id(&field.into());
+        item_ref.borrow_mut().data.field = Some(field_id);
         self.item_ref().append(item);
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {
-        let map = self.borrow().as_map().unwrap();
+        let map = self.borrow().as_map(self.store.clone()).unwrap();
         let value = map.get(&key.as_string());
         if let Some(value) = value {
             value.delete();
@@ -78,19 +80,19 @@ impl NMap {
 
     pub(crate) fn keys(&self) -> Vec<String> {
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
         map.keys().map(|key| key.clone().into()).collect()
     }
 
     pub(crate) fn values(&self) -> Vec<Type> {
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
         map.values().map(|item| item.clone().into()).collect()
     }
 
     pub(crate) fn clear(&self) {
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
         for item in map.values() {
             item.delete();
         }
@@ -103,7 +105,7 @@ impl NMap {
     pub(crate) fn to_json(&self) -> serde_json::Value {
         let mut json = self.borrow().to_json();
         let item = self.borrow();
-        let map = item.as_map().unwrap();
+        let map = item.as_map(self.store.clone()).unwrap();
         let mut content = serde_json::Map::new();
         for (key, value) in map.iter() {
             content.insert(key.clone(), value.to_json());
@@ -123,7 +125,7 @@ impl Serialize for NMap {
         let mut s = serializer.serialize_struct("Doc", self.borrow().serialize_size() + 1)?;
         self.borrow().serialize(&mut s)?;
 
-        let map = self.borrow().as_map().unwrap();
+        let map = self.borrow().as_map(self.store.clone()).unwrap();
         let content = serde_json::to_value(map).unwrap_or_default();
         s.serialize_field("content", &content)?;
 
@@ -169,6 +171,8 @@ mod tests {
         map.set("b", atom.clone());
 
         let yaml = serde_yaml::to_string(&map).unwrap();
+        println!("{}", yaml);
+
         let expect = r#"id: (0, 1)
 kind: map
 parent_id: (0, 0)

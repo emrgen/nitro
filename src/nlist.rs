@@ -29,7 +29,7 @@ impl NList {
     }
 
     pub(crate) fn field(&self) -> Option<String> {
-        self.borrow().field()
+        self.borrow().field(self.item_ref().store.clone())
     }
 
     pub(crate) fn content(&self) -> Content {

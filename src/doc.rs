@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::clients::ClientId;
+use crate::bimapid::Client;
 use crate::diff::Diff;
 use crate::id::Id;
 use crate::item::{Content, ItemKey};
@@ -23,8 +23,8 @@ use crate::types::Type;
 #[derive(Clone, Debug)]
 pub(crate) struct DocOpts {
     pub(crate) id: String,
-    pub(crate) client_id: ClientId,
-    pub(crate) crated_by: ClientId,
+    pub(crate) client_id: Client,
+    pub(crate) crated_by: Client,
 }
 
 impl Default for DocOpts {
@@ -123,9 +123,9 @@ impl Doc {
         text
     }
 
-    pub fn string(&self, string: String) -> NString {
+    pub fn string(&self, value: impl Into<String>) -> NString {
         let id = self.store.borrow_mut().next_id();
-        let string = NString::new(id, string, Rc::downgrade(&self.store));
+        let string = NString::new(id, value.into(), Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(string.clone().into());
 
         string
@@ -200,7 +200,7 @@ impl Serialize for Doc {
         s.serialize_field("created_by", &self.opts.crated_by)?;
         if let Some(root) = &self.root {
             root.borrow().serialize(&mut s)?;
-            let map = root.borrow().as_map().unwrap();
+            let map = root.borrow().as_map(Rc::downgrade(&self.store)).unwrap();
             let content = serde_json::to_value(map).unwrap_or_default();
             s.serialize_field("content", &content)?;
         }

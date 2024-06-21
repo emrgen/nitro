@@ -1,3 +1,4 @@
+use crate::bimapid::ClientMap;
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::id::{Id, IdRange, WithId};
@@ -15,6 +16,15 @@ impl DeleteItem {
 
     pub(crate) fn range(&self) -> IdRange {
         self.range
+    }
+
+    pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> DeleteItem {
+        let mut adjust = self.clone();
+
+        adjust.id = self.id.adjust(before, after);
+        adjust.range = self.range.adjust(before, after);
+
+        adjust
     }
 }
 

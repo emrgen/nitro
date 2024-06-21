@@ -10,6 +10,7 @@ use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use serde_json::Value;
 
+use crate::bimapid::{ClientMap, FieldId, FieldMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
@@ -36,11 +37,12 @@ impl ItemRef {
     }
 
     pub(crate) fn field(&self) -> Option<String> {
-        self.item.borrow().field()
+        self.item.borrow().field(self.store.clone())
     }
 
-    pub(crate) fn append(&self, item: Type) {
+    pub(crate) fn append(&self, value: impl Into<Type>) {
         let end = self.borrow().end.clone();
+        let item = value.into();
         if let Some(ref end) = end {
             end.item_ref().borrow_mut().right = Some(item.clone());
             item.item_ref().borrow_mut().left = Some(end.clone());
@@ -55,8 +57,10 @@ impl ItemRef {
         item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
     }
 
-    pub(crate) fn prepend(&self, item: Type) {
-        if let Some(ref start) = self.borrow().start.clone() {
+    pub(crate) fn prepend(&self, value: impl Into<Type>) {
+        let item = value.into();
+        let start = self.borrow().start.clone();
+        if let Some(ref start) = start {
             start.item_ref().borrow_mut().left = Some(item.clone());
             item.item_ref().borrow_mut().right = Some(start.clone());
             self.borrow_mut().start = Some(item.clone());
@@ -65,6 +69,9 @@ impl ItemRef {
             self.borrow_mut().start = Some(item.clone());
             self.borrow_mut().end = Some(item.clone());
         }
+
+        item.item_ref().borrow_mut().parent = Some(self.clone().into());
+        item.item_ref().borrow_mut().data.parent_id = Some(self.id());
     }
 
     pub(crate) fn left_origin(&self) -> Option<Type> {
@@ -174,8 +181,12 @@ impl Item {
         self.flags & 0x01 == 0x01
     }
 
-    pub(crate) fn field(&self) -> Option<String> {
-        self.data.field.clone()
+    pub(crate) fn field(&self, store: WeakStoreRef) -> Option<String> {
+        let store = store.upgrade().unwrap();
+        let store = store.borrow();
+        let field = store.get_field(&self.data.field.unwrap());
+
+        field.map(|s| s.to_string())
     }
 
     pub(crate) fn left_origin(&self, store: &WeakStoreRef) -> Option<Type> {
@@ -200,12 +211,12 @@ impl Item {
         self.data.content.clone()
     }
 
-    pub(crate) fn as_map(&self) -> Option<HashMap<String, Type>> {
+    pub(crate) fn as_map(&self, store: WeakStoreRef) -> Option<HashMap<String, Type>> {
         let items = self.items();
         let mut map = HashMap::new();
 
         for item in items.clone() {
-            if let Some(field) = item.item_ref().borrow().field() {
+            if let Some(field) = item.item_ref().borrow().field(store.clone()) {
                 map.insert(field, item.clone());
             }
         }
@@ -213,7 +224,7 @@ impl Item {
         // remove items that are moved or deleted
         for item in items.iter() {
             if item.item_ref().borrow().is_moved() || item.item_ref().borrow().is_deleted() {
-                map.remove(&item.item_ref().borrow().field().unwrap());
+                map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
             }
         }
 
@@ -389,8 +400,45 @@ pub(crate) struct ItemData {
     pub(crate) target_id: Option<Id>, // for proxy & move
     pub(crate) mover_id: Option<Id>,  // for proxy
 
-    pub(crate) field: Option<String>,
+    pub(crate) field: Option<FieldId>,
     pub(crate) content: Content,
+}
+
+impl ItemData {
+    pub(crate) fn adjust(
+        &self,
+        before_clients: &ClientMap,
+        before_fields: &FieldMap,
+        after_clients: &ClientMap,
+        after_fields: &FieldMap,
+    ) -> ItemData {
+        let mut data = self.clone();
+        data.id = self.id.adjust(before_clients, after_clients);
+        data.parent_id = data
+            .parent_id
+            .map(|id| id.adjust(before_clients, after_clients));
+        data.left_id = data
+            .left_id
+            .map(|id| id.adjust(before_clients, after_clients));
+        data.right_id = data
+            .right_id
+            .map(|id| id.adjust(before_clients, after_clients));
+        data.target_id = data
+            .target_id
+            .map(|id| id.adjust(before_clients, after_clients));
+        data.mover_id = data
+            .mover_id
+            .map(|id| id.adjust(before_clients, after_clients));
+
+        let field = data.field.map(|field_id| {
+            let field = before_fields.get_field(&field_id).unwrap();
+            after_fields.get_field_id(field).unwrap()
+        });
+
+        data.field = field.copied();
+
+        data
+    }
 }
 
 impl ItemData {
@@ -406,41 +454,6 @@ impl ItemData {
             field: None,
             content: Content::Null,
         }
-    }
-
-    pub(crate) fn with_content(mut self, content: Content) -> Self {
-        self.content = content;
-        self
-    }
-
-    pub(crate) fn with_field(mut self, field: String) -> Self {
-        self.field = Some(field);
-        self
-    }
-
-    pub(crate) fn with_parent(mut self, parent: Id) -> Self {
-        self.parent_id = Some(parent);
-        self
-    }
-
-    pub(crate) fn with_left(mut self, left: Id) -> Self {
-        self.left_id = Some(left);
-        self
-    }
-
-    pub(crate) fn with_right(mut self, right: Id) -> Self {
-        self.right_id = Some(right);
-        self
-    }
-
-    pub(crate) fn with_target(mut self, target: Id) -> Self {
-        self.target_id = Some(target);
-        self
-    }
-
-    pub(crate) fn with_mover(mut self, mover: Id) -> Self {
-        self.mover_id = Some(mover);
-        self
     }
 }
 

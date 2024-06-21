@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::{Add, Sub};
 
-use crate::clients::{Client, ClientMap};
+use crate::bimapid::{ClientId, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::hash::calculate_hash;
@@ -17,13 +17,22 @@ where
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Id {
-    pub(crate) client: Client,
+pub struct Id {
+    pub(crate) client: ClientId,
     pub(crate) clock: Clock,
 }
 
 impl Id {
-    pub(crate) fn new(client: Client, clock: Clock) -> Id {
+    pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> Id {
+        let client = before.get_client(&self.client).unwrap();
+        let new_client = after.get_client_id(client).unwrap();
+
+        Id::new(*new_client, self.clock)
+    }
+}
+
+impl Id {
+    pub(crate) fn new(client: ClientId, clock: Clock) -> Id {
         Id { client, clock }
     }
 
@@ -43,8 +52,8 @@ impl Id {
 
     pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> Ordering {
         if self.client != other.client {
-            let client = clients.get_client_id(&self.client).unwrap();
-            let other_client = clients.get_client_id(&other.client).unwrap();
+            let client = clients.get_client(&self.client).unwrap();
+            let other_client = clients.get_client(&other.client).unwrap();
             return calculate_hash(client).cmp(&calculate_hash(other_client));
         }
 
@@ -72,8 +81,8 @@ impl WithId for Id {
     }
 }
 
-impl From<(Client, Clock)> for Id {
-    fn from((client, clock): (Client, Clock)) -> Self {
+impl From<(ClientId, Clock)> for Id {
+    fn from((client, clock): (ClientId, Clock)) -> Self {
         Id::new(client, clock)
     }
 }
@@ -146,13 +155,13 @@ impl Decode for Id {
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct IdRange {
-    pub(crate) client: Client,
+    pub(crate) client: ClientId,
     pub(crate) start: Clock,
     pub(crate) end: Clock,
 }
 
 impl IdRange {
-    pub(crate) fn new(client: Client, start: Clock, end: Clock) -> IdRange {
+    pub(crate) fn new(client: ClientId, start: Clock, end: Clock) -> IdRange {
         IdRange { client, start, end }
     }
 
@@ -185,8 +194,8 @@ impl IdRange {
     // Compare two Ids, considering the client field if they are different
     pub(crate) fn compare(&self, other: &IdRange, clients: &ClientMap) -> std::cmp::Ordering {
         if self.client != other.client {
-            let client = clients.get_client_id(&self.client).unwrap();
-            let other_client = clients.get_client_id(&other.client).unwrap();
+            let client = clients.get_client(&self.client).unwrap();
+            let other_client = clients.get_client(&other.client).unwrap();
             return calculate_hash(client).cmp(&calculate_hash(other_client));
         }
 
@@ -214,6 +223,10 @@ impl IdRange {
             IdRange::new(self.client, self.start, at - 1),
             IdRange::new(self.client, at, self.end),
         ))
+    }
+
+    pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> IdRange {
+        self.id().adjust(before, after).range(self.size())
     }
 }
 
@@ -312,7 +325,7 @@ impl std::hash::Hash for IdRange {
 
 #[cfg(test)]
 mod tests {
-    use crate::clients::ClientMap;
+    use crate::bimapid::ClientMap;
 
     use super::*;
 

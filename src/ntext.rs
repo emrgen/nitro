@@ -89,3 +89,26 @@ impl From<ItemRef> for NText {
         Self { item }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::doc::Doc;
+
+    #[test]
+    fn test_text() {
+        let doc = Doc::default();
+        let text = doc.text();
+        doc.set("text", text.clone());
+
+        assert_eq!(text.size(), 0);
+
+        let s1 = doc.string("hello");
+        text.append(s1.clone());
+
+        let s2 = doc.string("world");
+        text.prepend(s2.clone());
+
+        let yaml = serde_yaml::to_string(&text).unwrap();
+        println!("{}", yaml);
+    }
+}

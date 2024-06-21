@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::{Rc, Weak};
 
-use crate::clients::{Client, ClientId, ClientMap};
+use crate::bimapid::{Client, ClientId, ClientMap, Field, FieldId, FieldMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
@@ -17,23 +17,33 @@ pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct DocStore {
-    pub(crate) client: Client,
+    pub(crate) client: ClientId,
     pub(crate) clock: Clock,
 
+    pub(crate) state: ClientState,
+
+    pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
     pub(crate) clients: ClientMap,
-    pub(crate) state: ClientState,
+
     pub(crate) items: ItemStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
 }
 
 impl DocStore {
-    pub(crate) fn get_client(&mut self, client_id: &ClientId) -> Client {
+    pub(crate) fn get_field_id(&mut self, field: &Field) -> u32 {
+        self.fields.get_or_insert(field)
+    }
+    pub(crate) fn get_field(&self, field_id: &FieldId) -> Option<&Field> {
+        self.fields.get_field(field_id)
+    }
+
+    pub(crate) fn get_client(&mut self, client_id: &Client) -> ClientId {
         self.clients.get_or_insert(client_id)
     }
 
-    pub(crate) fn update_client(&mut self, client: &ClientId, clock: Clock) -> Client {
+    pub(crate) fn update_client(&mut self, client: &Client, clock: Clock) -> ClientId {
         self.client = self.clients.get_or_insert(client);
         self.clock = clock;
 
@@ -78,7 +88,7 @@ impl DocStore {
         self.items.replace(item, items);
     }
 
-    pub(crate) fn client(&mut self, client_id: &ClientId) -> Client {
+    pub(crate) fn client(&mut self, client_id: &Client) -> ClientId {
         self.clients.get_or_insert(client_id)
     }
 
@@ -88,6 +98,7 @@ impl DocStore {
         Diff::from(
             guid,
             self.clients.clone(),
+            self.fields.clone(),
             self.state.clone(),
             items,
             deletes,
@@ -184,7 +195,7 @@ trait IdDiff {
 
 #[derive(Default, Clone, Debug)]
 pub struct ClientStore<T: WithId + Clone + Encode + Decode> {
-    items: HashMap<Client, IdStore<T>>,
+    pub(crate) items: HashMap<ClientId, IdStore<T>>,
 }
 
 impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
@@ -214,6 +225,15 @@ impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
     }
 }
 
+impl<T: WithId + Clone + Default + Encode + Decode> std::iter::IntoIterator for ClientStore<T> {
+    type Item = (ClientId, IdStore<T>);
+    type IntoIter = std::collections::hash_map::IntoIter<ClientId, IdStore<T>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
 impl<T: WithId + Clone + Default + Encode + Decode> Encode for ClientStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E) {
         for (client, store) in self.items.iter() {
@@ -235,7 +255,7 @@ impl<T: WithId + Clone + Default + Encode + Decode> Decode for ClientStore<T> {
 }
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct IdStore<T: WithId + Clone + Encode + Decode> {
+pub struct IdStore<T: WithId + Clone + Encode + Decode> {
     data: BTreeMap<Id, T>,
 }
 
@@ -258,6 +278,15 @@ impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
 
     pub(crate) fn size(&self) -> usize {
         self.data.len()
+    }
+}
+
+impl<T: WithId + Clone + Encode + Decode> IntoIterator for IdStore<T> {
+    type Item = (Id, T);
+    type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.data.into_iter()
     }
 }
 

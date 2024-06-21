@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
@@ -48,6 +50,21 @@ impl NString {
         map.insert("text".to_string(), self.borrow().content().to_json());
 
         map.into()
+    }
+}
+
+impl Serialize for NString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("String", self.borrow().serialize_size() + 1)?;
+        self.borrow().serialize(&mut s)?;
+
+        let content = serde_json::to_value(self.content()).unwrap_or_default();
+        s.serialize_field("content", &content)?;
+
+        s.end()
     }
 }
 

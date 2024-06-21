@@ -74,16 +74,16 @@ impl Type {
         }
     }
 
-    pub fn insert(&self, offset: usize, item: Type) {
+    pub fn insert(&self, offset: usize, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.insert(offset, item),
+            Type::List(n) => n.insert(offset, item.into()),
             _ => panic!("insert: not implemented"),
         }
     }
 
-    pub fn set(&self, key: String, item: Type) {
+    pub fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         match self {
-            Type::Map(n) => n.set(key, item),
+            Type::Map(n) => n.set(key.into(), item.into()),
             _ => panic!("set: not implemented"),
         }
     }
@@ -202,9 +202,9 @@ impl Serialize for Type {
     {
         match self {
             Type::List(n) => n.serialize(serializer),
-            // Type::Map(n) => n.serialize(serializer),
-            // Type::Text(n) => n.serialize(serializer),
-            // Type::String(n) => n.serialize(serializer),
+            Type::Map(n) => n.serialize(serializer),
+            Type::Text(n) => n.serialize(serializer),
+            Type::String(n) => n.serialize(serializer),
             Type::Atom(n) => n.serialize(serializer),
             // Type::Proxy(n) => n.serialize(serializer),
             // Type::Move(n) => n.serialize(serializer),

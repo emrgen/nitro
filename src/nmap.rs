@@ -148,3 +148,43 @@ impl From<ItemRef> for NMap {
         Self { item }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::doc::Doc;
+
+    #[test]
+    fn test_map() {
+        let doc = Doc::default();
+        let map = doc.map();
+        doc.set("map", map.clone());
+
+        let map = doc.get("map").unwrap();
+        assert_eq!(map.size(), 0);
+
+        let atom = doc.atom("a");
+        map.set("a", atom.clone());
+
+        let atom = doc.atom("b");
+        map.set("b", atom.clone());
+
+        let yaml = serde_yaml::to_string(&map).unwrap();
+        let expect = r#"id: (0, 1)
+kind: map
+parent_id: (0, 0)
+content:
+  a:
+    content: a
+    id: (0, 2)
+    kind: atom
+    parent_id: (0, 1)
+  b:
+    content: b
+    id: (0, 3)
+    kind: atom
+    left_id: (0, 2)
+    parent_id: (0, 1)
+"#;
+        assert_eq!(yaml, expect);
+    }
+}

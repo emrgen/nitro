@@ -1,5 +1,8 @@
 use std::ops::Deref;
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemRef};
 use crate::store::WeakStoreRef;
@@ -41,6 +44,26 @@ impl NText {
         items.into()
     }
 }
+
+impl Serialize for NText {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Text", self.borrow().serialize_size() + 1)?;
+        self.borrow().serialize(&mut s)?;
+
+        let items = self.borrow().as_list();
+        let content = items
+            .iter()
+            .map(|item| serde_json::to_value(item).unwrap_or_default())
+            .collect();
+        s.serialize_field("content", &serde_json::Value::Array(content))?;
+
+        s.end()
+    }
+}
+
 impl WithId for NText {
     fn id(&self) -> Id {
         self.item.borrow().id()

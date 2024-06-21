@@ -137,14 +137,14 @@ impl Doc {
         self.root.as_ref().unwrap().size()
     }
 
-    fn get(&self, key: String) -> Option<Type> {
-        self.root.as_ref().unwrap().get(key)
+    pub(crate) fn get(&self, key: impl Into<String>) -> Option<Type> {
+        self.root.as_ref().unwrap().get(key.into())
     }
 
-    pub(crate) fn set(&self, key: impl Into<String>, item: Type) {
+    pub(crate) fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         let key = key.into();
 
-        self.root.as_ref().unwrap().set(key, item);
+        self.root.as_ref().unwrap().set(key, item.into());
     }
 
     fn remove(&self, key: ItemKey) {
@@ -219,15 +219,15 @@ mod test {
         assert_eq!(doc.size(), 0);
 
         let atom = doc.atom("world");
-        doc.set("hello", atom.clone().into());
+        doc.set("hello", atom.clone());
 
         assert_eq!(doc.size(), 1);
 
         let atom = doc.atom("hudrogen");
-        doc.set("el", atom.clone().into());
+        doc.set("el", atom.clone());
 
         let atom = doc.atom("oxygen");
-        doc.set("el", atom.clone().into());
+        doc.set("el", atom.clone());
 
         assert_eq!(doc.size(), 2);
 

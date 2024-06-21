@@ -148,7 +148,7 @@ mod test {
         let doc = &Doc::default();
 
         let list = &doc.list();
-        doc.set("list", list.clone().into());
+        doc.set("list", list.clone());
         assert_eq!(list.size(), 0);
 
         ["a", "b", "c"]
@@ -186,7 +186,7 @@ content:
         let doc = &Doc::default();
 
         let list1 = &doc.list();
-        doc.set("list", list1.clone().into());
+        doc.set("list", list1.clone());
         assert_eq!(list1.size(), 0);
 
         let list2 = &doc.list();

@@ -5,7 +5,10 @@ use std::fmt::Display;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
-use serde_json::{Map, Value};
+use indexmap::IndexMap;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+use serde_json::Value;
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
@@ -50,8 +53,6 @@ impl ItemRef {
 
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
         item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
-        // let typ = Type::from(self.clone());
-        // item.item_ref().borrow_mut().parent.replace(typ);
     }
 
     pub(crate) fn prepend(&self, item: Type) {
@@ -230,8 +231,8 @@ impl Item {
         // remove items that are moved or deleted
         list.into_iter()
             .filter(|item| {
-                return item.item_ref().borrow().is_moved()
-                    || item.item_ref().borrow().is_deleted();
+                return !item.item_ref().borrow().is_moved()
+                    && !item.item_ref().borrow().is_deleted();
             })
             .collect()
     }
@@ -257,8 +258,8 @@ impl Item {
         items
     }
 
-    pub(crate) fn to_json(&self) -> Map<String, Value> {
-        let mut map = serde_json::Map::new();
+    pub(crate) fn to_json(&self) -> IndexMap<String, Value> {
+        let mut map = IndexMap::new();
 
         map.insert("id".to_string(), self.data.id.to_string().into());
         map.insert("kind".to_string(), self.data.kind.to_string().into());
@@ -284,6 +285,62 @@ impl Item {
         }
 
         map
+    }
+
+    pub(crate) fn serialize<S>(&self, s: &mut S) -> Result<(), S::Error>
+    where
+        S: serde::ser::SerializeStruct,
+    {
+        s.serialize_field("id", &self.data.id.to_string())?;
+        s.serialize_field("kind", &self.data.kind.to_string())?;
+
+        if let Some(parent) = &self.parent {
+            s.serialize_field("parent_id", &parent.id().to_string())?;
+        }
+
+        if let Some(left) = &self.left_id {
+            s.serialize_field("left_id", &left.id().to_string())?;
+        }
+
+        if let Some(right) = &self.right_id {
+            s.serialize_field("right_id", &right.id().to_string())?;
+        }
+
+        if let Some(target) = &self.target_id {
+            s.serialize_field("target_id", &target.id().to_string())?;
+        }
+
+        if let Some(mover) = &self.mover_id {
+            s.serialize_field("mover_id", &mover.id().to_string())?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn serialize_size(&self) -> usize {
+        let mut size = 2_usize;
+
+        if self.parent_id.is_some() {
+            size += 1;
+        }
+
+        if self.left_id.is_some() {
+            size += 1;
+        }
+
+        if self.right_id.is_some() {
+            size += 1;
+        }
+
+        if self.target_id.is_some() {
+            size += 1;
+        }
+
+        if self.mover_id.is_some() {
+            size += 1;
+        }
+
+        size
     }
 }
 
@@ -528,6 +585,22 @@ impl Content {
             Self::Embed(a) => a.to_json(),
             Self::Doc(d) => Value::String(d.guid.clone()),
             Self::Null => Value::Null,
+        }
+    }
+}
+
+impl Serialize for Content {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match self {
+            Self::Binary(b) => serializer.serialize_str(&serde_json::to_string(b).unwrap()),
+            Self::String(s) => serializer.serialize_str(s),
+            // Self::Embed(a) => a.serialize(serializer),
+            Self::Doc(d) => serializer.serialize_str(&d.guid),
+            Self::Null => serializer.serialize_none(),
+            _ => serializer.serialize_none(),
         }
     }
 }

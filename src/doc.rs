@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -36,7 +38,7 @@ impl Default for DocOpts {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct Doc {
     pub(crate) opts: DocOpts,
     pub(crate) root: Option<NMap>,
@@ -64,7 +66,7 @@ impl Doc {
         let mut doc = Self {
             opts,
             store,
-            ..Doc::default()
+            root: None,
         };
 
         doc.root = Some(root);
@@ -139,7 +141,7 @@ impl Doc {
         self.root.as_ref().unwrap().get(key)
     }
 
-    fn set(&self, key: impl Into<String>, item: Type) {
+    pub(crate) fn set(&self, key: impl Into<String>, item: Type) {
         let key = key.into();
 
         self.root.as_ref().unwrap().set(key, item);
@@ -157,7 +159,7 @@ impl Doc {
         self.root.as_ref().unwrap().values()
     }
 
-    fn to_json(&self) -> Value {
+    pub(crate) fn to_json(&self) -> Value {
         let mut map = serde_json::Map::new();
 
         map.insert(
@@ -174,6 +176,36 @@ impl Doc {
         }
 
         serde_json::Value::Object(map)
+    }
+}
+
+impl Default for Doc {
+    fn default() -> Self {
+        Doc::new(Default::default())
+    }
+}
+
+impl Serialize for Doc {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut size = 2;
+        if let Some(root) = &self.root {
+            size += root.borrow().serialize_size();
+        }
+
+        let mut s = serializer.serialize_struct("Doc", size + 1)?;
+        s.serialize_field("id", &self.opts.id)?;
+        s.serialize_field("created_by", &self.opts.crated_by)?;
+        if let Some(root) = &self.root {
+            root.borrow().serialize(&mut s)?;
+            let map = root.borrow().as_map().unwrap();
+            let content = serde_json::to_value(map).unwrap_or_default();
+            s.serialize_field("content", &content)?;
+        }
+
+        s.end()
     }
 }
 

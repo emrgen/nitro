@@ -6,9 +6,17 @@ edition = "2021"
 [dependencies]
 bimap = "0.6.3"
 log = "0.4.21"
-serde_json = "1.0"
 base64 = "0.22.1"
-serde_yaml = "0.8.0"
+serde = "1.0.203"
+indexmap = { version = "2.2.6", features = ["serde"] }
+
+[dependencies.serde_json]
+version = "1.0"
+preserve_order = true
+
+[dependencies.serde_yaml]
+version = "0.9.34+deprecated"
+preserve_order = true
 
 [dependencies.uuid]
 version = "1.8.0"

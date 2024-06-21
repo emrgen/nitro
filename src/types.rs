@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::codec::decoder::{Decode, Decoder};
@@ -190,6 +191,24 @@ impl Type {
             Type::Proxy(n) => n.to_json(),
             Type::Move(n) => n.to_json(),
             Type::Identity => panic!("to_json: not implemented"),
+        }
+    }
+}
+
+impl Serialize for Type {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match self {
+            Type::List(n) => n.serialize(serializer),
+            // Type::Map(n) => n.serialize(serializer),
+            // Type::Text(n) => n.serialize(serializer),
+            // Type::String(n) => n.serialize(serializer),
+            Type::Atom(n) => n.serialize(serializer),
+            // Type::Proxy(n) => n.serialize(serializer),
+            // Type::Move(n) => n.serialize(serializer),
+            _ => panic!("serialize: not implemented"),
         }
     }
 }

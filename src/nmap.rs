@@ -1,5 +1,8 @@
 use std::ops::Deref;
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
@@ -108,7 +111,23 @@ impl NMap {
 
         json.insert("content".to_string(), serde_json::Value::Object(content));
 
-        serde_json::Value::Object(json)
+        serde_json::to_value(map).unwrap()
+    }
+}
+
+impl Serialize for NMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Doc", self.borrow().serialize_size() + 1)?;
+        self.borrow().serialize(&mut s)?;
+
+        let map = self.borrow().as_map().unwrap();
+        let content = serde_json::to_value(map).unwrap_or_default();
+        s.serialize_field("content", &content)?;
+
+        s.end()
     }
 }
 

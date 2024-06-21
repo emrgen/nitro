@@ -1,5 +1,8 @@
 use std::ops::Deref;
 
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
@@ -42,7 +45,22 @@ impl NAtom {
         let mut map = self.borrow().to_json();
         map.insert("content".to_string(), self.content().to_json());
 
-        serde_json::Value::Object(map)
+        serde_json::to_value(map).unwrap()
+    }
+}
+
+impl Serialize for NAtom {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Atom", self.borrow().serialize_size() + 1)?;
+        self.borrow().serialize(&mut s)?;
+
+        let content = serde_json::to_value(self.content()).unwrap_or_default();
+        s.serialize_field("content", &content)?;
+
+        s.end()
     }
 }
 

@@ -1,11 +1,13 @@
+use serde_json::Value;
+
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{GetItemRef, ItemKind, ItemRef};
+use crate::item::{Content, GetItemRef, ItemKey, ItemKind, ItemRef};
 use crate::natom::NAtom;
-use crate::nlist::{IList, NList};
-use crate::nmap::{IMap, NMap};
+use crate::nlist::NList;
+use crate::nmap::NMap;
 use crate::nmove::NMove;
 use crate::nproxy::NProxy;
 use crate::nstring::NString;
@@ -29,32 +31,48 @@ impl Type {
         self.item_ref().kind()
     }
 
-    pub(crate) fn field(&self) -> Option<String> {
+    pub fn field(&self) -> Option<String> {
         self.item_ref().field()
     }
 
     pub fn size(&self) -> usize {
         match self {
             Type::List(n) => n.size(),
+            Type::Map(n) => n.size(),
+            Type::Text(n) => n.size(),
+            Type::String(n) => n.size(),
+            Type::Atom(n) => n.size(),
+            Type::Proxy(n) => n.size(),
+            Type::Move(n) => n.size(),
             _ => panic!("size: not implemented"),
         }
     }
 
-    pub fn append(&mut self, item: Type) {
+    pub(crate) fn content(&self) -> Content {
+        match self {
+            Type::String(n) => n.content(),
+            Type::Atom(n) => n.content(),
+            Type::Text(n) => n.content(),
+            Type::Proxy(n) => n.content(),
+            _ => panic!("content: not implemented"),
+        }
+    }
+
+    pub fn append(&self, item: Type) {
         match self {
             Type::List(n) => n.append(item),
             _ => panic!("append: not implemented"),
         }
     }
 
-    pub fn prepend(&mut self, item: Type) {
+    pub fn prepend(&self, item: Type) {
         match self {
             Type::List(n) => n.prepend(item),
             _ => panic!("prepend: not implemented"),
         }
     }
 
-    pub fn insert(&mut self, offset: usize, item: Type) {
+    pub fn insert(&self, offset: usize, item: Type) {
         match self {
             Type::List(n) => n.insert(offset, item),
             _ => panic!("insert: not implemented"),
@@ -75,19 +93,19 @@ impl Type {
         }
     }
 
+    pub fn remove(&self, key: ItemKey) {
+        match self {
+            Type::Map(n) => n.remove(key),
+            _ => panic!("remove: not implemented"),
+        }
+    }
+
     pub fn delete(&self) {
         let store = self.item_ref().store.upgrade().unwrap();
         let id = store.borrow_mut().next_id();
         let item = DeleteItem::new(id, self.id().range(self.size() as u32));
         store.borrow_mut().insert_delete(item);
         self.item_ref().delete()
-    }
-
-    pub fn remove(&self, key: String) {
-        match self {
-            Type::Map(n) => n.remove(key),
-            _ => panic!("remove: not implemented"),
-        }
     }
 
     pub(crate) fn start_id(&self) -> Id {
@@ -154,6 +172,10 @@ impl Type {
             Type::Move(n) => n.item_ref(),
             Type::Identity => panic!("item_ref: not implemented"),
         }
+    }
+
+    pub(crate) fn to_json(&self) -> Value {
+        todo!()
     }
 }
 

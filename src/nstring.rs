@@ -21,11 +21,14 @@ impl NString {
             item: ItemRef::new(data.into(), store),
         }
     }
+    pub(crate) fn content(&self) -> Content {
+        self.borrow().content()
+    }
 
-    pub(crate) fn size(&self) -> u64 {
+    pub(crate) fn size(&self) -> usize {
         match self.borrow().content {
-            Content::String(ref s) => s.len() as u64,
-            _ => 1,
+            Content::String(ref s) => s.len(),
+            _ => panic!("NString has invalid content"),
         }
     }
 

@@ -3,10 +3,10 @@ use std::rc::Rc;
 
 use crate::clients::ClientId;
 use crate::diff::Diff;
-use crate::item::Content;
+use crate::item::{Content, ItemKey};
 use crate::natom::NAtom;
 use crate::nlist::NList;
-use crate::nmap::{IMap, NMap};
+use crate::nmap::NMap;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
@@ -123,7 +123,7 @@ impl Doc {
     }
 }
 
-impl IMap for Doc {
+impl Doc {
     fn size(&self) -> usize {
         self.root.as_ref().unwrap().size()
     }
@@ -136,7 +136,7 @@ impl IMap for Doc {
         self.root.as_ref().unwrap().set(key, item)
     }
 
-    fn remove(&self, key: String) {
+    fn remove(&self, key: ItemKey) {
         self.root.as_ref().unwrap().remove(key)
     }
 

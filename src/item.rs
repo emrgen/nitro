@@ -186,6 +186,10 @@ impl Item {
 
     pub(crate) fn set(&mut self, key: &ItemKey, _ref: ItemRef) {}
 
+    pub(crate) fn content(&self) -> Content {
+        self.data.content.clone()
+    }
+
     pub(crate) fn as_map(&self) -> Option<HashMap<String, Type>> {
         let items = self.items();
         let mut map = HashMap::new();
@@ -313,7 +317,7 @@ impl ItemData {
             target_id: None,
             mover_id: None,
             field: None,
-            content: Content::None,
+            content: Content::Null,
         }
     }
 
@@ -481,9 +485,10 @@ impl From<usize> for ItemKey {
 pub(crate) enum Content {
     Binary(Vec<u8>),
     String(String),
+    Types(Vec<Type>),
     Embed(Any),
     Doc(DocOpts),
-    None,
+    Null,
 }
 
 impl Content {
@@ -491,16 +496,17 @@ impl Content {
         match self {
             Self::Binary(b) => Value::String(serde_json::to_string(b).unwrap()),
             Self::String(s) => Value::String(s.clone()),
+            Self::Types(t) => Value::Array(t.iter().map(|t| t.to_json()).collect()),
             Self::Embed(a) => a.to_json(),
             Self::Doc(d) => Value::String(d.guid.clone()),
-            Self::None => Value::Null,
+            Self::Null => Value::Null,
         }
     }
 }
 
 impl Default for Content {
     fn default() -> Self {
-        Self::None
+        Self::Null
     }
 }
 

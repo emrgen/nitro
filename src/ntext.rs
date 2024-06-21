@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{ItemData, ItemRef};
+use crate::item::{Content, ItemData, ItemRef};
 use crate::store::WeakStoreRef;
 
 #[derive(Clone, Debug)]
@@ -19,6 +19,15 @@ impl NText {
         Self {
             item: ItemRef::new(data.into(), store),
         }
+    }
+
+    pub(crate) fn content(&self) -> Content {
+        let items = self.borrow().as_list();
+        Content::Types(items)
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.borrow().as_list().iter().map(|item| item.size()).sum()
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {

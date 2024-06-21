@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{ItemData, ItemRef};
+use crate::item::{Content, ItemData, ItemRef};
 use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 
@@ -23,6 +23,14 @@ impl NMove {
         }
     }
 
+    pub(crate) fn content(&self) -> Content {
+        Content::Null
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        1
+    }
+
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
@@ -38,12 +46,16 @@ impl NMove {
             (mover_id, proxy_id)
         };
 
-        let proxy = NProxy::new(proxy_id, mover_id, target_id, store.clone());
-        let mover = NMove::new(mover_id, proxy_id, store.clone());
+        let mover_store = store.clone();
+        let proxy_store = store.clone();
 
         let store = store.upgrade().unwrap();
         let mut store = store.borrow_mut();
+
+        let mover = NMove::new(mover_id, proxy_id, mover_store);
         store.insert(mover.clone().into());
+
+        let proxy = NProxy::new(proxy_id, mover_id, target_id, proxy_store);
         store.insert(proxy.clone().into());
 
         (mover, proxy)

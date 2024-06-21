@@ -22,6 +22,14 @@ impl NAtom {
         }
     }
 
+    pub(crate) fn size(&self) -> usize {
+        1
+    }
+
+    pub(crate) fn content(&self) -> Content {
+        self.borrow().content()
+    }
+
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }

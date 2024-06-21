@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use serde_json::Value;
+
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemRef};
 use crate::nproxy::NProxy;
@@ -8,6 +10,12 @@ use crate::store::WeakStoreRef;
 #[derive(Debug, Clone)]
 pub(crate) struct NMove {
     pub(crate) item: ItemRef,
+}
+
+impl NMove {
+    pub(crate) fn to_json(&self) -> Value {
+        todo!()
+    }
 }
 
 impl NMove {
@@ -21,6 +29,10 @@ impl NMove {
         Self {
             item: ItemRef::new(data.into(), store),
         }
+    }
+
+    pub(crate) fn delete(&self) {
+        self.item.delete(1);
     }
 
     pub(crate) fn content(&self) -> Content {

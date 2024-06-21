@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use serde_json::Value;
+
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemRef};
 use crate::store::WeakStoreRef;
@@ -32,8 +34,20 @@ impl NString {
         }
     }
 
+    pub(crate) fn delete(&self) {
+        self.item.delete(self.size() as u32);
+    }
+
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
+    }
+
+    pub(crate) fn to_json(&self) -> Value {
+        let mut map = serde_json::Map::new();
+
+        map.insert("text".to_string(), self.borrow().content().to_json());
+
+        map.into()
     }
 }
 

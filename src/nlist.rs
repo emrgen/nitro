@@ -68,23 +68,35 @@ impl NList {
     }
 
     fn remove(&self, key: ItemKey) {
-        match key {
-            ItemKey::Number(offset) => {
-                if offset < self.size() {
-                    let items = self.borrow().as_list();
-                    let item = items[offset].clone();
-                    item.delete();
-                }
+        if let ItemKey::Number(offset) = key {
+            if offset < self.size() {
+                let items = self.borrow().as_list();
+                let item = items[offset].clone();
+                item.delete();
             }
-            _ => {}
         }
     }
 
-    fn clear(&self) {
+    pub(crate) fn delete(&self) {
+        self.item.delete(1);
+    }
+
+    pub(crate) fn clear(&self) {
         let items = self.borrow().as_list();
         for item in items {
             item.delete();
         }
+    }
+
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        let mut json = self.borrow().to_json();
+        let items = self.borrow().as_list();
+
+        let content = items.iter().map(|item| item.to_json()).collect();
+
+        json.insert("content".to_string(), serde_json::Value::Array(content));
+
+        serde_json::Value::Object(json)
     }
 }
 

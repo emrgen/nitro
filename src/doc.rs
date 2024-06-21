@@ -1,8 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use serde_json::Value;
+use uuid::Uuid;
+
 use crate::clients::ClientId;
 use crate::diff::Diff;
+use crate::id::Id;
 use crate::item::{Content, ItemKey};
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -23,10 +27,11 @@ pub(crate) struct DocOpts {
 
 impl Default for DocOpts {
     fn default() -> Self {
+        let client_id = Uuid::new_v4().to_string();
         Self {
-            id: "".to_string(),
-            client_id: "".to_string(),
-            crated_by: "".to_string(),
+            id: Uuid::new_v4().to_string(),
+            client_id: client_id.clone(),
+            crated_by: client_id,
         }
     }
 }
@@ -43,12 +48,14 @@ impl Doc {
         let mut store = DocStore::default();
         // doc is always created by the client with clock 0,
         // each doc is created by a new client
-        store.update_client(opts.crated_by.clone(), 0);
+        store.update_client(&opts.crated_by, 0);
         if opts.client_id != opts.crated_by {
-            store.update_client(opts.client_id.clone(), 1);
+            store.update_client(&opts.client_id, 1);
         }
 
-        let root_id = store.next_id();
+        let client = store.get_client(&opts.client_id);
+
+        let root_id = Id::new(client, 0);
         let store = Rc::new(RefCell::new(store));
         let weak = Rc::downgrade(&store);
         let root = NMap::new(root_id, weak);
@@ -98,9 +105,9 @@ impl Doc {
         map
     }
 
-    pub fn atom(&self, content: Content) -> NAtom {
+    pub fn atom(&self, content: impl Into<Content>) -> NAtom {
         let id = self.store.borrow_mut().next_id();
-        let atom = NAtom::new(id, content, Rc::downgrade(&self.store));
+        let atom = NAtom::new(id, content.into(), Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(atom.clone().into());
 
         atom
@@ -132,8 +139,10 @@ impl Doc {
         self.root.as_ref().unwrap().get(key)
     }
 
-    fn set(&self, key: String, item: Type) {
-        self.root.as_ref().unwrap().set(key, item)
+    fn set(&self, key: impl Into<String>, item: Type) {
+        let key = key.into();
+
+        self.root.as_ref().unwrap().set(key, item);
     }
 
     fn remove(&self, key: ItemKey) {
@@ -146,5 +155,52 @@ impl Doc {
 
     fn values(&self) -> Vec<Type> {
         self.root.as_ref().unwrap().values()
+    }
+
+    fn to_json(&self) -> Value {
+        let mut map = serde_json::Map::new();
+
+        map.insert(
+            "id".to_string(),
+            serde_json::Value::String(self.opts.id.to_string()),
+        );
+        map.insert(
+            "created_by".to_string(),
+            serde_json::Value::String(self.opts.crated_by.to_string()),
+        );
+
+        if let Some(root) = self.root.as_ref() {
+            map.insert("root".to_string(), root.to_json());
+        }
+
+        serde_json::Value::Object(map)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::doc::Doc;
+
+    #[test]
+    fn test_create_doc() {
+        let doc = Doc::new(Default::default());
+        assert_eq!(doc.size(), 0);
+
+        let atom = doc.atom("world");
+        doc.set("hello", atom.clone().into());
+
+        assert_eq!(doc.size(), 1);
+
+        let atom = doc.atom("hudrogen");
+        doc.set("el", atom.clone().into());
+
+        let atom = doc.atom("oxygen");
+        doc.set("el", atom.clone().into());
+
+        assert_eq!(doc.size(), 2);
+
+        // let json_str = serde_json::to_string_pretty(&doc.to_json()).unwrap();
+        let yaml = serde_yaml::to_string(&doc.to_json()).unwrap();
+        println!("{}", yaml);
     }
 }

@@ -62,7 +62,7 @@ impl Id {
 
 impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", format!("({}, {})", self.client, self.clock))
+        write!(f, "({}, {})", self.client, self.clock)
     }
 }
 
@@ -319,8 +319,8 @@ mod tests {
     #[test]
     fn test_compare() {
         let mut clients = ClientMap::new();
-        clients.get_or_insert("client1".to_string());
-        clients.get_or_insert("client2".to_string());
+        clients.get_or_insert(&"client1".to_string());
+        clients.get_or_insert(&"client2".to_string());
 
         let id1 = IdRange::new(0, 1, 1);
         let id2 = IdRange::new(0, 1, 1);

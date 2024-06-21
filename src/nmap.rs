@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, GetItemRef, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -22,7 +22,7 @@ impl NMap {
         Self { item: item_ref }
     }
 
-    fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> usize {
         let item = self.borrow();
         let map = item.as_map().unwrap();
         map.len()
@@ -61,8 +61,8 @@ impl NMap {
 
     pub(crate) fn set(&self, field: String, item: Type) {
         let item_ref = item.clone().item_ref();
-        item_ref.borrow_mut().data.field = Some(field);
-        self.item_ref().append(item)
+        item_ref.borrow_mut().data.field = Some(field.clone());
+        self.item_ref().append(item);
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {
@@ -85,12 +85,30 @@ impl NMap {
         map.values().map(|item| item.clone().into()).collect()
     }
 
-    fn clear(&self) {
+    pub(crate) fn clear(&self) {
         let item = self.borrow();
         let map = item.as_map().unwrap();
         for item in map.values() {
             item.delete();
         }
+    }
+
+    pub(crate) fn delete(&self) {
+        self.item.delete(1);
+    }
+
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        let mut json = self.borrow().to_json();
+        let item = self.borrow();
+        let map = item.as_map().unwrap();
+        let mut content = serde_json::Map::new();
+        for (key, value) in map.iter() {
+            content.insert(key.clone(), value.to_json());
+        }
+
+        json.insert("content".to_string(), serde_json::Value::Object(content));
+
+        serde_json::Value::Object(json)
     }
 }
 

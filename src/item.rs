@@ -1,14 +1,15 @@
 use std::cell::RefCell;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, PartialEq};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
 use crate::id::{Clock, Id, Split, WithId};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -36,7 +37,8 @@ impl ItemRef {
     }
 
     pub(crate) fn append(&self, item: Type) {
-        if let Some(ref end) = self.borrow().end.clone() {
+        let end = self.borrow().end.clone();
+        if let Some(ref end) = end {
             end.item_ref().borrow_mut().right = Some(item.clone());
             item.item_ref().borrow_mut().left = Some(end.clone());
             self.borrow_mut().end = Some(item.clone());
@@ -45,6 +47,11 @@ impl ItemRef {
             self.borrow_mut().start = Some(item.clone());
             self.borrow_mut().end = Some(item.clone());
         }
+
+        item.item_ref().borrow_mut().data.parent_id = Some(self.id());
+        item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
+        // let typ = Type::from(self.clone());
+        // item.item_ref().borrow_mut().parent.replace(typ);
     }
 
     pub(crate) fn prepend(&self, item: Type) {
@@ -60,20 +67,16 @@ impl ItemRef {
     }
 
     pub(crate) fn left_origin(&self) -> Option<Type> {
-        self.item.borrow().left_origin(&self.store)
+        self.borrow().left_origin(&self.store)
     }
 
-    pub(crate) fn delete(&self) {
+    pub(crate) fn delete(&self, size: u32) {
+        let store = self.store.upgrade().unwrap();
+        let id = store.borrow_mut().next_id();
+        let item = DeleteItem::new(id, self.id().range(size));
+        store.borrow_mut().insert_delete(item);
         self.borrow_mut().delete();
     }
-
-    pub(crate) fn size(&self) -> usize {
-        Type::from(self.clone()).size()
-    }
-}
-
-pub(crate) trait GetItemRef {
-    fn item_ref(&self) -> ItemRef;
 }
 
 impl Deref for ItemRef {
@@ -138,6 +141,12 @@ pub(crate) struct Item {
     pub(crate) mover: Option<Type>,  // mover ref (proxy)
     pub(crate) movers: Option<Type>, // linked movers
     pub(crate) flags: u8,
+}
+
+impl PartialEq<Content> for &Content {
+    fn eq(&self, other: &Content) -> bool {
+        self.to_json().as_str() == other.to_json().as_str()
+    }
 }
 
 impl Item {
@@ -231,8 +240,8 @@ impl Item {
         self.all_items()
             .into_iter()
             .filter(|item| {
-                return item.item_ref().borrow().is_moved()
-                    || item.item_ref().borrow().is_deleted();
+                return !item.item_ref().borrow().is_moved()
+                    && !item.item_ref().borrow().is_deleted();
             })
             .collect()
     }
@@ -248,39 +257,60 @@ impl Item {
         items
     }
 
-    pub(crate) fn to_json(&self) -> serde_json::Value {
+    pub(crate) fn to_json(&self) -> Map<String, Value> {
         let mut map = serde_json::Map::new();
+
         map.insert("id".to_string(), self.data.id.to_string().into());
         map.insert("kind".to_string(), self.data.kind.to_string().into());
-        map.insert("content".to_string(), self.data.content.to_json());
-        map.insert(
-            "field".to_string(),
-            self.data.field.clone().unwrap_or("".to_string()).into(),
-        );
 
         if let Some(parent) = &self.parent {
-            map.insert("parent".to_string(), parent.id().to_string().into());
+            map.insert("parent_id".to_string(), parent.id().to_string().into());
         }
 
-        if let Some(left) = &self.left {
-            map.insert("left".to_string(), left.id().to_string().into());
+        if let Some(left) = &self.left_id {
+            map.insert("left_id".to_string(), left.id().to_string().into());
         }
 
-        if let Some(right) = &self.right {
-            map.insert("right".to_string(), right.id().to_string().into());
+        if let Some(right) = &self.right_id {
+            map.insert("right_id".to_string(), right.id().to_string().into());
         }
 
-        if let Some(target) = &self.target {
+        if let Some(target) = &self.target_id {
             map.insert("target".to_string(), target.id().to_string().into());
         }
 
-        if let Some(mover) = &self.mover {
+        if let Some(mover) = &self.mover_id {
             map.insert("mover".to_string(), mover.id().to_string().into());
         }
 
-        serde_json::Value::Object(map)
+        map
     }
 }
+
+// impl OriginIds for Item {
+//     fn left_id(&self) -> Option<Id> {
+//         self.data.left_id
+//     }
+//
+//     fn right_id(&self) -> Option<Id> {
+//         self.data.right_id
+//     }
+// }
+//
+// pub(crate) trait OriginIds {
+//     fn left_id(&self) -> Option<Id>;
+//     fn right_id(&self) -> Option<Id>;
+// }
+
+// impl<T: Deref<Target = ItemRefInner>> OriginIds for T {
+//     fn left_id(&self) -> Option<Id> {
+//         self.borrow().left_id()
+//     }
+//
+//     fn right_id(&self) -> Option<Id> {
+//         self.borrow().right_id()
+//     }
+// }
 
 impl Deref for Item {
     type Target = ItemData;
@@ -417,7 +447,6 @@ impl Decode for ItemData {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ItemKind {
-    Root,
     Map,
     List,
     Text,
@@ -430,14 +459,13 @@ pub(crate) enum ItemKind {
 impl Display for ItemKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Root => write!(f, "Root"),
-            Self::Map => write!(f, "Map"),
-            Self::List => write!(f, "List"),
-            Self::Text => write!(f, "Text"),
-            Self::String => write!(f, "String"),
-            Self::Atom => write!(f, "Atom"),
-            Self::Proxy => write!(f, "Proxy"),
-            Self::Move => write!(f, "Move"),
+            Self::Map => write!(f, "map"),
+            Self::List => write!(f, "list"),
+            Self::Text => write!(f, "text"),
+            Self::String => write!(f, "string"),
+            Self::Atom => write!(f, "atom"),
+            Self::Proxy => write!(f, "proxy"),
+            Self::Move => write!(f, "move"),
         }
     }
 }
@@ -510,14 +538,58 @@ impl Default for Content {
     }
 }
 
+impl From<&String> for Content {
+    fn from(s: &std::string::String) -> Self {
+        Self::String(s.to_string())
+    }
+}
+
+impl From<&str> for Content {
+    fn from(s: &str) -> Self {
+        Self::String(s.to_string())
+    }
+}
+
+impl From<String> for Content {
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
+}
+
+impl From<Vec<u8>> for Content {
+    fn from(b: Vec<u8>) -> Self {
+        Self::Binary(b)
+    }
+}
+
+impl From<Vec<Type>> for Content {
+    fn from(t: Vec<Type>) -> Self {
+        Self::Types(t)
+    }
+}
+
+impl From<DocOpts> for Content {
+    fn from(d: DocOpts) -> Self {
+        Self::Doc(d)
+    }
+}
+
+impl From<Any> for Content {
+    fn from(a: Any) -> Self {
+        Self::Embed(a)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct DocOpts {
     pub(crate) guid: String,
     pub(crate) opts: Any,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) enum Any {
+    #[default]
+    Null,
     True,
     False,
     Float32(f32),
@@ -539,6 +611,7 @@ pub(crate) enum Any {
 impl Any {
     pub(crate) fn to_json(&self) -> Value {
         match self {
+            Self::Null => Value::Null,
             Self::True => Value::Bool(true),
             Self::False => Value::Bool(false),
             Self::Float32(f) => Value::Number(serde_json::Number::from_f64(*f as f64).unwrap()),

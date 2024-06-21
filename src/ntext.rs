@@ -33,6 +33,13 @@ impl NText {
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
+
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        let items = self.borrow().as_list();
+        let items: Vec<_> = items.iter().map(|item| item.to_json()).collect();
+
+        items.into()
+    }
 }
 impl WithId for NText {
     fn id(&self) -> Id {

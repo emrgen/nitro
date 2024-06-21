@@ -28,12 +28,12 @@ impl ClientMap {
         self.map.get_by_right(client)
     }
 
-    pub(crate) fn get_or_insert(&mut self, client_id: ClientId) -> Client {
+    pub(crate) fn get_or_insert(&mut self, client_id: &ClientId) -> Client {
         match self.get_client(&client_id) {
             Some(client) => *client,
             None => {
                 let client = self.map.len() as Client;
-                self.insert(client_id, client);
+                self.insert(client_id.clone(), client);
                 client
             }
         }

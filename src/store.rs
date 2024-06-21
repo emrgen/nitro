@@ -29,7 +29,11 @@ pub(crate) struct DocStore {
 }
 
 impl DocStore {
-    pub(crate) fn update_client(&mut self, client: ClientId, clock: Clock) -> Client {
+    pub(crate) fn get_client(&mut self, client_id: &ClientId) -> Client {
+        self.clients.get_or_insert(client_id)
+    }
+
+    pub(crate) fn update_client(&mut self, client: &ClientId, clock: Clock) -> Client {
         self.client = self.clients.get_or_insert(client);
         self.clock = clock;
 
@@ -74,7 +78,7 @@ impl DocStore {
         self.items.replace(item, items);
     }
 
-    pub(crate) fn client(&mut self, client_id: ClientId) -> Client {
+    pub(crate) fn client(&mut self, client_id: &ClientId) -> Client {
         self.clients.get_or_insert(client_id)
     }
 
@@ -365,7 +369,7 @@ mod tests {
         assert!(store.contains(&Id::new(1, 1)));
 
         store.insert(Id::new(1, 5));
-        assert!(store.contains(&Id::new(1, 6,)));
+        assert!(store.contains(&Id::new(1, 5,)));
     }
 
     #[test]

@@ -2,9 +2,8 @@ use serde_json::Value;
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
-use crate::delete::DeleteItem;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, GetItemRef, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemKey, ItemKind, ItemRef};
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
@@ -25,6 +24,8 @@ pub(crate) enum Type {
     #[default]
     Identity,
 }
+
+impl Type {}
 
 impl Type {
     pub fn kind(&self) -> ItemKind {
@@ -79,7 +80,7 @@ impl Type {
         }
     }
 
-    pub fn set(&mut self, key: String, item: Type) {
+    pub fn set(&self, key: String, item: Type) {
         match self {
             Type::Map(n) => n.set(key, item),
             _ => panic!("set: not implemented"),
@@ -101,11 +102,15 @@ impl Type {
     }
 
     pub fn delete(&self) {
-        let store = self.item_ref().store.upgrade().unwrap();
-        let id = store.borrow_mut().next_id();
-        let item = DeleteItem::new(id, self.id().range(self.size() as u32));
-        store.borrow_mut().insert_delete(item);
-        self.item_ref().delete()
+        self.item_ref().delete(1);
+    }
+
+    pub(crate) fn clear(&self) {
+        match self {
+            Type::List(n) => n.clear(),
+            Type::Map(n) => n.clear(),
+            _ => panic!("clear: not implemented"),
+        }
     }
 
     pub(crate) fn start_id(&self) -> Id {
@@ -145,6 +150,7 @@ impl Type {
 
         let item_ref = item.item_ref();
         let mut item_mut = item_ref.borrow_mut();
+
         item_mut.data.parent_id = parent.clone().map(|p| p.id());
         item_mut.data.left_id = prev.clone().map(|p| p.id());
         item_mut.data.right_id = Some(self.id());
@@ -175,7 +181,16 @@ impl Type {
     }
 
     pub(crate) fn to_json(&self) -> Value {
-        todo!()
+        match self {
+            Type::List(n) => n.to_json(),
+            Type::Map(n) => n.to_json(),
+            Type::Text(n) => n.to_json(),
+            Type::String(n) => n.to_json(),
+            Type::Atom(n) => n.to_json(),
+            Type::Proxy(n) => n.to_json(),
+            Type::Move(n) => n.to_json(),
+            Type::Identity => panic!("to_json: not implemented"),
+        }
     }
 }
 

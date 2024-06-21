@@ -30,12 +30,19 @@ impl NAtom {
         self.borrow().content()
     }
 
+    pub(crate) fn delete(&self) {
+        self.item.delete(1);
+    }
+
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
-        self.borrow().to_json()
+        let mut map = self.borrow().to_json();
+        map.insert("content".to_string(), self.content().to_json());
+
+        serde_json::Value::Object(map)
     }
 }
 

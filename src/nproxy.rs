@@ -42,6 +42,32 @@ impl NProxy {
 }
 
 impl NProxy {
+    pub(crate) fn size(&self) -> usize {
+        if let Some(target) = self.target.as_ref() {
+            target.size()
+        } else {
+            0
+        }
+    }
+
+    fn get(&self, key: String) -> Option<Type> {
+        if let Some(target) = self.target.as_ref() {
+            target.get(key)
+        } else {
+            None
+        }
+    }
+
+    fn set(&self, key: String, item: Type) {
+        if let Some(target) = self.target.as_ref() {
+            target.set(key, item);
+        }
+    }
+
+    fn delete(&self) {
+        self.item_ref().delete(1);
+    }
+
     fn prepend(&self, item: Type) {
         if let Some(target) = self.target.as_ref() {
             target.prepend(item);
@@ -67,7 +93,17 @@ impl NProxy {
     }
 
     fn clear(&self) {
-        todo!()
+        if let Some(target) = self.target.as_ref() {
+            target.clear();
+        }
+    }
+
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        if let Some(target) = self.target.as_ref() {
+            target.to_json()
+        } else {
+            serde_json::Value::Null
+        }
     }
 }
 

@@ -1,7 +1,11 @@
-use crate::id::Id;
-use crate::item::{ItemData, ItemKey, ItemRef};
-use crate::store::WeakStoreRef;
+use std::ops::Deref;
 
+use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::item::{ItemData, ItemRef};
+use crate::store::WeakStoreRef;
+use crate::types::Type;
+
+#[derive(Clone, Debug)]
 pub(crate) struct NList {
     item: ItemRef,
 }
@@ -19,42 +23,11 @@ impl NList {
     }
 
     pub(crate) fn field(&self) -> Option<String> {
-        self.item.borrow().field()
+        self.borrow().field()
     }
 
-    pub(crate) fn size(&self) -> usize {
-        0
-    }
-
-    pub(crate) fn append(&mut self, _item: ItemRef) {
-        // self.item.append(item)
-    }
-
-    pub(crate) fn prepend(&mut self, _item: ItemRef) {
-        // self.item.append(item)
-    }
-
-    pub(crate) fn insert(&mut self, key: &ItemKey, _item: ItemRef) {
-        match key {
-            ItemKey::Number(offset) => {
-                if *offset == 0 {
-                    self.prepend(_item);
-                } else if *offset >= self.size() {
-                    self.append(_item);
-                } else {
-                    panic!("insert: not implemented")
-                }
-            }
-            ItemKey::String(_) => panic!("insert: not implemented"),
-        }
-    }
-
-    fn insert_at(&mut self, offset: usize, _item: ItemRef) {
-        // self.item.append(item)
-    }
-
-    pub(crate) fn remove(&mut self, offset: usize) {
-        // self.item.append(item)
+    fn get(&self, index: usize) -> Option<Type> {
+        self.borrow().as_list().get(index).cloned()
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -62,8 +35,69 @@ impl NList {
     }
 }
 
+impl Deref for NList {
+    type Target = ItemRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
+}
+
+impl IList for NList {
+    fn size(&self) -> usize {
+        0
+    }
+
+    fn prepend(&self, item: Type) {
+        self.item.append(item)
+    }
+
+    fn append(&self, item: Type) {
+        self.item.append(item)
+    }
+
+    fn insert(&self, offset: usize, item: Type) {
+        if offset == 0 {
+            self.prepend(item);
+        } else if offset >= self.size() {
+            self.append(item);
+        } else {
+            // self.item.insert(offset, item)
+        }
+    }
+
+    fn remove(&self, offset: usize) {
+        // self.item.append(item)
+    }
+
+    fn clear(&self) {
+        todo!()
+    }
+}
+
+impl WithId for NList {
+    fn id(&self) -> Id {
+        self.item.borrow().id()
+    }
+}
+
+impl WithIdRange for NList {
+    fn range(&self) -> IdRange {
+        self.borrow().id().range(1)
+    }
+}
+
 impl From<ItemRef> for NList {
     fn from(item: ItemRef) -> Self {
         Self { item }
     }
+}
+
+pub trait IList {
+    fn size(&self) -> usize;
+    fn prepend(&self, item: Type);
+    fn append(&self, item: Type);
+    fn insert(&self, offset: usize, item: Type);
+    fn remove(&self, index: usize);
+    fn clear(&self);
 }

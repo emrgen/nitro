@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::Display;
 use std::ops::{Add, Sub};
 
 use crate::clients::{Client, ClientMap};
@@ -26,6 +27,16 @@ impl Id {
         Id { client, clock }
     }
 
+    pub(crate) fn eq_opt(a: Option<Id>, b: Option<Id>) -> bool {
+        match (a, b) {
+            (Some(a), Some(b)) => {
+                a.client == b.client && a.compare_without_client(&b) == std::cmp::Ordering::Equal
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn compare_without_client(&self, other: &Id) -> Ordering {
         self.clock.cmp(&other.clock)
     }
@@ -46,6 +57,12 @@ impl Id {
 
     pub(crate) fn range(&self, size: u32) -> IdRange {
         IdRange::new(self.client, self.clock, self.clock + size - 1)
+    }
+}
+
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", format!("({}, {})", self.client, self.clock))
     }
 }
 
@@ -242,6 +259,10 @@ impl Add<IdRange> for IdRange {
 
 pub(crate) trait WithId {
     fn id(&self) -> Id;
+}
+
+pub(crate) trait WithIdRange {
+    fn range(&self) -> IdRange;
 }
 
 impl Split for IdRange {

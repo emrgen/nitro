@@ -14,7 +14,6 @@ mod nlist;
 mod nmap;
 mod nmove;
 mod nproxy;
-mod nroot;
 mod nstring;
 mod ntext;
 mod state;

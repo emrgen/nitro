@@ -1,5 +1,7 @@
-use crate::id::Id;
-use crate::item::{ItemData, ItemKey, ItemKind, ItemRef};
+use std::ops::Deref;
+
+use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::item::{GetItemRef, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -20,44 +22,8 @@ impl NMap {
         Self { item: item_ref }
     }
 
-    pub fn set(&mut self, key: &ItemKey, value: ItemRef) {
-        let item = self.item.borrow();
-        // item.set(key, value);
-    }
-
-    pub fn get(&self, key: ItemKey) -> Option<Type> {
-        let item = self.item.borrow();
-        let map = item.as_map().unwrap();
-        match key {
-            ItemKey::String(key) => {
-                let item = map.get(&key);
-                item.map(|item| item.clone().into())
-            }
-            ItemKey::Number(key) => {
-                let item = map.get(&key.to_string());
-                item.map(|item| item.clone().into())
-            }
-        }
-    }
-
-    pub fn remove(&mut self, key: &ItemKey) {
-        let map = self.item.borrow().as_map().unwrap();
-        let value = map.get(&key.as_string());
-        if let Some(value) = value {
-            value.delete();
-        }
-    }
-
-    pub fn keys(&self) -> Vec<ItemKey> {
-        let item = self.item.borrow();
-        let map = item.as_map().unwrap();
-        map.keys().map(|key| key.clone().into()).collect()
-    }
-
-    pub fn values(&self) -> Vec<Type> {
-        let item = self.item.borrow();
-        let map = item.as_map().unwrap();
-        map.values().map(|item| item.clone().into()).collect()
+    fn field(&self) -> Option<String> {
+        self.borrow().field()
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -65,8 +31,79 @@ impl NMap {
     }
 }
 
+impl Deref for NMap {
+    type Target = ItemRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
+}
+
+impl IMap for NMap {
+    fn size(&self) -> usize {
+        let item = self.borrow();
+        let map = item.as_map().unwrap();
+        map.len()
+    }
+
+    fn get(&self, key: String) -> Option<Type> {
+        let item = self.borrow();
+        let map = item.as_map().unwrap();
+
+        let item = map.get(&key);
+        item.map(|item| item.clone().into())
+    }
+
+    fn set(&self, field: String, item: Type) {
+        let item_ref = item.clone().item_ref();
+        item_ref.borrow_mut().data.field = Some(field);
+        self.item_ref().append(item)
+    }
+
+    fn remove(&self, key: String) {
+        let map = self.borrow().as_map().unwrap();
+        let value = map.get(&key);
+        if let Some(value) = value {
+            value.delete();
+        }
+    }
+
+    fn keys(&self) -> Vec<String> {
+        let item = self.borrow();
+        let map = item.as_map().unwrap();
+        map.keys().map(|key| key.clone().into()).collect()
+    }
+
+    fn values(&self) -> Vec<Type> {
+        let item = self.borrow();
+        let map = item.as_map().unwrap();
+        map.values().map(|item| item.clone().into()).collect()
+    }
+}
+
+impl WithId for NMap {
+    fn id(&self) -> Id {
+        self.item.borrow().id()
+    }
+}
+
+impl WithIdRange for NMap {
+    fn range(&self) -> IdRange {
+        self.item.borrow().id().range(1)
+    }
+}
+
 impl From<ItemRef> for NMap {
     fn from(item: ItemRef) -> Self {
         Self { item }
     }
+}
+
+pub trait IMap {
+    fn size(&self) -> usize;
+    fn get(&self, key: String) -> Option<Type>;
+    fn set(&self, key: String, item: Type);
+    fn remove(&self, key: String);
+    fn keys(&self) -> Vec<String>;
+    fn values(&self) -> Vec<Type>;
 }

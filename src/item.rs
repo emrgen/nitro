@@ -1,13 +1,17 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
+
+use serde_json::Value;
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::id::{Clock, Id, Split, WithId};
-use crate::store::{DocStore, WeakStoreRef};
+use crate::store::WeakStoreRef;
+use crate::types::Type;
 
 type ItemRefInner = Rc<RefCell<Item>>;
 type WeakItemRefInner = Weak<RefCell<Item>>;
@@ -27,19 +31,49 @@ impl ItemRef {
         self.item.borrow().kind.clone()
     }
 
-    pub(crate) fn delete(&self) {
-        {
-            // let store = self.store.upgrade().unwrap();
-            // let mut store = store.write().unwrap();
-            // let id = store.next_id_range(1);
-            // let delete_item = DeleteItem::new(id, self.id().range(self.size).unwrap());
-            // store.insert_delete(delete_item);
-        }
-        // let mut item = self.item.clone();
-        // item.delete()
-
-        // self.item.borrow_mut().flags |= 0x1
+    pub(crate) fn field(&self) -> Option<String> {
+        self.item.borrow().field()
     }
+
+    pub(crate) fn append(&self, item: Type) {
+        if let Some(ref end) = self.borrow().end.clone() {
+            end.item_ref().borrow_mut().right = Some(item.clone());
+            item.item_ref().borrow_mut().left = Some(end.clone());
+            self.borrow_mut().end = Some(item.clone());
+            item.item_ref().borrow_mut().data.left_id = Some(end.end_id());
+        } else {
+            self.borrow_mut().start = Some(item.clone());
+            self.borrow_mut().end = Some(item.clone());
+        }
+    }
+
+    pub(crate) fn prepend(&self, item: Type) {
+        if let Some(ref start) = self.borrow().start.clone() {
+            start.item_ref().borrow_mut().left = Some(item.clone());
+            item.item_ref().borrow_mut().right = Some(start.clone());
+            self.borrow_mut().start = Some(item.clone());
+            item.item_ref().borrow_mut().data.right_id = Some(start.id());
+        } else {
+            self.borrow_mut().start = Some(item.clone());
+            self.borrow_mut().end = Some(item.clone());
+        }
+    }
+
+    pub(crate) fn left_origin(&self) -> Option<Type> {
+        self.item.borrow().left_origin(&self.store)
+    }
+
+    pub(crate) fn delete(&self) {
+        self.borrow_mut().delete();
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        Type::from(self.clone()).size()
+    }
+}
+
+pub(crate) trait GetItemRef {
+    fn item_ref(&self) -> ItemRef;
 }
 
 impl Deref for ItemRef {
@@ -57,8 +91,8 @@ impl Encode for ItemRef {
 }
 
 impl Decode for ItemRef {
-    fn decode<D: Decoder>(d: &mut D) -> Result<ItemRef, String> {
-        Err("ItemRef decode not implemented".to_string())
+    fn decode<D: Decoder>(d: &mut D) -> Result<Self, String> {
+        Err("ItemRef::decode not implemented".to_string())
     }
 }
 
@@ -94,19 +128,17 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Item {
-    pub(crate) data: ItemData,          // data for the item
-    pub(crate) parent: Option<ItemRef>, // parent link
-    pub(crate) left: Option<ItemRef>,   // left link
-    pub(crate) right: Option<ItemRef>,  // right link
-    pub(crate) start: Option<ItemRef>,  // linked children start
-    pub(crate) end: Option<ItemRef>,    // linked children end
-    pub(crate) target: Option<ItemRef>, // indirect item ref (proxy, mover)
-    pub(crate) mover: Option<ItemRef>,  // mover ref (proxy)
-    pub(crate) movers: Option<ItemRef>, // linked movers
+    pub(crate) data: ItemData,       // data for the item
+    pub(crate) parent: Option<Type>, // parent link
+    pub(crate) left: Option<Type>,   // left link
+    pub(crate) right: Option<Type>,  // right link
+    pub(crate) start: Option<Type>,  // linked children start
+    pub(crate) end: Option<Type>,    // linked children end
+    pub(crate) target: Option<Type>, // indirect item ref (proxy, mover)
+    pub(crate) mover: Option<Type>,  // mover ref (proxy)
+    pub(crate) movers: Option<Type>, // linked movers
     pub(crate) flags: u8,
 }
-
-impl Item {}
 
 impl Item {
     pub(crate) fn new(data: ItemData) -> Self {
@@ -136,12 +168,16 @@ impl Item {
         self.data.field.clone()
     }
 
-    pub(crate) fn left_origin(&mut self, store: &DocStore) -> Option<ItemRef> {
-        self.data.left_id.and_then(|id| store.find(id))
+    pub(crate) fn left_origin(&self, store: &WeakStoreRef) -> Option<Type> {
+        self.data
+            .left_id
+            .and_then(|id| store.upgrade()?.borrow().find(id))
     }
 
-    pub(crate) fn right_origin(&mut self, store: &DocStore) -> Option<ItemRef> {
-        self.data.right_id.and_then(|id| store.find(id))
+    pub(crate) fn right_origin(&self, store: &WeakStoreRef) -> Option<Type> {
+        self.data
+            .right_id
+            .and_then(|id| store.upgrade()?.borrow().find(id))
     }
 
     pub(crate) fn delete(&mut self) {
@@ -150,37 +186,95 @@ impl Item {
 
     pub(crate) fn set(&mut self, key: &ItemKey, _ref: ItemRef) {}
 
-    pub(crate) fn as_map(&self) -> Option<HashMap<String, ItemRef>> {
+    pub(crate) fn as_map(&self) -> Option<HashMap<String, Type>> {
         let items = self.items();
         let mut map = HashMap::new();
 
-        for item in items {
-            if let Some(field) = item.borrow().field() {
+        for item in items.clone() {
+            if let Some(field) = item.item_ref().borrow().field() {
                 map.insert(field, item.clone());
+            }
+        }
+
+        // remove items that are moved or deleted
+        for item in items.iter() {
+            if item.item_ref().borrow().is_moved() || item.item_ref().borrow().is_deleted() {
+                map.remove(&item.item_ref().borrow().field().unwrap());
             }
         }
 
         Some(map)
     }
-    pub(crate) fn insert_after(&mut self, item: ItemRef) {}
-    pub(crate) fn insert_before(&mut self, item: ItemRef) {}
-    pub(crate) fn items(&self) -> Vec<ItemRef> {
-        self.all_items()
-            .into_iter()
+
+    pub(crate) fn as_list(&self) -> Vec<Type> {
+        let items = self.items();
+        let mut list = vec![];
+
+        for item in items.clone() {
+            list.push(item.clone());
+        }
+
+        // remove items that are moved or deleted
+        list.into_iter()
             .filter(|item| {
-                return item.borrow().is_moved() || item.borrow().is_deleted();
+                return item.item_ref().borrow().is_moved()
+                    || item.item_ref().borrow().is_deleted();
             })
             .collect()
     }
-    pub(crate) fn all_items(&self) -> Vec<ItemRef> {
-        let mut items: Vec<ItemRef> = vec![];
+
+    pub(crate) fn items(&self) -> Vec<Type> {
+        self.all_items()
+            .into_iter()
+            .filter(|item| {
+                return item.item_ref().borrow().is_moved()
+                    || item.item_ref().borrow().is_deleted();
+            })
+            .collect()
+    }
+
+    pub(crate) fn all_items(&self) -> Vec<Type> {
+        let mut items: Vec<Type> = vec![];
         let mut item = self.start.clone();
         while item.is_some() {
-            items.push(item.clone().unwrap());
-            item = item.unwrap().borrow().right.clone();
+            items.push(item.clone().unwrap().into());
+            item = item.unwrap().item_ref().borrow().right.clone();
         }
 
         items
+    }
+
+    pub(crate) fn to_json(&self) -> serde_json::Value {
+        let mut map = serde_json::Map::new();
+        map.insert("id".to_string(), self.data.id.to_string().into());
+        map.insert("kind".to_string(), self.data.kind.to_string().into());
+        map.insert("content".to_string(), self.data.content.to_json());
+        map.insert(
+            "field".to_string(),
+            self.data.field.clone().unwrap_or("".to_string()).into(),
+        );
+
+        if let Some(parent) = &self.parent {
+            map.insert("parent".to_string(), parent.id().to_string().into());
+        }
+
+        if let Some(left) = &self.left {
+            map.insert("left".to_string(), left.id().to_string().into());
+        }
+
+        if let Some(right) = &self.right {
+            map.insert("right".to_string(), right.id().to_string().into());
+        }
+
+        if let Some(target) = &self.target {
+            map.insert("target".to_string(), target.id().to_string().into());
+        }
+
+        if let Some(mover) = &self.mover {
+            map.insert("mover".to_string(), mover.id().to_string().into());
+        }
+
+        serde_json::Value::Object(map)
     }
 }
 
@@ -329,6 +423,21 @@ pub(crate) enum ItemKind {
     Move,
 }
 
+impl Display for ItemKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Root => write!(f, "Root"),
+            Self::Map => write!(f, "Map"),
+            Self::List => write!(f, "List"),
+            Self::Text => write!(f, "Text"),
+            Self::String => write!(f, "String"),
+            Self::Atom => write!(f, "Atom"),
+            Self::Proxy => write!(f, "Proxy"),
+            Self::Move => write!(f, "Move"),
+        }
+    }
+}
+
 impl Default for ItemKind {
     fn default() -> Self {
         Self::Atom
@@ -377,6 +486,18 @@ pub(crate) enum Content {
     None,
 }
 
+impl Content {
+    pub(crate) fn to_json(&self) -> Value {
+        match self {
+            Self::Binary(b) => Value::String(serde_json::to_string(b).unwrap()),
+            Self::String(s) => Value::String(s.clone()),
+            Self::Embed(a) => a.to_json(),
+            Self::Doc(d) => Value::String(d.guid.clone()),
+            Self::None => Value::Null,
+        }
+    }
+}
+
 impl Default for Content {
     fn default() -> Self {
         Self::None
@@ -407,4 +528,33 @@ pub(crate) enum Any {
     Binary(Vec<u8>),
     Array(Vec<Any>),
     Map(Vec<(String, Any)>),
+}
+
+impl Any {
+    pub(crate) fn to_json(&self) -> Value {
+        match self {
+            Self::True => Value::Bool(true),
+            Self::False => Value::Bool(false),
+            Self::Float32(f) => Value::Number(serde_json::Number::from_f64(*f as f64).unwrap()),
+            Self::Float64(f) => Value::Number(serde_json::Number::from_f64(*f).unwrap()),
+            Self::Int8(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::Int16(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::Int32(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::Int64(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::Uint8(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::Uint16(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::Uint32(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::Uint64(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::String(s) => Value::String(s.clone()),
+            Self::Binary(b) => Value::String(serde_json::to_string(b).unwrap()),
+            Self::Array(a) => Value::Array(a.iter().map(|a| a.to_json()).collect()),
+            Self::Map(m) => {
+                let mut map = serde_json::Map::new();
+                for (k, v) in m.iter() {
+                    map.insert(k.clone(), v.to_json());
+                }
+                Value::Object(map)
+            }
+        }
+    }
 }

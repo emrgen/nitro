@@ -1,52 +1,191 @@
-use crate::item::{ItemKey, ItemKind, ItemRef};
+use crate::codec::decoder::{Decode, Decoder};
+use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
+use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::item::{GetItemRef, ItemKind, ItemRef};
 use crate::natom::NAtom;
-use crate::nlist::NList;
-use crate::nmap::NMap;
+use crate::nlist::{IList, NList};
+use crate::nmap::{IMap, NMap};
+use crate::nmove::NMove;
+use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 
+#[derive(Debug, Clone, Default)]
 pub(crate) enum Type {
     List(NList),
     Map(NMap),
     Text(NText),
     String(NString),
     Atom(NAtom),
+    Proxy(NProxy),
+    Move(NMove),
+    #[default]
+    Identity,
 }
 
 impl Type {
-    pub(crate) fn field(&self) -> Option<String> {
-        match self {
-            Type::List(n) => n.field(),
-            _ => panic!("field: not implemented"),
-        }
+    pub fn kind(&self) -> ItemKind {
+        self.item_ref().kind()
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn field(&self) -> Option<String> {
+        self.item_ref().field()
+    }
+
+    pub fn size(&self) -> usize {
         match self {
             Type::List(n) => n.size(),
             _ => panic!("size: not implemented"),
         }
     }
 
-    pub(crate) fn append(&mut self, item: Type) {
+    pub fn append(&mut self, item: Type) {
         match self {
-            Type::List(n) => n.append(item.into()),
+            Type::List(n) => n.append(item),
             _ => panic!("append: not implemented"),
         }
     }
 
-    pub(crate) fn prepend(&mut self, item: Type) {
+    pub fn prepend(&mut self, item: Type) {
         match self {
-            Type::List(n) => n.prepend(item.into()),
+            Type::List(n) => n.prepend(item),
             _ => panic!("prepend: not implemented"),
         }
     }
 
-    pub(crate) fn insert(&mut self, key: &ItemKey, item: Type) {
+    pub fn insert(&mut self, offset: usize, item: Type) {
         match self {
-            Type::List(n) => n.insert(key, item.into()),
-            Type::Map(n) => n.set(key, item.into()),
+            Type::List(n) => n.insert(offset, item),
             _ => panic!("insert: not implemented"),
+        }
+    }
+
+    pub fn set(&mut self, key: String, item: Type) {
+        match self {
+            Type::Map(n) => n.set(key, item),
+            _ => panic!("set: not implemented"),
+        }
+    }
+
+    pub fn get(&self, key: String) -> Option<Type> {
+        match self {
+            Type::Map(n) => n.get(key),
+            _ => panic!("get: not implemented"),
+        }
+    }
+
+    pub fn delete(&self) {
+        let store = self.item_ref().store.upgrade().unwrap();
+        let id = store.borrow_mut().next_id();
+        let item = DeleteItem::new(id, self.id().range(self.size() as u32));
+        store.borrow_mut().insert_delete(item);
+        self.item_ref().delete()
+    }
+
+    pub fn remove(&self, key: String) {
+        match self {
+            Type::Map(n) => n.remove(key),
+            _ => panic!("remove: not implemented"),
+        }
+    }
+
+    pub(crate) fn start_id(&self) -> Id {
+        self.item_ref().id().range(0).start_id()
+    }
+
+    pub(crate) fn end_id(&self) -> Id {
+        self.item_ref().id().range(self.size() as u32).end_id()
+    }
+
+    pub(crate) fn insert_after(&self, item: Type) {
+        let parent = self.item_ref().borrow().parent.clone();
+        let next = self.item_ref().borrow().right.clone();
+
+        let item_ref = item.item_ref();
+        let mut item_mut = item_ref.borrow_mut();
+
+        item_mut.data.parent_id = parent.clone().map(|p| p.id());
+        item_mut.data.left_id = Some(self.id());
+        item_mut.data.right_id = next.clone().map(|n| n.id());
+
+        item_mut.parent.clone_from(&parent);
+        item_mut.left = Some(self.clone());
+        item_mut.right.clone_from(&next);
+
+        self.item_ref().borrow_mut().right = Some(item.clone());
+        if let Some(next) = next {
+            next.item_ref().borrow_mut().left = Some(item.clone());
+        } else if let Some(ref parent) = parent {
+            parent.item_ref().borrow_mut().end = Some(item.clone());
+        }
+    }
+
+    pub(crate) fn insert_before(&self, item: Type) {
+        let parent = self.item_ref().borrow().parent.clone();
+        let prev = self.item_ref().borrow().left.clone();
+
+        let item_ref = item.item_ref();
+        let mut item_mut = item_ref.borrow_mut();
+        item_mut.data.parent_id = parent.clone().map(|p| p.id());
+        item_mut.data.left_id = prev.clone().map(|p| p.id());
+        item_mut.data.right_id = Some(self.id());
+
+        item_mut.parent.clone_from(&parent);
+        item_mut.left.clone_from(&prev);
+        item_mut.right = Some(self.clone());
+
+        self.item_ref().borrow_mut().left = Some(item.clone());
+        if let Some(prev) = prev {
+            prev.item_ref().borrow_mut().right = Some(item.clone());
+        } else if let Some(ref parent) = parent {
+            parent.item_ref().borrow_mut().start = Some(item.clone());
+        }
+    }
+
+    pub(crate) fn item_ref(&self) -> ItemRef {
+        match self {
+            Type::List(n) => n.item_ref(),
+            Type::Map(n) => n.item_ref(),
+            Type::Text(n) => n.item_ref(),
+            Type::String(n) => n.item_ref(),
+            Type::Atom(n) => n.item_ref(),
+            Type::Proxy(n) => n.item_ref(),
+            Type::Move(n) => n.item_ref(),
+            Type::Identity => panic!("item_ref: not implemented"),
+        }
+    }
+}
+
+impl Encode for Type {
+    fn encode<T: Encoder>(&self, e: &mut T) {
+        e.item(&self.item_ref().borrow().data.clone());
+    }
+}
+
+impl Decode for Type {
+    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+        Err("Type::decode: not implemented".to_string())
+    }
+}
+
+impl WithId for Type {
+    fn id(&self) -> Id {
+        self.item_ref().id()
+    }
+}
+
+impl WithIdRange for Type {
+    fn range(&self) -> IdRange {
+        match &self {
+            Type::List(n) => n.range(),
+            Type::Map(n) => n.range(),
+            Type::Text(n) => n.range(),
+            Type::String(n) => n.range(),
+            Type::Atom(n) => n.range(),
+            Type::Proxy(n) => n.range(),
+            Type::Move(n) => n.range(),
+            Type::Identity => panic!("range: not implemented for identity"),
         }
     }
 }
@@ -75,6 +214,24 @@ impl From<NString> for Type {
     }
 }
 
+impl From<NAtom> for Type {
+    fn from(n: NAtom) -> Self {
+        Self::Atom(n)
+    }
+}
+
+impl From<NProxy> for Type {
+    fn from(n: NProxy) -> Self {
+        Self::Proxy(n)
+    }
+}
+
+impl From<NMove> for Type {
+    fn from(n: NMove) -> Self {
+        Self::Move(n)
+    }
+}
+
 impl From<ItemRef> for Type {
     fn from(item: ItemRef) -> Self {
         let kind = item.borrow().kind.clone();
@@ -88,6 +245,7 @@ impl From<ItemRef> for Type {
         }
     }
 }
+
 impl From<Type> for ItemRef {
     fn from(t: Type) -> Self {
         match t {
@@ -96,6 +254,9 @@ impl From<Type> for ItemRef {
             Type::Text(n) => n.item_ref(),
             Type::String(n) => n.item_ref(),
             Type::Atom(n) => n.item_ref(),
+            Type::Proxy(n) => n.item_ref(),
+            Type::Move(n) => n.item_ref(),
+            Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
     }
 }

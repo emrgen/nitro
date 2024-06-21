@@ -8,8 +8,9 @@ use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::{Clock, Id, IdRange, Split, WithId};
-use crate::item::{ItemData, ItemRef};
+use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
+use crate::types::Type;
 
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
@@ -49,12 +50,16 @@ impl DocStore {
         id
     }
 
-    pub(crate) fn find(&self, id: Id) -> Option<ItemRef> {
+    pub(crate) fn find(&self, id: Id) -> Option<Type> {
         self.items.find(id)
     }
 
-    pub(crate) fn insert(&mut self, item: ItemRef) {
-        self.items.insert(item);
+    pub(crate) fn insert(&mut self, item: Type) {
+        self.items.insert(item.clone());
+        let size = item.size();
+        if item.kind() == ItemKind::String {
+            self.id_map.insert(item.id().range(size as u32));
+        }
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -65,7 +70,7 @@ impl DocStore {
         self.deleted_items.insert(item);
     }
 
-    pub(crate) fn replace(&mut self, item: ItemRef, items: (ItemRef, ItemRef)) {
+    pub(crate) fn replace(&mut self, item: Type, items: (Type, Type)) {
         self.items.replace(item, items);
     }
 
@@ -101,7 +106,7 @@ pub(crate) struct PendingStore {
 
 pub(crate) type ItemDataStore = ClientStore<ItemData>;
 pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
-pub(crate) type ItemStore = ClientStore<ItemRef>;
+pub(crate) type ItemStore = ClientStore<Type>;
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct IdRangeMap {
@@ -285,6 +290,32 @@ impl IdClockDiff for IdStore<ItemRef> {
         let mut items = IdStore::default();
         for (id, item) in self.data.iter() {
             let data = item.borrow().data.clone();
+            // collect items that are newer than the given clock
+            if id.clock > clock {
+                items.insert(data);
+            } else if let Some(range) = id_map.get(id) {
+                // if id falls within a range split the item and collect the right side
+                if id.clock > clock {
+                    items.insert(data);
+                } else if range.start < clock && clock <= range.end {
+                    if let Ok((_, r)) = data.split(clock) {
+                        items.insert(r);
+                    }
+                }
+            }
+        }
+
+        items
+    }
+}
+
+impl IdClockDiff for IdStore<Type> {
+    type Target = IdStore<ItemData>;
+
+    fn diff(&self, clock: Clock, id_map: &IdRangeMap) -> Self::Target {
+        let mut items = IdStore::default();
+        for (id, item) in self.data.iter() {
+            let data = item.item_ref().borrow().data.clone();
             // collect items that are newer than the given clock
             if id.clock > clock {
                 items.insert(data);

@@ -1,7 +1,10 @@
-use crate::id::Id;
+use std::ops::Deref;
+
+use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{ItemData, ItemRef};
 use crate::store::WeakStoreRef;
 
+#[derive(Debug, Clone)]
 pub(crate) struct NProxy {
     pub(crate) item: ItemRef,
 }
@@ -22,5 +25,19 @@ impl NProxy {
 
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
+    }
+}
+
+impl WithIdRange for NProxy {
+    fn range(&self) -> IdRange {
+        self.borrow().id().range(1)
+    }
+}
+
+impl Deref for NProxy {
+    type Target = ItemRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
     }
 }

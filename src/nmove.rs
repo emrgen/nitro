@@ -1,8 +1,11 @@
-use crate::id::Id;
+use std::ops::Deref;
+
+use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{ItemData, ItemRef};
 use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 
+#[derive(Debug, Clone)]
 pub(crate) struct NMove {
     pub(crate) item: ItemRef,
 }
@@ -40,9 +43,29 @@ impl NMove {
 
         let store = store.upgrade().unwrap();
         let mut store = store.borrow_mut();
-        store.insert(mover.item_ref());
-        store.insert(proxy.item_ref());
+        store.insert(mover.clone().into());
+        store.insert(proxy.clone().into());
 
         (mover, proxy)
+    }
+}
+
+impl WithIdRange for NMove {
+    fn range(&self) -> IdRange {
+        self.borrow().id().range(1)
+    }
+}
+
+impl From<ItemRef> for NMove {
+    fn from(item: ItemRef) -> Self {
+        Self { item }
+    }
+}
+
+impl Deref for NMove {
+    type Target = ItemRef;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
     }
 }

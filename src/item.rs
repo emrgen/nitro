@@ -3,11 +3,10 @@ use std::cmp::{Ordering, PartialEq};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use indexmap::IndexMap;
-use serde::{Serialize, Serializer};
-use serde::ser::SerializeStruct;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
@@ -21,7 +20,6 @@ use crate::store::WeakStoreRef;
 use crate::types::Type;
 
 type ItemRefInner = Rc<RefCell<Item>>;
-type WeakItemRefInner = Weak<RefCell<Item>>;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ItemRef {
@@ -269,19 +267,12 @@ impl Item {
     }
 
     pub(crate) fn get_marks(&self) -> HashMap<String, Type> {
-        let mut mark_list: Vec<Type> = vec![];
-        let mut mark = self.marks.clone();
-
-        while mark.is_some() {
-            mark_list.push(mark.clone().unwrap());
-            mark = mark.and_then(|m| m.right().clone());
-        }
-
+        let mark_list = self.get_all_marks();
         let mut marks = HashMap::new();
 
         for mark in mark_list {
             if let Content::Mark(field) = mark.content() {
-                let (k, v) = field.key_value();
+                let (k, v) = field.get_key_value();
                 marks.insert(k, mark);
             }
         }
@@ -293,6 +284,19 @@ impl Item {
         }
 
         marks
+    }
+
+    // all marks need to match for adjacent string items to be merged into a single string
+    pub(crate) fn get_all_marks(&self) -> Vec<Type> {
+        let mut mark_list: Vec<Type> = vec![];
+        let mut mark = self.marks.clone();
+
+        while mark.is_some() {
+            mark_list.push(mark.clone().unwrap());
+            mark = mark.and_then(|m| m.right().clone());
+        }
+
+        mark_list
     }
 
     pub(crate) fn as_list(&self) -> Vec<Type> {
@@ -393,7 +397,7 @@ impl Item {
         let mut map = serde_json::Map::new();
         for (_, mark) in marks_map.iter() {
             if let Content::Mark(mark) = mark.content() {
-                let (k, v) = mark.key_value();
+                let (k, v) = mark.get_key_value();
                 map.insert(k, v);
             }
         }

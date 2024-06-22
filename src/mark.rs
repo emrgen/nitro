@@ -81,8 +81,12 @@ impl MarkContent {
         }
     }
 
-    pub(crate) fn key_value(&self) -> (String, Value) {
+    pub(crate) fn get_key_value(&self) -> (String, Value) {
         self.key_value_with_range()
+    }
+
+    pub(crate) fn get_key(&self) -> String {
+        self.get_key_value().0
     }
 }
 

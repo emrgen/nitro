@@ -144,7 +144,7 @@ impl WithId for NString {
 
 impl WithIdRange for NString {
     fn range(&self) -> IdRange {
-        self.item.borrow().id().range(self.size() as u32)
+        self.item.borrow().id().range(self.size())
     }
 }
 

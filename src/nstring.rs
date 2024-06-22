@@ -5,7 +5,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemRef};
+use crate::item::{Content, ItemData, ItemKind, ItemRef};
+use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 
 #[derive(Clone, Debug)]
@@ -17,6 +18,7 @@ impl NString {
     pub(crate) fn new(id: Id, string: String, store: WeakStoreRef) -> Self {
         let data = ItemData {
             id,
+            kind: ItemKind::String,
             content: Content::String(string),
             ..ItemData::default()
         };
@@ -38,6 +40,14 @@ impl NString {
 
     pub(crate) fn delete(&self) {
         self.item.delete(self.size() as u32);
+    }
+
+    pub(crate) fn add_mark(&self, mark: NMark) {
+        if let Content::Mark(m) = mark.item_ref().borrow_mut().content_mut() {
+            m.range = self.id().range(self.size() as u32);
+        }
+
+        self.item_ref().add_mark(mark);
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {

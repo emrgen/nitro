@@ -16,6 +16,7 @@ use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
 use crate::id::{Clock, Id, Split, WithId};
 use crate::mark::Mark;
+use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -33,15 +34,18 @@ impl ItemRef {
         Self { item, store }
     }
 
+    #[inline]
     pub(crate) fn kind(&self) -> ItemKind {
         self.item.borrow().kind.clone()
     }
 
+    #[inline]
     pub(crate) fn field(&self) -> Option<String> {
         self.item.borrow().field(self.store.clone())
     }
 
-    pub(crate) fn add_mark(&self, mark: Type) {
+    #[inline]
+    pub(crate) fn add_mark(&self, mark: NMark) {
         self.borrow_mut().add_mark(mark);
     }
 
@@ -79,6 +83,7 @@ impl ItemRef {
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
     }
 
+    #[inline]
     pub(crate) fn left_origin(&self) -> Option<Type> {
         self.borrow().left_origin(self.store.clone())
     }
@@ -214,15 +219,22 @@ impl Item {
             .and_then(|id| store.upgrade()?.borrow().find(id))
     }
 
+    #[inline]
     pub(crate) fn delete(&mut self) {
         self.flags |= 0x01;
     }
 
-    pub(crate) fn set(&mut self, key: &ItemKey, _ref: ItemRef) {}
+    pub(crate) fn set(&mut self, _key: &ItemKey, _ref: ItemRef) {}
 
-    pub(crate) fn add_mark(&mut self, mark: Type) {
+    pub(crate) fn add_mark(&mut self, mark: impl Into<Type>) {
+        let mark = mark.into();
         if let Some(ref marks) = self.marks {
-            // marks.item_ref().borrow_mut().append(mark);
+            let mut end = marks.clone();
+            while end.right().is_some() {
+                end = end.right().unwrap();
+            }
+
+            end.set_right(mark)
         } else {
             self.marks = Some(mark);
         }
@@ -230,6 +242,10 @@ impl Item {
 
     pub(crate) fn content(&self) -> Content {
         self.data.content.clone()
+    }
+
+    pub(crate) fn content_mut(&mut self) -> &mut Content {
+        &mut self.data.content
     }
 
     pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {

@@ -91,19 +91,37 @@ impl From<ItemRef> for NMark {
 #[cfg(test)]
 mod tests {
     use crate::doc::Doc;
-    use crate::id::IdRange;
     use crate::mark::MarkContent;
 
     #[test]
     fn test_nmark() {
         let doc = Doc::default();
-        let m1 = doc.mark(IdRange::default(), MarkContent::Bold);
-
-        println!("{}", serde_json::to_string(&m1).unwrap());
+        let m1 = doc.mark(MarkContent::Bold);
+        let m2 = doc.mark(MarkContent::Italic);
 
         doc.add_mark(m1);
+        doc.add_mark(m2);
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
+        println!("{}", yaml);
+        let marks = doc
+            .root
+            .map(|root| root.borrow().get_marks())
+            .unwrap_or_default();
+
+        let yaml = serde_yaml::to_string(&marks).unwrap();
+
+        println!("{}", yaml);
+    }
+
+    #[test]
+    fn test_mark_string() {
+        let doc = Doc::default();
+        let s1 = doc.string("hello");
+        let m1 = doc.mark(MarkContent::Bold);
+        s1.add_mark(m1);
+
+        let yaml = serde_yaml::to_string(&s1).unwrap();
         println!("{}", yaml);
     }
 }

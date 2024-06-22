@@ -3,7 +3,7 @@ use std::ops::Deref;
 use serde::ser::{Serialize, SerializeStruct};
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemRef};
+use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -16,6 +16,7 @@ impl NList {
     pub(crate) fn new(id: Id, store: WeakStoreRef) -> Self {
         let data = ItemData {
             id,
+            kind: ItemKind::List,
             ..ItemData::default()
         };
 

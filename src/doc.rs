@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::bimapid::Client;
 use crate::diff::Diff;
-use crate::id::{Id, IdRange};
+use crate::id::Id;
 use crate::item::{Content, ItemKey};
 use crate::mark::{Mark, MarkContent};
 use crate::natom::NAtom;
@@ -86,6 +86,7 @@ impl Doc {
         doc
     }
 
+    #[inline]
     pub fn diff(&self, state: ClientState) -> Diff {
         self.store.borrow().diff(self.opts.id.clone(), state)
     }
@@ -135,9 +136,9 @@ impl Doc {
         string
     }
 
-    pub fn mark(&self, range: IdRange, content: impl Into<MarkContent>) -> NMark {
+    pub fn mark(&self, content: impl Into<MarkContent>) -> NMark {
         let id = self.store.borrow_mut().next_id();
-        let content = Content::Mark(Mark::new(range, content.into()));
+        let content = Content::Mark(Mark::new(content.into()));
         let mark = NMark::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(mark.clone().into());
 
@@ -146,18 +147,22 @@ impl Doc {
 }
 
 impl Doc {
+    #[inline]
     pub(crate) fn add_mark(&self, mark: impl Into<NMark>) {
-        self.root.as_ref().unwrap().add_mark(mark.into());
+        self.root.as_ref().unwrap().item_ref().add_mark(mark.into())
     }
 
+    #[inline]
     fn size(&self) -> usize {
         self.root.as_ref().unwrap().size()
     }
 
+    #[inline]
     pub(crate) fn get(&self, key: impl Into<String>) -> Option<Type> {
         self.root.as_ref().unwrap().get(key.into())
     }
 
+    #[inline]
     pub(crate) fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         let key = key.into();
 

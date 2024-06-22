@@ -56,7 +56,11 @@ impl Deref for NMap {
 
 impl NMap {
     pub(crate) fn add_mark(&self, mark: NMark) {
-        self.item_ref().add_mark(mark.into());
+        if let Content::Mark(m) = mark.item_ref().borrow_mut().content_mut() {
+            m.range = self.id().into();
+        }
+
+        self.item_ref().add_mark(mark);
     }
 
     pub(crate) fn get(&self, key: String) -> Option<Type> {
@@ -103,6 +107,7 @@ impl NMap {
         }
     }
 
+    #[inline]
     pub(crate) fn delete(&self) {
         self.item.delete(1);
     }

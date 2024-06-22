@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemRef};
+use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -15,6 +15,7 @@ impl NProxy {
     pub(crate) fn new(id: Id, mover_id: Id, target_id: Id, store: WeakStoreRef) -> NProxy {
         let data = ItemData {
             id,
+            kind: ItemKind::Proxy,
             mover_id: Some(mover_id),
             target_id: Some(target_id),
             ..ItemData::default()
@@ -104,6 +105,12 @@ impl NProxy {
         } else {
             serde_json::Value::Null
         }
+    }
+}
+
+impl WithId for NProxy {
+    fn id(&self) -> Id {
+        self.item.borrow().id()
     }
 }
 

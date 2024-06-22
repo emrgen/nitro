@@ -4,7 +4,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemRef};
+use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 
 #[derive(Clone, Debug)]
@@ -16,6 +16,7 @@ impl NText {
     pub(crate) fn new(id: Id, store: WeakStoreRef) -> Self {
         let data = ItemData {
             id,
+            kind: ItemKind::Text,
             ..ItemData::default()
         };
 

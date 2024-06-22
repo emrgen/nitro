@@ -65,7 +65,8 @@ impl DocStore {
     }
 
     pub(crate) fn find(&self, id: Id) -> Option<Type> {
-        self.items.find(id)
+        let key = self.id_map.find(&id);
+        self.items.find(key)
     }
 
     pub(crate) fn insert(&mut self, item: Type) {
@@ -126,6 +127,17 @@ pub(crate) type ItemStore = ClientStore<Type>;
 #[derive(Default, Debug, Clone)]
 pub(crate) struct IdRangeMap {
     pub(crate) map: BTreeSet<IdRange>,
+}
+
+impl IdRangeMap {
+    pub(crate) fn find(&self, id: &Id) -> Id {
+        let e = self.map.get(&id.range(1));
+        if let Some(range) = e {
+            range.id()
+        } else {
+            id.clone()
+        }
+    }
 }
 
 impl IdRangeMap {

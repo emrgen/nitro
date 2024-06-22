@@ -4,10 +4,12 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Clock, Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
+use crate::mark::{Mark, MarkContent};
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
+use crate::types::Type;
 
 #[derive(Clone, Debug)]
 pub(crate) struct NString {
@@ -31,27 +33,83 @@ impl NString {
         self.borrow().content()
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> u32 {
         match self.borrow().content {
-            Content::String(ref s) => s.len(),
+            Content::String(ref s) => s.len() as u32,
             _ => panic!("NString has invalid content"),
         }
     }
 
     pub(crate) fn delete(&self) {
-        self.item.delete(self.size() as u32);
+        self.item.delete(self.size());
     }
 
-    pub(crate) fn add_mark(&self, mark: NMark) {
-        if let Content::Mark(m) = mark.item_ref().borrow_mut().content_mut() {
-            m.range = self.id().range(self.size() as u32);
-        }
+    pub(crate) fn add_mark(&self, mark: Mark) {
+        let content = MarkContent::new(self.id().range(self.size()), mark.clone());
+        let id = self
+            .store
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .next_id_range(self.size() as Clock)
+            .id();
+
+        let mark = NMark::new(id, Content::Mark(content), self.store.clone());
 
         self.item_ref().add_mark(mark);
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
+    }
+
+    pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
+        let data = self.item_ref().borrow().data.clone();
+        let (ld, rd) = data.split(offset).unwrap();
+
+        let split_marks: Vec<(Type, Type)> = self
+            .item_ref()
+            .borrow()
+            .get_marks()
+            .values()
+            .map(|mark| mark.split(offset))
+            .collect();
+
+        let left_item: Type = ItemRef::new(ld.into(), self.store.clone()).into();
+        let right_item: Type = ItemRef::new(rd.into(), self.store.clone()).into();
+
+        for (l, r) in split_marks {
+            left_item.item_ref().borrow_mut().add_mark(l);
+            right_item.item_ref().borrow_mut().add_mark(r);
+        }
+
+        left_item.set_right(right_item.clone());
+        right_item.set_left(left_item.clone());
+        left_item.set_parent(self.item_ref().borrow().parent.clone());
+        right_item.set_parent(self.item_ref().borrow().parent.clone());
+
+        let left = self.item_ref().borrow().left.clone();
+        let right = self.item_ref().borrow().right.clone();
+
+        if let Some(left) = left {
+            left.set_right(left_item.clone());
+            left_item.set_left(left);
+        } else if let Some(parent) = self.item_ref().borrow().parent.clone() {
+            parent.set_start(left_item.clone());
+        }
+
+        if let Some(right) = right {
+            right.set_left(right_item.clone());
+            right_item.set_right(right);
+        }
+
+        self.store
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .replace(self.clone().into(), (left_item.clone(), right_item.clone()));
+
+        (left_item, right_item)
     }
 
     pub(crate) fn to_json(&self) -> Value {
@@ -101,5 +159,34 @@ impl Deref for NString {
 impl From<ItemRef> for NString {
     fn from(item: ItemRef) -> Self {
         Self { item }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::doc::Doc;
+    use crate::id::Id;
+    use crate::mark::Mark;
+
+    #[test]
+    fn test_split_string() {
+        let doc = Doc::default();
+
+        let text = doc.text();
+        doc.set("text", text.clone());
+
+        let string = doc.string("hello world");
+        text.append(string.clone());
+
+        string.add_mark(Mark::Bold);
+        string.split(5);
+
+        let ls = doc.find_by_id(Id::new(0, 2)).unwrap();
+        let (l, r) = ls.split(2);
+
+        r.add_mark(Mark::Code);
+
+        let yaml = serde_yaml::to_string(&doc).unwrap();
+        println!("{}", yaml);
     }
 }

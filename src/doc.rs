@@ -10,11 +10,10 @@ use crate::bimapid::Client;
 use crate::diff::Diff;
 use crate::id::Id;
 use crate::item::{Content, ItemKey};
-use crate::mark::{Mark, MarkContent};
+use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
-use crate::nmark::NMark;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
@@ -96,6 +95,10 @@ impl Doc {
         tx.commit();
     }
 
+    pub fn find_by_id(&self, id: Id) -> Option<Type> {
+        self.store.borrow().find(id)
+    }
+
     pub fn list(&self) -> NList {
         let id = self.store.borrow_mut().next_id();
         let list = NList::new(id, Rc::downgrade(&self.store));
@@ -135,25 +138,16 @@ impl Doc {
 
         string
     }
-
-    pub fn mark(&self, content: impl Into<MarkContent>) -> NMark {
-        let id = self.store.borrow_mut().next_id();
-        let content = Content::Mark(Mark::new(content.into()));
-        let mark = NMark::new(id, content, Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(mark.clone().into());
-
-        mark
-    }
 }
 
 impl Doc {
     #[inline]
-    pub(crate) fn add_mark(&self, mark: impl Into<NMark>) {
-        self.root.as_ref().unwrap().item_ref().add_mark(mark.into())
+    pub(crate) fn add_mark(&self, mark: Mark) {
+        self.root.as_ref().unwrap().add_mark(mark);
     }
 
     #[inline]
-    fn size(&self) -> usize {
+    fn size(&self) -> u32 {
         self.root.as_ref().unwrap().size()
     }
 

@@ -14,8 +14,8 @@ use crate::bimapid::{ClientMap, FieldId, FieldMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
-use crate::id::{Clock, Id, Split, WithId};
-use crate::mark::Mark;
+use crate::id::{Id, Split, WithId};
+use crate::mark::MarkContent;
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -268,7 +268,7 @@ impl Item {
         map
     }
 
-    pub(crate) fn get_marks(&self) -> HashMap<String, Value> {
+    pub(crate) fn get_marks(&self) -> HashMap<String, Type> {
         let mut mark_list: Vec<Type> = vec![];
         let mut mark = self.marks.clone();
 
@@ -282,20 +282,17 @@ impl Item {
         for mark in mark_list {
             if let Content::Mark(field) = mark.content() {
                 let (k, v) = field.key_value();
-                marks.insert(k, (mark, v));
+                marks.insert(k, mark);
             }
         }
 
-        for (field, (mark, _)) in marks.clone().iter() {
+        for (field, mark) in marks.clone().iter() {
             if mark.item_ref().borrow().is_moved() || mark.item_ref().borrow().is_deleted() {
                 marks.remove(field);
             }
         }
 
         marks
-            .iter()
-            .map(|(k, (_, v))| (k.clone(), v.clone()))
-            .collect()
     }
 
     pub(crate) fn as_list(&self) -> Vec<Type> {
@@ -392,7 +389,14 @@ impl Item {
             s.serialize_field("mover_id", &mover.id().to_string())?;
         }
 
-        let map = self.get_marks();
+        let marks_map = self.get_marks();
+        let mut map = serde_json::Map::new();
+        for (_, mark) in marks_map.iter() {
+            if let Content::Mark(mark) = mark.content() {
+                let (k, v) = mark.key_value();
+                map.insert(k, v);
+            }
+        }
         if !map.is_empty() {
             let marks = serde_json::to_value(map).unwrap_or_default();
             s.serialize_field("marks", &marks)?;
@@ -537,32 +541,43 @@ impl ItemData {
 }
 
 impl Split for ItemData {
-    fn split(&self, at: Clock) -> Result<(Self, Self), String> {
+    fn split(&self, offset: u32) -> Result<(Self, Self), String> {
         let mut left = self.clone();
         let mut right = self.clone();
 
-        if self.kind != ItemKind::String {
-            return Err("Cannot split root item".to_string());
+        match self.kind {
+            ItemKind::String | ItemKind::Mark => {
+                // do nothing
+            }
+            _ => return Err(stringify!("Cannot split {} item", self.kind).to_string()),
         }
 
         let size = match &self.content {
-            Content::String(s) => s.len(),
+            Content::String(s) => s.len() as u32,
+            Content::Mark(m) => m.size(),
             _ => return Err("Cannot split non-string item".to_string()),
         };
 
         // split id
-        let (left_range, right_range) = self.id.range(size as u32).split(at)?;
+        let (left_range, right_range) = self.id.range(size).split(offset)?;
         left.id = left_range.start_id();
         right.id = right_range.start_id();
 
         left.right_id = Some(right_range.start_id());
         right.left_id = Some(left_range.end_id());
 
-        // split content if it is a string
-        if let Content::String(s) = &self.content {
-            let (l, r) = s.split_at(at as usize);
-            left.content = Content::String(l.to_string());
-            right.content = Content::String(r.to_string());
+        match &self.content {
+            Content::String(s) => {
+                let (l, r) = s.split_at(offset as usize);
+                left.content = Content::String(l.to_string());
+                right.content = Content::String(r.to_string());
+            }
+            Content::Mark(m) => {
+                let (l, r) = m.split(offset);
+                left.content = Content::Mark(l);
+                right.content = Content::Mark(r);
+            }
+            _ => return Err("Cannot split non-string item".to_string()),
         }
 
         Ok((left, right))
@@ -635,7 +650,7 @@ impl WithId for ItemData {
 
 #[derive(Debug, Clone)]
 pub(crate) enum ItemKey {
-    Number(usize),
+    Number(u32),
     String(String),
 }
 
@@ -656,13 +671,13 @@ impl From<String> for ItemKey {
 
 impl From<usize> for ItemKey {
     fn from(n: usize) -> Self {
-        Self::Number(n)
+        Self::Number(n as u32)
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Content {
-    Mark(Mark),
+    Mark(MarkContent),
     Binary(Vec<u8>),
     String(String),
     Types(Vec<Type>),
@@ -707,8 +722,8 @@ impl Default for Content {
     }
 }
 
-impl From<Mark> for Content {
-    fn from(m: Mark) -> Self {
+impl From<MarkContent> for Content {
+    fn from(m: MarkContent) -> Self {
         Self::Mark(m)
     }
 }

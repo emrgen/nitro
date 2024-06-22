@@ -3,9 +3,10 @@ use std::ops::Deref;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
+use crate::types::Type;
 
 #[derive(Clone, Debug)]
 pub(crate) struct NMark {
@@ -26,10 +27,16 @@ impl NMark {
         Self { item }
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn from_data(data: ItemData, store: WeakStoreRef) -> Self {
+        let item = ItemRef::new(data.into(), store);
+
+        Self { item }
+    }
+
+    pub(crate) fn size(&self) -> u32 {
         let marks = self.borrow().get_marks();
 
-        marks.len()
+        marks.len() as u32
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -44,6 +51,13 @@ impl NMark {
 impl NMark {
     pub(crate) fn content(&self) -> Content {
         self.item_ref().borrow().content.clone()
+    }
+
+    pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
+        let (ld, rd) = self.item_ref().borrow().data.split(offset).unwrap();
+        let left = NMark::from_data(ld, self.store.clone());
+        let right = NMark::from_data(rd, self.store.clone());
+        (left.into(), right.into())
     }
 }
 
@@ -91,16 +105,14 @@ impl From<ItemRef> for NMark {
 #[cfg(test)]
 mod tests {
     use crate::doc::Doc;
-    use crate::mark::MarkContent;
+    use crate::mark::Mark;
 
     #[test]
     fn test_nmark() {
         let doc = Doc::default();
-        let m1 = doc.mark(MarkContent::Bold);
-        let m2 = doc.mark(MarkContent::Italic);
 
-        doc.add_mark(m1);
-        doc.add_mark(m2);
+        doc.add_mark(Mark::Bold);
+        doc.add_mark(Mark::Italic);
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);
@@ -118,8 +130,7 @@ mod tests {
     fn test_mark_string() {
         let doc = Doc::default();
         let s1 = doc.string("hello");
-        let m1 = doc.mark(MarkContent::Bold);
-        s1.add_mark(m1);
+        s1.add_mark(Mark::Bold);
 
         let yaml = serde_yaml::to_string(&s1).unwrap();
         println!("{}", yaml);

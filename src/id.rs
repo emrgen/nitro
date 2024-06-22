@@ -216,14 +216,16 @@ impl IdRange {
         }
     }
 
-    pub(crate) fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
-        if at <= self.start || at > self.end {
+    pub(crate) fn split(&self, offset: u32) -> Result<(IdRange, IdRange), String> {
+        if offset == 0 || offset >= self.size() {
+            println!("offset: {}", offset);
+            println!("size: {}", self);
             return Err("Cannot split IdRange at invalid position".to_string());
         }
 
         Ok((
-            IdRange::new(self.client, self.start, at - 1),
-            IdRange::new(self.client, at, self.end),
+            IdRange::new(self.client, self.start, self.start + offset - 1),
+            IdRange::new(self.client, self.start + offset, self.end),
         ))
     }
 

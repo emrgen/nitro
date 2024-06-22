@@ -30,7 +30,7 @@ impl NText {
         Content::Types(items)
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> u32 {
         self.borrow().as_list().iter().map(|item| item.size()).sum()
     }
 

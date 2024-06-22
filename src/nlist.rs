@@ -25,8 +25,8 @@ impl NList {
         }
     }
 
-    pub(crate) fn size(&self) -> usize {
-        self.borrow().as_list().len()
+    pub(crate) fn size(&self) -> u32 {
+        self.borrow().as_list().len() as u32
     }
 
     pub(crate) fn field(&self) -> Option<String> {
@@ -63,7 +63,7 @@ impl NList {
     pub(crate) fn insert(&self, offset: usize, item: Type) {
         if offset == 0 {
             self.prepend(item);
-        } else if offset >= self.size() {
+        } else if offset >= self.size() as usize {
             self.append(item);
         } else {
             // self.item.insert(offset, item)
@@ -74,7 +74,7 @@ impl NList {
         if let ItemKey::Number(offset) = key {
             if offset < self.size() {
                 let items = self.borrow().as_list();
-                let item = items[offset].clone();
+                let item = items[offset as usize].clone();
                 item.delete();
             }
         }

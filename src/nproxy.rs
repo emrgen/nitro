@@ -43,7 +43,7 @@ impl NProxy {
 }
 
 impl NProxy {
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> u32 {
         if let Some(target) = self.target.as_ref() {
             target.size()
         } else {

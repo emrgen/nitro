@@ -34,7 +34,7 @@ impl NMove {
         Content::Null
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> u32 {
         1
     }
 

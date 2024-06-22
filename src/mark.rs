@@ -4,74 +4,80 @@ use serde_json::Value;
 use crate::id::IdRange;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Mark {
+pub(crate) struct MarkContent {
     pub(crate) range: IdRange,
-    pub(crate) data: MarkContent,
+    pub(crate) data: Mark,
 }
 
-impl Mark {
-    pub(crate) fn new(data: MarkContent) -> Self {
-        Self {
-            data,
-            ..Default::default()
-        }
+impl MarkContent {
+    pub(crate) fn new(range: IdRange, data: Mark) -> Self {
+        Self { range, data }
+    }
+
+    pub(crate) fn size(&self) -> u32 {
+        self.range.size()
+    }
+
+    pub(crate) fn split(&self, offset: u32) -> (MarkContent, MarkContent) {
+        let (ld, rd) = self.range.split(offset).unwrap();
+        let left = MarkContent::new(ld, self.data.clone());
+        let right = MarkContent::new(rd, self.data.clone());
+        (left, right)
     }
 
     // used for debugging
     pub(crate) fn key_value_with_range(&self) -> (String, Value) {
         match self.data {
-            MarkContent::Bold => (
+            Mark::Bold => (
                 "bold".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Italic => (
+            Mark::Italic => (
                 "italic".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Underline => (
+            Mark::Underline => (
                 "underline".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::StrikeThrough => (
+            Mark::StrikeThrough => (
                 "strikethrough".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Code => (
+            Mark::Code => (
                 "code".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Subscript => (
+            Mark::Subscript => (
                 "subscript".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Superscript => (
+            Mark::Superscript => (
                 "superscript".to_string(),
                 serde_json::to_value((self.range.to_string(), true)).unwrap(),
             ),
-            MarkContent::Color(ref color) => ("color".to_string(), color.to_string().into()),
-            MarkContent::Background(ref color) => {
-                ("background".to_string(), color.to_string().into())
-            }
-            MarkContent::Link(ref url) => ("link".to_string(), url.to_string().into()),
-            MarkContent::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
-            MarkContent::None => ("_".to_string(), Value::Null),
+            Mark::Color(ref color) => ("color".to_string(), color.to_string().into()),
+            Mark::Background(ref color) => ("background".to_string(), color.to_string().into()),
+            Mark::Link(ref url) => ("link".to_string(), url.to_string().into()),
+            Mark::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
+            Mark::None => ("_".to_string(), Value::Null),
         }
     }
 
     pub(crate) fn key_value_without_range(&self) -> (String, Value) {
         match self.data {
-            MarkContent::Bold => ("bold".into(), true.into()),
-            MarkContent::Italic => ("italic".into(), true.into()),
-            MarkContent::Underline => ("underline".into(), true.into()),
-            MarkContent::StrikeThrough => ("strikethrough".into(), true.into()),
-            MarkContent::Code => ("code".into(), true.into()),
-            MarkContent::Subscript => ("subscript".into(), true.into()),
-            MarkContent::Superscript => ("superscript".into(), true.into()),
-            MarkContent::Color(ref color) => ("color".into(), color.to_string().into()),
-            MarkContent::Background(ref color) => ("background".into(), color.to_string().into()),
-            MarkContent::Link(ref url) => ("link".into(), url.to_string().into()),
-            MarkContent::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
-            MarkContent::None => ("_".into(), Value::Null),
+            Mark::Bold => ("bold".into(), true.into()),
+            Mark::Italic => ("italic".into(), true.into()),
+            Mark::Underline => ("underline".into(), true.into()),
+            Mark::StrikeThrough => ("strikethrough".into(), true.into()),
+            Mark::Code => ("code".into(), true.into()),
+            Mark::Subscript => ("subscript".into(), true.into()),
+            Mark::Superscript => ("superscript".into(), true.into()),
+            Mark::Color(ref color) => ("color".into(), color.to_string().into()),
+            Mark::Background(ref color) => ("background".into(), color.to_string().into()),
+            Mark::Link(ref url) => ("link".into(), url.to_string().into()),
+            Mark::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
+            Mark::None => ("_".into(), Value::Null),
         }
     }
 
@@ -80,55 +86,55 @@ impl Mark {
     }
 }
 
-impl Serialize for Mark {
+impl Serialize for MarkContent {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::ser::Serializer,
     {
         let mut map = serde_json::Map::new();
         match self.data {
-            MarkContent::Bold => {
+            Mark::Bold => {
                 map.insert("bold".to_string(), true.into());
             }
-            MarkContent::Italic => {
+            Mark::Italic => {
                 map.insert("italic".to_string(), true.into());
             }
-            MarkContent::Underline => {
+            Mark::Underline => {
                 map.insert("underline".to_string(), true.into());
             }
-            MarkContent::StrikeThrough => {
+            Mark::StrikeThrough => {
                 map.insert("strikethrough".to_string(), true.into());
             }
-            MarkContent::Code => {
+            Mark::Code => {
                 map.insert("code".to_string(), true.into());
             }
-            MarkContent::Subscript => {
+            Mark::Subscript => {
                 map.insert("subscript".to_string(), true.into());
             }
-            MarkContent::Superscript => {
+            Mark::Superscript => {
                 map.insert("superscript".to_string(), true.into());
             }
-            MarkContent::Color(ref color) => {
+            Mark::Color(ref color) => {
                 map.insert("color".to_string(), color.to_string().into());
             }
-            MarkContent::Background(ref color) => {
+            Mark::Background(ref color) => {
                 map.insert("background".to_string(), color.to_string().into());
             }
-            MarkContent::Link(ref url) => {
+            Mark::Link(ref url) => {
                 map.insert("link".to_string(), url.to_string().into());
             }
-            MarkContent::Custom(ref name, ref json) => {
+            Mark::Custom(ref name, ref json) => {
                 map.insert("name".to_string(), name.to_string().into());
                 map.insert("json".to_string(), json.to_string().into());
             }
-            MarkContent::None => {}
+            Mark::None => {}
         }
         serde_json::Value::Object(map).serialize(serializer)
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) enum MarkContent {
+pub(crate) enum Mark {
     Bold,
     Italic,
     Underline,

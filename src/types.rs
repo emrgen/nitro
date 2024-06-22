@@ -3,8 +3,10 @@ use serde_json::Value;
 
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
+use crate::delete::DeleteItem;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemKey, ItemKind, ItemRef};
+use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
@@ -194,7 +196,28 @@ impl Type {
         self.item_ref().field()
     }
 
-    pub fn size(&self) -> usize {
+    pub(crate) fn add_mark(&self, mark: Mark) {
+        match self {
+            // Type::List(n) => n.add_mark(mark),
+            Type::Map(n) => n.add_mark(mark),
+            // Type::Text(n) => n.add_mark(mark),
+            Type::String(n) => n.add_mark(mark),
+            // Type::Atom(n) => n.add_mark(mark),
+            // Type::Proxy(n) => n.add_mark(mark),
+            // Type::Move(n) => n.add_mark(mark),
+            // Type::Mark(n) => n.add_mark(mark),
+            Type::Identity => panic!("add_mark: not implemented"),
+            _ => panic!("add_mark: not implemented"),
+        }
+    }
+
+    pub(crate) fn remove_mark(&self, mark: Mark) {
+        let id = self.store().upgrade().unwrap().borrow_mut().next_id();
+        let marks = self.item_ref().borrow().get_marks();
+        let item = DeleteItem::new(id, self.range());
+    }
+
+    pub fn size(&self) -> u32 {
         match self {
             Type::List(n) => n.size(),
             Type::Map(n) => n.size(),
@@ -271,6 +294,14 @@ impl Type {
             Type::List(n) => n.clear(),
             Type::Map(n) => n.clear(),
             _ => panic!("clear: not implemented"),
+        }
+    }
+
+    pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
+        match self {
+            Type::String(n) => n.split(offset),
+            Type::Mark(n) => n.split(offset),
+            _ => panic!("split: not implemented"),
         }
     }
 

@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::mark::{Mark, MarkContent};
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -26,10 +27,10 @@ impl NMap {
         Self { item: item_ref }
     }
 
-    pub(crate) fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> u32 {
         let item = self.borrow();
         let map = item.as_map(self.store.clone());
-        map.len()
+        map.len() as u32
     }
 
     fn field(&self) -> Option<String> {
@@ -55,10 +56,17 @@ impl Deref for NMap {
 }
 
 impl NMap {
-    pub(crate) fn add_mark(&self, mark: NMark) {
-        if let Content::Mark(m) = mark.item_ref().borrow_mut().content_mut() {
-            m.range = self.id().into();
-        }
+    pub(crate) fn add_mark(&self, mark: Mark) {
+        let content = MarkContent::new(self.id().into(), mark.clone());
+        let id = self
+            .store
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .next_id_range(1)
+            .id();
+
+        let mark = NMark::new(id, Content::Mark(content), self.store.clone());
 
         self.item_ref().add_mark(mark);
     }

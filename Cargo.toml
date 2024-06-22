@@ -7,7 +7,7 @@ edition = "2021"
 bimap = "0.6.3"
 log = "0.4.21"
 base64 = "0.22.1"
-serde = "1.0.203"
+serde = { version = "1.0.203", features = ["derive"] }
 indexmap = { version = "2.2.6", features = ["serde"] }
 bitflags = "2.5.0"
 

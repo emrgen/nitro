@@ -2,6 +2,8 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::{Add, Sub};
 
+use serde::Serialize;
+
 use crate::bimapid::{ClientId, ClientMap};
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
@@ -153,7 +155,7 @@ impl Decode for Id {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Serialize)]
 pub(crate) struct IdRange {
     pub(crate) client: ClientId,
     pub(crate) start: Clock,
@@ -227,6 +229,12 @@ impl IdRange {
 
     pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> IdRange {
         self.id().adjust(before, after).range(self.size())
+    }
+}
+
+impl Display for IdRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {})", self.client, self.start, self.end)
     }
 }
 

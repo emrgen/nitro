@@ -15,6 +15,7 @@ use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
 use crate::id::{Clock, Id, Split, WithId};
+use crate::mark::Mark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -38,6 +39,10 @@ impl ItemRef {
 
     pub(crate) fn field(&self) -> Option<String> {
         self.item.borrow().field(self.store.clone())
+    }
+
+    pub(crate) fn add_mark(&self, mark: Type) {
+        self.borrow_mut().add_mark(mark);
     }
 
     pub(crate) fn append(&self, value: impl Into<Type>) {
@@ -215,11 +220,19 @@ impl Item {
 
     pub(crate) fn set(&mut self, key: &ItemKey, _ref: ItemRef) {}
 
+    pub(crate) fn add_mark(&mut self, mark: Type) {
+        if let Some(ref marks) = self.marks {
+            // marks.item_ref().borrow_mut().append(mark);
+        } else {
+            self.marks = Some(mark);
+        }
+    }
+
     pub(crate) fn content(&self) -> Content {
         self.data.content.clone()
     }
 
-    pub(crate) fn as_map(&self, store: WeakStoreRef) -> Option<HashMap<String, Type>> {
+    pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {
         let items = self.items();
         let mut map = HashMap::new();
 
@@ -236,7 +249,37 @@ impl Item {
             }
         }
 
-        Some(map)
+        map
+    }
+
+    pub(crate) fn get_marks(&self) -> HashMap<String, Value> {
+        let mut mark_list: Vec<Type> = vec![];
+        let mut mark = self.marks.clone();
+
+        while mark.is_some() {
+            mark_list.push(mark.clone().unwrap());
+            mark = mark.and_then(|m| m.right().clone());
+        }
+
+        let mut marks = HashMap::new();
+
+        for mark in mark_list {
+            if let Content::Mark(field) = mark.content() {
+                let (k, v) = field.key_value();
+                marks.insert(k, (mark, v));
+            }
+        }
+
+        for (field, (mark, _)) in marks.clone().iter() {
+            if mark.item_ref().borrow().is_moved() || mark.item_ref().borrow().is_deleted() {
+                marks.remove(field);
+            }
+        }
+
+        marks
+            .iter()
+            .map(|(k, (_, v))| (k.clone(), v.clone()))
+            .collect()
     }
 
     pub(crate) fn as_list(&self) -> Vec<Type> {
@@ -270,8 +313,8 @@ impl Item {
         let mut items: Vec<Type> = vec![];
         let mut item = self.start.clone();
         while item.is_some() {
-            items.push(item.clone().unwrap().into());
-            item = item.unwrap().item_ref().borrow().right.clone();
+            items.push(item.clone().unwrap());
+            item = item.and_then(|i| i.right().clone());
         }
 
         items
@@ -331,6 +374,12 @@ impl Item {
 
         if let Some(mover) = &self.mover_id {
             s.serialize_field("mover_id", &mover.id().to_string())?;
+        }
+
+        let map = self.get_marks();
+        if !map.is_empty() {
+            let marks = serde_json::to_value(map).unwrap_or_default();
+            s.serialize_field("marks", &marks)?;
         }
 
         Ok(())
@@ -538,6 +587,7 @@ pub(crate) enum ItemKind {
     Atom,
     Proxy,
     Move,
+    Mark,
 }
 
 impl Display for ItemKind {
@@ -550,6 +600,7 @@ impl Display for ItemKind {
             Self::Atom => write!(f, "atom"),
             Self::Proxy => write!(f, "proxy"),
             Self::Move => write!(f, "move"),
+            Self::Mark => write!(f, "mark"),
         }
     }
 }
@@ -595,6 +646,7 @@ impl From<usize> for ItemKey {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Content {
+    Mark(Mark),
     Binary(Vec<u8>),
     String(String),
     Types(Vec<Type>),
@@ -606,6 +658,7 @@ pub(crate) enum Content {
 impl Content {
     pub(crate) fn to_json(&self) -> Value {
         match self {
+            Self::Mark(m) => Value::String(serde_json::to_string(m).unwrap()),
             Self::Binary(b) => Value::String(serde_json::to_string(b).unwrap()),
             Self::String(s) => Value::String(s.clone()),
             Self::Types(t) => Value::Array(t.iter().map(|t| t.to_json()).collect()),
@@ -635,6 +688,12 @@ impl Serialize for Content {
 impl Default for Content {
     fn default() -> Self {
         Self::Null
+    }
+}
+
+impl From<Mark> for Content {
+    fn from(m: Mark) -> Self {
+        Self::Mark(m)
     }
 }
 

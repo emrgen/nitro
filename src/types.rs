@@ -8,6 +8,7 @@ use crate::item::{Content, ItemKey, ItemKind, ItemRef};
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
+use crate::nmark::NMark;
 use crate::nmove::NMove;
 use crate::nproxy::NProxy;
 use crate::nstring::NString;
@@ -23,6 +24,7 @@ pub(crate) enum Type {
     Atom(NAtom),
     Proxy(NProxy),
     Move(NMove),
+    Mark(NMark),
     #[default]
     Identity,
 }
@@ -44,7 +46,7 @@ impl Type {
     }
 
     pub(crate) fn parent_id(&self) -> Option<Id> {
-        self.item_ref().borrow().data.parent_id.clone()
+        self.item_ref().borrow().data.parent_id
     }
 
     pub(crate) fn left(&self) -> Option<Type> {
@@ -175,6 +177,7 @@ impl Type {
             Type::Atom(n) => n.item_ref(),
             Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
+            Type::Mark(n) => n.item_ref(),
             Type::Identity => panic!("item_ref: not implemented"),
         }
     }
@@ -200,6 +203,7 @@ impl Type {
             Type::Atom(n) => n.size(),
             Type::Proxy(n) => n.size(),
             Type::Move(n) => n.size(),
+            Type::Mark(n) => n.size(),
             _ => panic!("size: not implemented"),
         }
     }
@@ -210,6 +214,8 @@ impl Type {
             Type::Atom(n) => n.content(),
             Type::Text(n) => n.content(),
             Type::Proxy(n) => n.content(),
+            Type::Move(n) => n.content(),
+            Type::Mark(n) => n.content(),
             _ => panic!("content: not implemented"),
         }
     }
@@ -277,6 +283,7 @@ impl Type {
             Type::Atom(n) => n.to_json(),
             Type::Proxy(n) => n.to_json(),
             Type::Move(n) => n.to_json(),
+            Type::Mark(n) => n.to_json(),
             Type::Identity => panic!("to_json: not implemented"),
         }
     }
@@ -307,7 +314,7 @@ impl Encode for Type {
 }
 
 impl Decode for Type {
-    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+    fn decode<T: Decoder>(_d: &mut T) -> Result<Self, String> {
         Err("Type::decode: not implemented".to_string())
     }
 }
@@ -339,6 +346,7 @@ impl WithIdRange for Type {
             Type::Atom(n) => n.range(),
             Type::Proxy(n) => n.range(),
             Type::Move(n) => n.range(),
+            Type::Mark(n) => n.range(),
             Type::Identity => panic!("range: not implemented for identity"),
         }
     }
@@ -386,6 +394,12 @@ impl From<NMove> for Type {
     }
 }
 
+impl From<NMark> for Type {
+    fn from(n: NMark) -> Self {
+        Self::Mark(n)
+    }
+}
+
 impl From<ItemRef> for Type {
     fn from(item: ItemRef) -> Self {
         let kind = item.borrow().kind.clone();
@@ -410,6 +424,7 @@ impl From<Type> for ItemRef {
             Type::Atom(n) => n.item_ref(),
             Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
+            Type::Mark(n) => n.item_ref(),
             Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
     }

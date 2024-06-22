@@ -8,11 +8,13 @@ use uuid::Uuid;
 
 use crate::bimapid::Client;
 use crate::diff::Diff;
-use crate::id::Id;
+use crate::id::{Id, IdRange};
 use crate::item::{Content, ItemKey};
+use crate::mark::{Mark, MarkContent};
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
+use crate::nmark::NMark;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
@@ -44,6 +46,8 @@ pub(crate) struct Doc {
     pub(crate) root: Option<NMap>,
     pub(crate) store: StoreRef,
 }
+
+impl Doc {}
 
 impl Doc {
     pub(crate) fn new(opts: DocOpts) -> Self {
@@ -130,9 +134,22 @@ impl Doc {
 
         string
     }
+
+    pub fn mark(&self, range: IdRange, content: impl Into<MarkContent>) -> NMark {
+        let id = self.store.borrow_mut().next_id();
+        let content = Content::Mark(Mark::new(range, content.into()));
+        let mark = NMark::new(id, content, Rc::downgrade(&self.store));
+        self.store.borrow_mut().insert(mark.clone().into());
+
+        mark
+    }
 }
 
 impl Doc {
+    pub(crate) fn add_mark(&self, mark: impl Into<NMark>) {
+        self.root.as_ref().unwrap().add_mark(mark.into());
+    }
+
     fn size(&self) -> usize {
         self.root.as_ref().unwrap().size()
     }
@@ -200,7 +217,7 @@ impl Serialize for Doc {
         s.serialize_field("created_by", &self.opts.crated_by)?;
         if let Some(root) = &self.root {
             root.borrow().serialize(&mut s)?;
-            let map = root.borrow().as_map(Rc::downgrade(&self.store)).unwrap();
+            let map = root.borrow().as_map(Rc::downgrade(&self.store));
             let content = serde_json::to_value(map).unwrap_or_default();
             s.serialize_field("content", &content)?;
         }

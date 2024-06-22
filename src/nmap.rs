@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -27,7 +28,7 @@ impl NMap {
 
     pub(crate) fn size(&self) -> usize {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
+        let map = item.as_map(self.store.clone());
         map.len()
     }
 
@@ -54,12 +55,16 @@ impl Deref for NMap {
 }
 
 impl NMap {
+    pub(crate) fn add_mark(&self, mark: NMark) {
+        self.item_ref().add_mark(mark.into());
+    }
+
     pub(crate) fn get(&self, key: String) -> Option<Type> {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
+        let map = item.as_map(self.store.clone());
 
         let item = map.get(&key);
-        item.map(|item| item.clone().into())
+        item.cloned()
     }
 
     pub(crate) fn set(&self, field: impl Into<String>, item: Type) {
@@ -71,7 +76,7 @@ impl NMap {
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {
-        let map = self.borrow().as_map(self.store.clone()).unwrap();
+        let map = self.borrow().as_map(self.store.clone());
         let value = map.get(&key.as_string());
         if let Some(value) = value {
             value.delete();
@@ -80,19 +85,19 @@ impl NMap {
 
     pub(crate) fn keys(&self) -> Vec<String> {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
-        map.keys().map(|key| key.clone().into()).collect()
+        let map = item.as_map(self.store.clone());
+        map.keys().cloned().collect()
     }
 
     pub(crate) fn values(&self) -> Vec<Type> {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
-        map.values().map(|item| item.clone().into()).collect()
+        let map = item.as_map(self.store.clone());
+        map.values().cloned().collect()
     }
 
     pub(crate) fn clear(&self) {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
+        let map = item.as_map(self.store.clone());
         for item in map.values() {
             item.delete();
         }
@@ -105,7 +110,7 @@ impl NMap {
     pub(crate) fn to_json(&self) -> serde_json::Value {
         let mut json = self.borrow().to_json();
         let item = self.borrow();
-        let map = item.as_map(self.store.clone()).unwrap();
+        let map = item.as_map(self.store.clone());
         let mut content = serde_json::Map::new();
         for (key, value) in map.iter() {
             content.insert(key.clone(), value.to_json());
@@ -125,7 +130,7 @@ impl Serialize for NMap {
         let mut s = serializer.serialize_struct("Doc", self.borrow().serialize_size() + 1)?;
         self.borrow().serialize(&mut s)?;
 
-        let map = self.borrow().as_map(self.store.clone()).unwrap();
+        let map = self.borrow().as_map(self.store.clone());
         let content = serde_json::to_value(map).unwrap_or_default();
         s.serialize_field("content", &content)?;
 

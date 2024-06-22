@@ -86,7 +86,20 @@ impl MarkContent {
     }
 
     pub(crate) fn get_key(&self) -> String {
-        self.get_key_value().0
+        match self.data {
+            Mark::Bold => "bold".to_string(),
+            Mark::Italic => "italic".to_string(),
+            Mark::Underline => "underline".to_string(),
+            Mark::StrikeThrough => "strikethrough".to_string(),
+            Mark::Code => "code".to_string(),
+            Mark::Subscript => "subscript".to_string(),
+            Mark::Superscript => "superscript".to_string(),
+            Mark::Color(_) => "color".to_string(),
+            Mark::Background(_) => "background".to_string(),
+            Mark::Link(_) => "link".to_string(),
+            Mark::Custom(ref name, _) => name.to_string(),
+            Mark::None => "_".to_string(),
+        }
     }
 }
 

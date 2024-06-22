@@ -218,8 +218,6 @@ impl IdRange {
 
     pub(crate) fn split(&self, offset: u32) -> Result<(IdRange, IdRange), String> {
         if offset == 0 || offset >= self.size() {
-            println!("offset: {}", offset);
-            println!("size: {}", self);
             return Err("Cannot split IdRange at invalid position".to_string());
         }
 

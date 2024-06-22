@@ -183,6 +183,18 @@ impl Type {
             Type::Identity => panic!("item_ref: not implemented"),
         }
     }
+
+    pub(crate) fn is_moved(&self) -> bool {
+        self.item_ref().borrow().is_moved()
+    }
+
+    pub(crate) fn is_deleted(&self) -> bool {
+        self.item_ref().borrow().is_deleted()
+    }
+
+    pub(crate) fn is_visible(&self) -> bool {
+        !self.is_moved() && !self.is_deleted()
+    }
 }
 
 impl Type {}
@@ -331,9 +343,10 @@ impl Serialize for Type {
             Type::Text(n) => n.serialize(serializer),
             Type::String(n) => n.serialize(serializer),
             Type::Atom(n) => n.serialize(serializer),
+            Type::Mark(n) => n.serialize(serializer),
             // Type::Proxy(n) => n.serialize(serializer),
             // Type::Move(n) => n.serialize(serializer),
-            _ => panic!("serialize: not implemented"),
+            _ => panic!("Type: serialize: not implemented for {:?}", self),
         }
     }
 }

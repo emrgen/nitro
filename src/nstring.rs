@@ -40,6 +40,7 @@ impl NString {
         }
     }
 
+    // delete string
     pub(crate) fn delete(&self) {
         self.item.delete(self.size());
     }
@@ -71,7 +72,7 @@ impl NString {
             .item_ref()
             .borrow()
             .get_marks()
-            .values()
+            .iter()
             .map(|mark| mark.split(offset))
             .collect();
 
@@ -183,8 +184,9 @@ mod test {
 
         let ls = doc.find_by_id(Id::new(0, 2)).unwrap();
         let (l, r) = ls.split(2);
-
         r.add_mark(Mark::Code);
+
+        // l.delete();
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);

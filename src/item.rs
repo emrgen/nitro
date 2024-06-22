@@ -258,7 +258,7 @@ impl Item {
 
         // remove items that are moved or deleted
         for item in items.iter() {
-            if item.item_ref().borrow().is_moved() || item.item_ref().borrow().is_deleted() {
+            if !item.is_visible() {
                 map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
             }
         }
@@ -266,24 +266,23 @@ impl Item {
         map
     }
 
-    pub(crate) fn get_marks(&self) -> HashMap<String, Type> {
+    pub(crate) fn get_marks(&self) -> Vec<Type> {
         let mark_list = self.get_all_marks();
         let mut marks = HashMap::new();
 
         for mark in mark_list {
-            if let Content::Mark(field) = mark.content() {
-                let (k, v) = field.get_key_value();
-                marks.insert(k, mark);
+            if let Content::Mark(mark_type) = mark.content() {
+                marks.insert(mark_type.get_key(), mark);
             }
         }
 
         for (field, mark) in marks.clone().iter() {
-            if mark.item_ref().borrow().is_moved() || mark.item_ref().borrow().is_deleted() {
+            if !mark.is_visible() {
                 marks.remove(field);
             }
         }
 
-        marks
+        marks.into_iter().map(|(_, v)| v).collect()
     }
 
     // all marks need to match for adjacent string items to be merged into a single string
@@ -308,21 +307,13 @@ impl Item {
         }
 
         // remove items that are moved or deleted
-        list.into_iter()
-            .filter(|item| {
-                return !item.item_ref().borrow().is_moved()
-                    && !item.item_ref().borrow().is_deleted();
-            })
-            .collect()
+        list.into_iter().filter(|item| item.is_visible()).collect()
     }
 
     pub(crate) fn items(&self) -> Vec<Type> {
         self.all_items()
             .into_iter()
-            .filter(|item| {
-                return !item.item_ref().borrow().is_moved()
-                    && !item.item_ref().borrow().is_deleted();
-            })
+            .filter(|item| item.is_visible())
             .collect()
     }
 
@@ -395,7 +386,7 @@ impl Item {
 
         let marks_map = self.get_marks();
         let mut map = serde_json::Map::new();
-        for (_, mark) in marks_map.iter() {
+        for mark in marks_map.iter() {
             if let Content::Mark(mark) = mark.content() {
                 let (k, v) = mark.get_key_value();
                 map.insert(k, v);

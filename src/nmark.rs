@@ -67,7 +67,6 @@ impl Serialize for NMark {
         S: serde::ser::Serializer,
     {
         let content = self.content();
-        println!("{:?}", content);
         if let Content::Mark(mark) = &content {
             serializer.serialize_some(mark)
         } else {
@@ -113,6 +112,7 @@ mod tests {
 
         doc.add_mark(Mark::Bold);
         doc.add_mark(Mark::Italic);
+        doc.add_mark(Mark::Color("red".into()));
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);
@@ -122,7 +122,6 @@ mod tests {
             .unwrap_or_default();
 
         let yaml = serde_yaml::to_string(&marks).unwrap();
-
         println!("{}", yaml);
     }
 

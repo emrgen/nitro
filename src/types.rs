@@ -12,6 +12,7 @@ use crate::nmove::NMove;
 use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
+use crate::store::WeakStoreRef;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) enum Type {
@@ -24,6 +25,159 @@ pub(crate) enum Type {
     Move(NMove),
     #[default]
     Identity,
+}
+
+impl Type {
+    pub(crate) fn store(&self) -> WeakStoreRef {
+        self.item_ref().store.clone()
+    }
+    pub(crate) fn right_origin(&self) -> Option<Type> {
+        self.item_ref().borrow().right_origin(self.store())
+    }
+
+    pub(crate) fn left_origin(&self) -> Option<Type> {
+        self.item_ref().borrow().left_origin(self.store())
+    }
+
+    pub(crate) fn parent(&self) -> Option<Type> {
+        self.item_ref().borrow().parent.clone()
+    }
+
+    pub(crate) fn parent_id(&self) -> Option<Id> {
+        self.item_ref().borrow().data.parent_id.clone()
+    }
+
+    pub(crate) fn left(&self) -> Option<Type> {
+        self.item_ref().borrow().left.clone()
+    }
+
+    pub(crate) fn right(&self) -> Option<Type> {
+        self.item_ref().borrow().right.clone()
+    }
+
+    pub(crate) fn left_id(&self) -> Option<Id> {
+        self.item_ref().borrow().data.left_id.clone()
+    }
+
+    pub(crate) fn right_id(&self) -> Option<Id> {
+        self.item_ref().borrow().data.right_id.clone()
+    }
+
+    pub(crate) fn start(&self) -> Option<Type> {
+        self.item_ref().borrow().start.clone()
+    }
+
+    pub(crate) fn end(&self) -> Option<Type> {
+        self.item_ref().borrow().end.clone()
+    }
+
+    pub(crate) fn start_id(&self) -> Id {
+        self.item_ref().id().range(0).start_id()
+    }
+
+    pub(crate) fn end_id(&self) -> Id {
+        self.item_ref().id().range(self.size() as u32).end_id()
+    }
+
+    pub(crate) fn set_parent(&self, parent: impl Into<Option<Type>>) {
+        self.item_ref()
+            .borrow_mut()
+            .parent
+            .clone_from(&parent.into());
+    }
+
+    pub(crate) fn set_parent_id(&self, parent_id: impl Into<Option<Id>>) {
+        self.item_ref()
+            .borrow_mut()
+            .parent_id
+            .clone_from(&parent_id.into());
+    }
+
+    pub(crate) fn set_left(&self, left: impl Into<Option<Type>>) {
+        self.item_ref().borrow_mut().left.clone_from(&left.into());
+    }
+
+    pub(crate) fn set_left_id(&self, left_id: impl Into<Option<Id>>) {
+        self.item_ref()
+            .borrow_mut()
+            .left_id
+            .clone_from(&left_id.into());
+    }
+
+    pub(crate) fn set_right(&self, right: impl Into<Option<Type>>) {
+        self.item_ref().borrow_mut().right.clone_from(&right.into());
+    }
+
+    pub(crate) fn set_right_id(&self, right_id: impl Into<Option<Id>>) {
+        self.item_ref()
+            .borrow_mut()
+            .data
+            .right_id
+            .clone_from(&right_id.into());
+    }
+
+    pub(crate) fn set_start(&self, start: impl Into<Option<Type>>) {
+        self.item_ref().borrow_mut().start.clone_from(&start.into());
+    }
+
+    pub(crate) fn set_end(&self, end: impl Into<Option<Type>>) {
+        self.item_ref().borrow_mut().end.clone_from(&end.into());
+    }
+
+    pub(crate) fn insert_after(&self, item: Type) {
+        let parent = self.parent();
+        let next = self.right();
+
+        item.set_parent_id(parent.clone().map(|p| p.id()));
+        item.set_left_id(Some(self.id()));
+        item.set_right_id(next.clone().map(|n| n.id()));
+
+        item.set_parent(parent.clone());
+        item.set_left(self.clone());
+        item.set_right(next.clone());
+
+        self.set_right(item.clone());
+
+        if let Some(next) = next {
+            next.set_left(item.clone());
+        } else if let Some(ref parent) = parent {
+            parent.set_end(item.clone());
+        }
+    }
+
+    pub(crate) fn insert_before(&self, item: Type) {
+        let parent = self.parent();
+        let prev = self.left();
+
+        item.set_parent_id(parent.clone().map(|p| p.id()));
+        item.set_left_id(prev.clone().map(|p| p.id()));
+        item.set_right_id(Some(self.id()));
+
+        item.set_parent(parent.clone());
+        item.set_left(prev.clone());
+        item.set_right(self.clone());
+
+        self.set_left(item.clone());
+
+        if let Some(prev) = prev {
+            prev.set_right(item.clone());
+        } else if let Some(ref parent) = parent {
+            parent.set_start(item.clone());
+        }
+    }
+
+    pub(crate) fn item_ref(&self) -> ItemRef {
+        match self {
+            Type::List(n) => n.item_ref(),
+            Type::Map(n) => n.item_ref(),
+            Type::Text(n) => n.item_ref(),
+            Type::String(n) => n.item_ref(),
+            Type::Atom(n) => n.item_ref(),
+            Type::Proxy(n) => n.item_ref(),
+            Type::Move(n) => n.item_ref(),
+            Type::Identity => panic!("item_ref: not implemented"),
+        }
+    }
 }
 
 impl Type {}
@@ -114,73 +268,6 @@ impl Type {
         }
     }
 
-    pub(crate) fn start_id(&self) -> Id {
-        self.item_ref().id().range(0).start_id()
-    }
-
-    pub(crate) fn end_id(&self) -> Id {
-        self.item_ref().id().range(self.size() as u32).end_id()
-    }
-
-    pub(crate) fn insert_after(&self, item: Type) {
-        let parent = self.item_ref().borrow().parent.clone();
-        let next = self.item_ref().borrow().right.clone();
-
-        let item_ref = item.item_ref();
-        let mut item_mut = item_ref.borrow_mut();
-
-        item_mut.data.parent_id = parent.clone().map(|p| p.id());
-        item_mut.data.left_id = Some(self.id());
-        item_mut.data.right_id = next.clone().map(|n| n.id());
-
-        item_mut.parent.clone_from(&parent);
-        item_mut.left = Some(self.clone());
-        item_mut.right.clone_from(&next);
-
-        self.item_ref().borrow_mut().right = Some(item.clone());
-        if let Some(next) = next {
-            next.item_ref().borrow_mut().left = Some(item.clone());
-        } else if let Some(ref parent) = parent {
-            parent.item_ref().borrow_mut().end = Some(item.clone());
-        }
-    }
-
-    pub(crate) fn insert_before(&self, item: Type) {
-        let parent = self.item_ref().borrow().parent.clone();
-        let prev = self.item_ref().borrow().left.clone();
-
-        let item_ref = item.item_ref();
-        let mut item_mut = item_ref.borrow_mut();
-
-        item_mut.data.parent_id = parent.clone().map(|p| p.id());
-        item_mut.data.left_id = prev.clone().map(|p| p.id());
-        item_mut.data.right_id = Some(self.id());
-
-        item_mut.parent.clone_from(&parent);
-        item_mut.left.clone_from(&prev);
-        item_mut.right = Some(self.clone());
-
-        self.item_ref().borrow_mut().left = Some(item.clone());
-        if let Some(prev) = prev {
-            prev.item_ref().borrow_mut().right = Some(item.clone());
-        } else if let Some(ref parent) = parent {
-            parent.item_ref().borrow_mut().start = Some(item.clone());
-        }
-    }
-
-    pub(crate) fn item_ref(&self) -> ItemRef {
-        match self {
-            Type::List(n) => n.item_ref(),
-            Type::Map(n) => n.item_ref(),
-            Type::Text(n) => n.item_ref(),
-            Type::String(n) => n.item_ref(),
-            Type::Atom(n) => n.item_ref(),
-            Type::Proxy(n) => n.item_ref(),
-            Type::Move(n) => n.item_ref(),
-            Type::Identity => panic!("item_ref: not implemented"),
-        }
-    }
-
     pub(crate) fn to_json(&self) -> Value {
         match self {
             Type::List(n) => n.to_json(),
@@ -228,6 +315,17 @@ impl Decode for Type {
 impl WithId for Type {
     fn id(&self) -> Id {
         self.item_ref().id()
+    }
+}
+
+impl From<Type> for Option<Id> {
+    fn from(value: Type) -> Self {
+        Some(value.id())
+    }
+}
+impl From<&Type> for Option<Id> {
+    fn from(value: &Type) -> Self {
+        Some(value.id())
     }
 }
 

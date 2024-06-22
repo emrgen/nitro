@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::rc::{Rc, Weak};
 
 use indexmap::IndexMap;
@@ -75,7 +75,7 @@ impl ItemRef {
     }
 
     pub(crate) fn left_origin(&self) -> Option<Type> {
-        self.borrow().left_origin(&self.store)
+        self.borrow().left_origin(self.store.clone())
     }
 
     pub(crate) fn delete(&self, size: u32) {
@@ -147,6 +147,7 @@ pub(crate) struct Item {
     pub(crate) end: Option<Type>,    // linked children end
     pub(crate) target: Option<Type>, // indirect item ref (proxy, mover)
     pub(crate) mover: Option<Type>,  // mover ref (proxy)
+    pub(crate) marks: Option<Type>,  // linked movers
     pub(crate) movers: Option<Type>, // linked movers
     pub(crate) flags: u8,
 }
@@ -168,6 +169,7 @@ impl Item {
             end: None,
             target: None,
             mover: None,
+            marks: None,
             movers: None,
             flags: 0,
         }
@@ -189,13 +191,19 @@ impl Item {
         field.map(|s| s.to_string())
     }
 
-    pub(crate) fn left_origin(&self, store: &WeakStoreRef) -> Option<Type> {
+    pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {
+        self.data
+            .parent_id
+            .and_then(|id| store.upgrade()?.borrow().find(id))
+    }
+
+    pub(crate) fn left_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .left_id
             .and_then(|id| store.upgrade()?.borrow().find(id))
     }
 
-    pub(crate) fn right_origin(&self, store: &WeakStoreRef) -> Option<Type> {
+    pub(crate) fn right_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .right_id
             .and_then(|id| store.upgrade()?.borrow().find(id))
@@ -385,6 +393,12 @@ impl Deref for Item {
 
     fn deref(&self) -> &Self::Target {
         &self.data
+    }
+}
+
+impl DerefMut for Item {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
     }
 }
 

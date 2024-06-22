@@ -159,8 +159,12 @@ mod test {
 
         assert_eq!(list.size(), 3);
 
+        let yaml = serde_yaml::to_string(&list).unwrap();
+
+        println!("{}", yaml);
+
         let expect = r#"id: (0, 1)
-kind: atom
+kind: list
 parent_id: (0, 0)
 content:
 - content: a
@@ -179,7 +183,7 @@ content:
   parent_id: (0, 1)
 "#;
 
-        assert_eq!(serde_yaml::to_string(&list).unwrap(), expect);
+        assert_eq!(yaml, expect);
     }
 
     #[test]
@@ -218,7 +222,7 @@ content:
         kind: atom
         parent_id: (0, 2)
       id: (0, 2)
-      kind: atom
+      kind: list
       parent_id: (0, 1)
     - content: b
       id: (0, 4)
@@ -226,7 +230,7 @@ content:
       left_id: (0, 2)
       parent_id: (0, 1)
     id: (0, 1)
-    kind: atom
+    kind: list
     parent_id: (0, 0)
 "#;
             assert_eq!(yaml, expect);

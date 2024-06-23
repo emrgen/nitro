@@ -60,10 +60,10 @@ impl NMove {
         let mut store = store.borrow_mut();
 
         let mover = NMove::new(mover_id, proxy_id, mover_store);
-        store.insert(mover.clone().into());
+        store.insert(mover.clone());
 
         let proxy = NProxy::new(proxy_id, mover_id, target_id, proxy_store);
-        store.insert(proxy.clone().into());
+        store.insert(proxy.clone());
 
         (mover, proxy)
     }

@@ -29,6 +29,7 @@ impl NString {
             item: ItemRef::new(data.into(), store),
         }
     }
+
     pub(crate) fn content(&self) -> Content {
         self.borrow().content()
     }
@@ -41,6 +42,7 @@ impl NString {
     }
 
     // delete string
+    #[inline]
     pub(crate) fn delete(&self) {
         self.item.delete(self.size());
     }
@@ -64,7 +66,18 @@ impl NString {
         self.item.clone()
     }
 
-    pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
+    pub(crate) fn to_json(&self) -> Value {
+        let mut map = serde_json::Map::new();
+
+        map.insert("text".to_string(), self.borrow().content().to_json());
+
+        map.into()
+    }
+}
+
+impl Split for NString {
+    type Target = Type;
+    fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String> {
         let data = self.item_ref().borrow().data.clone();
         let (ld, rd) = data.split(offset).unwrap();
 
@@ -110,15 +123,7 @@ impl NString {
             .borrow_mut()
             .replace(self.clone().into(), (left_item.clone(), right_item.clone()));
 
-        (left_item, right_item)
-    }
-
-    pub(crate) fn to_json(&self) -> Value {
-        let mut map = serde_json::Map::new();
-
-        map.insert("text".to_string(), self.borrow().content().to_json());
-
-        map.into()
+        Ok((left_item, right_item))
     }
 }
 
@@ -166,7 +171,7 @@ impl From<ItemRef> for NString {
 #[cfg(test)]
 mod test {
     use crate::doc::Doc;
-    use crate::id::Id;
+    use crate::id::{Id, Split};
     use crate::mark::Mark;
 
     #[test]
@@ -180,13 +185,13 @@ mod test {
         text.append(string.clone());
 
         string.add_mark(Mark::Bold);
-        string.split(5);
+        string.split(5).unwrap();
 
-        let ls = doc.find_by_id(Id::new(0, 2)).unwrap();
+        let ls = doc.find_by_id(Id::new(1, 2)).unwrap();
+        // println!("{}", serde_json::to_string(&ls).unwrap());
         let (l, r) = ls.split(2);
         r.add_mark(Mark::Code);
-
-        // l.delete();
+        l.delete();
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::bimapid::Client;
 use crate::diff::Diff;
 use crate::id::Id;
-use crate::item::{Content, ItemKey};
+use crate::item::{Content, DocContent, ItemKey};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -23,8 +23,7 @@ use crate::types::Type;
 
 #[derive(Clone, Debug)]
 pub(crate) struct DocOpts {
-    pub(crate) id: String,
-    pub(crate) client_id: Client,
+    pub(crate) guid: String,
     pub(crate) crated_by: Client,
 }
 
@@ -32,8 +31,7 @@ impl Default for DocOpts {
     fn default() -> Self {
         let client_id = Uuid::new_v4().to_string();
         Self {
-            id: Uuid::new_v4().to_string(),
-            client_id: client_id.clone(),
+            guid: Uuid::new_v4().to_string(),
             crated_by: client_id,
         }
     }
@@ -42,7 +40,7 @@ impl Default for DocOpts {
 #[derive(Clone, Debug)]
 pub(crate) struct Doc {
     pub(crate) opts: DocOpts,
-    pub(crate) root: Option<NMap>,
+    pub(crate) root: NMap,
     pub(crate) store: StoreRef,
 }
 
@@ -53,28 +51,26 @@ impl Doc {
         let mut store = DocStore::default();
         // doc is always created by the client with clock 0,
         // each doc is created by a new client
-        store.update_client(&opts.crated_by, 0);
-        if opts.client_id != opts.crated_by {
-            store.update_client(&opts.client_id, 1);
-        }
 
-        let client = store.get_client(&opts.client_id);
-
+        let client = store.get_client(&opts.crated_by);
         let root_id = Id::new(client, 0);
-        let store = Rc::new(RefCell::new(store));
-        let weak = Rc::downgrade(&store);
+
+        let client = Uuid::new_v4().to_string();
+        store.update_client(&client, 0);
+
+        let store_ref = Rc::new(RefCell::new(store));
+        let weak = Rc::downgrade(&store_ref);
         let root = NMap::new(root_id, weak);
-        store.borrow_mut().insert(root.clone().into());
 
-        let mut doc = Self {
+        root.set_content(DocContent::new(opts.guid.clone(), opts.crated_by.clone()));
+
+        store_ref.borrow_mut().insert(root.clone());
+
+        Self {
             opts,
-            store,
-            root: None,
-        };
-
-        doc.root = Some(root);
-
-        doc
+            store: store_ref,
+            root,
+        }
     }
 
     // create a new doc from a diff
@@ -87,7 +83,7 @@ impl Doc {
 
     #[inline]
     pub fn diff(&self, state: ClientState) -> Diff {
-        self.store.borrow().diff(self.opts.id.clone(), state)
+        self.store.borrow().diff(self.opts.guid.clone(), state)
     }
 
     pub(crate) fn apply(&mut self, diff: Diff) {
@@ -102,7 +98,7 @@ impl Doc {
     pub fn list(&self) -> NList {
         let id = self.store.borrow_mut().next_id();
         let list = NList::new(id, Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(list.clone().into());
+        self.store.borrow_mut().insert(list.clone());
 
         list
     }
@@ -110,7 +106,7 @@ impl Doc {
     pub fn map(&self) -> NMap {
         let id = self.store.borrow_mut().next_id();
         let map = NMap::new(id, Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(map.clone().into());
+        self.store.borrow_mut().insert(map.clone());
 
         map
     }
@@ -118,7 +114,7 @@ impl Doc {
     pub fn atom(&self, content: impl Into<Content>) -> NAtom {
         let id = self.store.borrow_mut().next_id();
         let atom = NAtom::new(id, content.into(), Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(atom.clone().into());
+        self.store.borrow_mut().insert(atom.clone());
 
         atom
     }
@@ -126,7 +122,7 @@ impl Doc {
     pub fn text(&self) -> NText {
         let id = self.store.borrow_mut().next_id();
         let text = NText::new(id, Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(text.clone().into());
+        self.store.borrow_mut().insert(text.clone());
 
         text
     }
@@ -134,7 +130,7 @@ impl Doc {
     pub fn string(&self, value: impl Into<String>) -> NString {
         let id = self.store.borrow_mut().next_id();
         let string = NString::new(id, value.into(), Rc::downgrade(&self.store));
-        self.store.borrow_mut().insert(string.clone().into());
+        self.store.borrow_mut().insert(string.clone());
 
         string
     }
@@ -143,36 +139,36 @@ impl Doc {
 impl Doc {
     #[inline]
     pub(crate) fn add_mark(&self, mark: Mark) {
-        self.root.as_ref().unwrap().add_mark(mark);
+        self.root.add_mark(mark);
     }
 
     #[inline]
     fn size(&self) -> u32 {
-        self.root.as_ref().unwrap().size()
+        self.root.size()
     }
 
     #[inline]
     pub(crate) fn get(&self, key: impl Into<String>) -> Option<Type> {
-        self.root.as_ref().unwrap().get(key.into())
+        self.root.get(key.into())
     }
 
     #[inline]
     pub(crate) fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         let key = key.into();
 
-        self.root.as_ref().unwrap().set(key, item.into());
+        self.root.set(key, item.into());
     }
 
     fn remove(&self, key: ItemKey) {
-        self.root.as_ref().unwrap().remove(key)
+        self.root.remove(key)
     }
 
     fn keys(&self) -> Vec<String> {
-        self.root.as_ref().unwrap().keys()
+        self.root.keys()
     }
 
     fn values(&self) -> Vec<Type> {
-        self.root.as_ref().unwrap().values()
+        self.root.values()
     }
 
     pub(crate) fn to_json(&self) -> Value {
@@ -180,16 +176,14 @@ impl Doc {
 
         map.insert(
             "id".to_string(),
-            serde_json::Value::String(self.opts.id.to_string()),
+            serde_json::Value::String(self.opts.guid.to_string()),
         );
         map.insert(
             "created_by".to_string(),
             serde_json::Value::String(self.opts.crated_by.to_string()),
         );
 
-        if let Some(root) = self.root.as_ref() {
-            map.insert("root".to_string(), root.to_json());
-        }
+        map.insert("root".to_string(), self.root.to_json());
 
         serde_json::Value::Object(map)
     }
@@ -207,19 +201,13 @@ impl Serialize for Doc {
         S: serde::ser::Serializer,
     {
         let mut size = 2;
-        if let Some(root) = &self.root {
-            size += root.borrow().serialize_size();
-        }
+        let root = self.root.clone();
+        size += root.borrow().serialize_size();
 
         let mut s = serializer.serialize_struct("Doc", size + 1)?;
-        s.serialize_field("id", &self.opts.id)?;
+        s.serialize_field("guid", &self.opts.guid)?;
         s.serialize_field("created_by", &self.opts.crated_by)?;
-        if let Some(root) = &self.root {
-            root.borrow().serialize(&mut s)?;
-            let map = root.borrow().as_map(Rc::downgrade(&self.store));
-            let content = serde_json::to_value(map).unwrap_or_default();
-            s.serialize_field("content", &content)?;
-        }
+        s.serialize_field("root", &root)?;
 
         s.end()
     }

@@ -11,11 +11,9 @@ use crate::hash::calculate_hash;
 
 pub(crate) type Clock = u32;
 
-pub(crate) trait Split
-where
-    Self: Sized,
-{
-    fn split(&self, at: Clock) -> Result<(Self, Self), String>;
+pub(crate) trait Split {
+    type Target;
+    fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String>;
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -287,6 +285,7 @@ pub(crate) trait WithIdRange {
 }
 
 impl Split for IdRange {
+    type Target = IdRange;
     fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
         self.split(at)
     }

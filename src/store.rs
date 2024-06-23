@@ -51,7 +51,7 @@ impl DocStore {
     }
 
     pub(crate) fn next_id(&mut self) -> Id {
-        let id = Id::new(self.client, self.clock + 1);
+        let id = Id::new(self.client, self.clock);
         self.clock += 1;
 
         id
@@ -69,12 +69,13 @@ impl DocStore {
         self.items.find(key)
     }
 
-    pub(crate) fn insert(&mut self, item: Type) {
-        self.items.insert(item.clone());
-        let size = item.size();
+    pub(crate) fn insert(&mut self, item: impl Into<Type>) {
+        let item = item.into();
         if item.kind() == ItemKind::String {
-            self.id_map.insert(item.id().range(size as u32));
+            self.id_map.insert(item.id().range(item.size()));
         }
+
+        self.items.insert(item);
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -97,7 +98,6 @@ impl DocStore {
         let items = self.items.diff(state.clone(), &self.id_map);
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
         Diff::from(
-            guid,
             self.clients.clone(),
             self.fields.clone(),
             self.state.clone(),

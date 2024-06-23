@@ -42,6 +42,10 @@ impl NMap {
         Content::Types(types)
     }
 
+    pub(crate) fn set_content(&self, content: impl Into<Content>) {
+        self.item_ref().set_content(content.into());
+    }
+
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
@@ -191,21 +195,21 @@ mod tests {
         let yaml = serde_yaml::to_string(&map).unwrap();
         println!("{}", yaml);
 
-        let expect = r#"id: (0, 1)
+        let expect = r#"id: (1, 0)
 kind: map
 parent_id: (0, 0)
 content:
   a:
     content: a
-    id: (0, 2)
+    id: (1, 1)
     kind: atom
-    parent_id: (0, 1)
+    parent_id: (1, 0)
   b:
     content: b
-    id: (0, 3)
+    id: (1, 2)
     kind: atom
-    left_id: (0, 2)
-    parent_id: (0, 1)
+    left_id: (1, 1)
+    parent_id: (1, 0)
 "#;
         assert_eq!(yaml, expect);
     }

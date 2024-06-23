@@ -25,6 +25,14 @@ impl NText {
         }
     }
 
+    pub(crate) fn clear(&self) {
+        self.item_ref()
+            .borrow()
+            .items()
+            .iter()
+            .for_each(|item| item.delete());
+    }
+
     pub(crate) fn content(&self) -> Content {
         let items = self.borrow().as_list();
         Content::Types(items)

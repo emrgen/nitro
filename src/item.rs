@@ -28,6 +28,12 @@ pub(crate) struct ItemRef {
 }
 
 impl ItemRef {
+    pub(crate) fn set_content(&self, content: Content) {
+        self.borrow_mut().content = content;
+    }
+}
+
+impl ItemRef {
     pub(crate) fn new(item: ItemRefInner, store: WeakStoreRef) -> Self {
         Self { item, store }
     }
@@ -536,6 +542,7 @@ impl ItemData {
 }
 
 impl Split for ItemData {
+    type Target = ItemData;
     fn split(&self, offset: u32) -> Result<(Self, Self), String> {
         let mut left = self.clone();
         let mut right = self.clone();
@@ -677,7 +684,7 @@ pub(crate) enum Content {
     String(String),
     Types(Vec<Type>),
     Embed(Any),
-    Doc(DocOpts),
+    Doc(DocContent),
     Null,
 }
 
@@ -753,8 +760,8 @@ impl From<Vec<Type>> for Content {
     }
 }
 
-impl From<DocOpts> for Content {
-    fn from(d: DocOpts) -> Self {
+impl From<DocContent> for Content {
+    fn from(d: DocContent) -> Self {
         Self::Doc(d)
     }
 }
@@ -766,9 +773,22 @@ impl From<Any> for Content {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct DocOpts {
+pub(crate) struct DocContent {
     pub(crate) guid: String,
-    pub(crate) opts: Any,
+    // user id of the creator
+    pub(crate) created_by: String,
+    // custom create time props fot the document
+    pub(crate) props: Any,
+}
+
+impl DocContent {
+    pub(crate) fn new(guid: String, created_by: String) -> Self {
+        Self {
+            guid,
+            created_by,
+            props: Any::Null,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]

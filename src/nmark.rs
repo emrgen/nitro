@@ -52,12 +52,16 @@ impl NMark {
     pub(crate) fn content(&self) -> Content {
         self.item_ref().borrow().content.clone()
     }
+}
 
-    pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
+impl Split for NMark {
+    type Target = Type;
+    fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String> {
         let (ld, rd) = self.item_ref().borrow().data.split(offset).unwrap();
         let left = NMark::from_data(ld, self.store.clone());
         let right = NMark::from_data(rd, self.store.clone());
-        (left.into(), right.into())
+
+        Ok((left.into(), right.into()))
     }
 }
 
@@ -116,10 +120,7 @@ mod tests {
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);
-        let marks = doc
-            .root
-            .map(|root| root.borrow().get_marks())
-            .unwrap_or_default();
+        let marks = doc.root.borrow().get_marks();
 
         let yaml = serde_yaml::to_string(&marks).unwrap();
         println!("{}", yaml);

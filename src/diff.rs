@@ -6,7 +6,6 @@ use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Diff {
-    pub(crate) doc_id: String,
     pub(crate) fields: FieldMap,
     pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
@@ -15,15 +14,11 @@ pub(crate) struct Diff {
 }
 
 impl Diff {
-    pub(crate) fn new(doc_id: String) -> Diff {
-        Diff {
-            doc_id,
-            ..Default::default()
-        }
+    pub(crate) fn new() -> Diff {
+        Default::default()
     }
 
     pub(crate) fn from(
-        doc_id: String,
         clients: ClientMap,
         fields: FieldMap,
         state: ClientState,
@@ -31,7 +26,6 @@ impl Diff {
         deletes: DeleteItemStore,
     ) -> Diff {
         Diff {
-            doc_id,
             clients,
             fields,
             state,
@@ -40,17 +34,15 @@ impl Diff {
         }
     }
 
-    pub(crate) fn from_deleted_items(guid: String, deleted_items: DeleteItemStore) -> Diff {
+    pub(crate) fn from_deleted_items(deleted_items: DeleteItemStore) -> Diff {
         Diff {
-            doc_id: guid,
             deletes: deleted_items,
             ..Default::default()
         }
     }
 
-    pub(crate) fn from_items(guid: String, items: ItemDataStore) -> Diff {
+    pub(crate) fn from_items(items: ItemDataStore) -> Diff {
         Diff {
-            doc_id: guid,
             items,
             ..Default::default()
         }
@@ -87,7 +79,6 @@ impl Diff {
         }
 
         Diff::from(
-            self.doc_id.clone(),
             clients.clone(),
             fields.clone(),
             state.clone(),
@@ -99,7 +90,6 @@ impl Diff {
 
 impl Encode for Diff {
     fn encode<E: Encoder>(&self, e: &mut E) {
-        e.string(&self.doc_id);
         self.clients.encode(e);
         self.fields.encode(e);
         self.state.encode(e);
@@ -110,7 +100,6 @@ impl Encode for Diff {
 
 impl Decode for Diff {
     fn decode<D: Decoder>(d: &mut D) -> Result<Diff, String> {
-        let guid = d.string()?;
         let clients = ClientMap::decode(d)?;
         let fields = FieldMap::decode(d)?;
         let state = ClientState::decode(d)?;
@@ -118,7 +107,6 @@ impl Decode for Diff {
         let deletes = DeleteItemStore::decode(d)?;
 
         Ok(Diff {
-            doc_id: guid,
             clients,
             fields,
             state,

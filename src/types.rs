@@ -4,7 +4,8 @@ use serde_json::Value;
 use crate::codec::decoder::{Decode, Decoder};
 use crate::codec::encoder::{Encode, Encoder};
 use crate::delete::DeleteItem;
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::doc::{Doc, DocOpts};
+use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemKey, ItemKind, ItemRef};
 use crate::mark::Mark;
 use crate::natom::NAtom;
@@ -27,6 +28,7 @@ pub(crate) enum Type {
     Proxy(NProxy),
     Move(NMove),
     Mark(NMark),
+    Doc(Doc),
     #[default]
     Identity,
 }
@@ -60,11 +62,11 @@ impl Type {
     }
 
     pub(crate) fn left_id(&self) -> Option<Id> {
-        self.item_ref().borrow().data.left_id.clone()
+        self.item_ref().borrow().data.left_id
     }
 
     pub(crate) fn right_id(&self) -> Option<Id> {
-        self.item_ref().borrow().data.right_id.clone()
+        self.item_ref().borrow().data.right_id
     }
 
     pub(crate) fn start(&self) -> Option<Type> {
@@ -180,6 +182,7 @@ impl Type {
             Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
+            Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("item_ref: not implemented"),
         }
     }
@@ -305,15 +308,16 @@ impl Type {
         match self {
             Type::List(n) => n.clear(),
             Type::Map(n) => n.clear(),
+            Type::Text(n) => n.clear(),
             _ => panic!("clear: not implemented"),
         }
     }
 
     pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
         match self {
-            Type::String(n) => n.split(offset),
-            Type::Mark(n) => n.split(offset),
-            _ => panic!("split: not implemented"),
+            Type::String(n) => n.split(offset).unwrap(),
+            Type::Mark(n) => n.split(offset).unwrap(),
+            _ => panic!("split: not implemented for {:?}", self.kind()),
         }
     }
 
@@ -327,7 +331,8 @@ impl Type {
             Type::Proxy(n) => n.to_json(),
             Type::Move(n) => n.to_json(),
             Type::Mark(n) => n.to_json(),
-            Type::Identity => panic!("to_json: not implemented"),
+            Type::Doc(n) => n.to_json(),
+            Type::Identity => panic!("to_json: not implemented for identity"),
         }
     }
 }
@@ -391,6 +396,7 @@ impl WithIdRange for Type {
             Type::Proxy(n) => n.range(),
             Type::Move(n) => n.range(),
             Type::Mark(n) => n.range(),
+            Type::Doc(n) => n.root.range(),
             Type::Identity => panic!("range: not implemented for identity"),
         }
     }
@@ -404,7 +410,14 @@ impl From<NList> for Type {
 
 impl From<NMap> for Type {
     fn from(n: NMap) -> Self {
-        Self::Map(n)
+        if let Content::Doc(d) = n.content() {
+            Type::Doc(Doc::new(DocOpts {
+                guid: d.guid,
+                crated_by: d.created_by,
+            }))
+        } else {
+            Self::Map(n)
+        }
     }
 }
 
@@ -469,6 +482,7 @@ impl From<Type> for ItemRef {
             Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
+            Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
     }

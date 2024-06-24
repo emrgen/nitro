@@ -1,6 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
 use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::IdRange;
 
@@ -62,6 +63,7 @@ impl MarkContent {
             Mark::Link(ref url) => ("link".to_string(), url.to_string().into()),
             Mark::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
             Mark::None => ("_".to_string(), Value::Null),
+            Mark::Id(id) => ("id".to_string(), id.into()),
         }
     }
 
@@ -78,6 +80,7 @@ impl MarkContent {
             Mark::Background(ref color) => ("background".into(), color.to_string().into()),
             Mark::Link(ref url) => ("link".into(), url.to_string().into()),
             Mark::Custom(ref name, ref json) => (name.to_string(), json.to_string().into()),
+            Mark::Id(id) => ("id".into(), id.into()),
             Mark::None => ("_".into(), Value::Null),
         }
     }
@@ -99,6 +102,7 @@ impl MarkContent {
             Mark::Background(_) => "background".to_string(),
             Mark::Link(_) => "link".to_string(),
             Mark::Custom(ref name, _) => name.to_string(),
+            Mark::Id(_) => "id".to_string(),
             Mark::None => "_".to_string(),
         }
     }
@@ -145,6 +149,9 @@ impl Serialize for MarkContent {
                 map.insert("name".to_string(), name.to_string().into());
                 map.insert("json".to_string(), json.to_string().into());
             }
+            Mark::Id(id) => {
+                map.insert("id".to_string(), id.into());
+            }
             Mark::None => {}
         }
         serde_json::Value::Object(map).serialize(serializer)
@@ -154,46 +161,7 @@ impl Serialize for MarkContent {
 impl Encode for MarkContent {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
         self.range.encode(e, ctx);
-        match self.data {
-            Mark::Bold => {
-                e.string("bold");
-            }
-            Mark::Italic => {
-                e.string("italic");
-            }
-            Mark::Underline => {
-                e.string("underline");
-            }
-            Mark::StrikeThrough => {
-                e.string("strikethrough");
-            }
-            Mark::Code => {
-                e.string("code");
-            }
-            Mark::Subscript => {
-                e.string("subscript");
-            }
-            Mark::Superscript => {
-                e.string("superscript");
-            }
-            Mark::Color(ref color) => {
-                e.string("color");
-                e.string(color);
-            }
-            Mark::Background(ref color) => {
-                e.string("background");
-                e.string(color);
-            }
-            Mark::Link(ref url) => {
-                e.string("link");
-                e.string(url);
-            }
-            Mark::Custom(ref name, ref json) => {
-                e.string(name);
-                e.string(json);
-            }
-            Mark::None => {}
-        }
+        self.data.encode(e, ctx);
     }
 }
 
@@ -212,4 +180,15 @@ pub(crate) enum Mark {
     Custom(String, String),
     #[default]
     None,
+    Id(u32),
+}
+
+impl Encode for Mark {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {}
+}
+
+impl Decode for Mark {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Mark, String> {
+        todo!()
+    }
 }

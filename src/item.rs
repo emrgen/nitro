@@ -601,19 +601,6 @@ impl From<ItemData> for ItemRefInner {
     }
 }
 
-impl Encode for ItemData {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
-        e.item(ctx, self)
-    }
-}
-
-impl Decode for ItemData {
-    fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<ItemData, String> {
-        let item = d.item()?;
-        Ok(item)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum ItemKind {
     Map,

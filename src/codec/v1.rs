@@ -51,6 +51,11 @@ impl Encoder for EncoderV1 {
         self.buf.push(value);
     }
 
+    fn u16(&mut self, value: u16) {
+        self.ensure_capacity(2);
+        self.buf.extend_from_slice(&value.to_be_bytes());
+    }
+
     fn u32(&mut self, value: u32) {
         self.ensure_capacity(4);
         self.buf.extend_from_slice(&value.to_be_bytes());
@@ -186,6 +191,13 @@ impl Decoder for DecoderV1 {
         self.ensure_capacity(1);
         let value = self.buf[self.pos];
         self.pos += 1;
+        Ok(value)
+    }
+
+    fn u16(&mut self) -> Result<u16, String> {
+        self.ensure_capacity(2);
+        let value = u16::from_be_bytes([self.buf[self.pos], self.buf[self.pos + 1]]);
+        self.pos += 2;
         Ok(value)
     }
 

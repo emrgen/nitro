@@ -14,12 +14,16 @@ pub(crate) trait BiMapEntry:
 {
 }
 
+trait EncoderMapEntry: Encode + Decode + Clone + Default + Eq + PartialEq + Hash {}
+
+impl<T: Encode + Decode + Clone + Default + Eq + PartialEq + Hash> EncoderMapEntry for T {}
+
 #[derive(Debug, Clone, Default)]
-pub(crate) struct EncoderMap<T: Clone + Default + PartialEq + Eq + Hash> {
-    pub map: BiMap<T, u32>,
+pub(crate) struct EncoderMap<L: EncoderMapEntry> {
+    pub map: BiMap<L, u32>,
 }
 
-impl<T: Clone + Default + PartialEq + Eq + Hash> EncoderMap<T> {
+impl<T: EncoderMapEntry> EncoderMap<T> {
     pub fn new() -> EncoderMap<T> {
         EncoderMap { map: BiMap::new() }
     }
@@ -108,21 +112,53 @@ impl Decode for EncoderMap<String> {
 }
 
 impl Encode for EncoderMap<Mark> {
-    fn encode<T: Encoder>(&self, e: &mut T, _ctx: &EncodeContext) {
-        e.u32(self.size() as u32);
-        for (client_id, client) in self.map.iter() {
-            // let size = client_id.len();
-            // let client_id = client_id.as_bytes();
-            // e.u8(size as u8);
-            // e.slice(client_id);
-            // e.u32(*client);
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        let len = self.map.len();
+        e.u32(len as u32);
+        if len > u16::MAX as usize {
+            for (mark, mark_id) in self.map.iter() {
+                mark.encode(e, ctx);
+                e.u32(*mark_id);
+            }
+        } else if len > u8::MAX as usize {
+            for (mark, mark_id) in self.map.iter() {
+                mark.encode(e, ctx);
+                e.u16(*mark_id as u16);
+            }
+        } else {
+            for (mark, mark_id) in self.map.iter() {
+                mark.encode(e, ctx);
+                e.u8(*mark_id as u8);
+            }
         }
     }
 }
 
 impl Decode for EncoderMap<Mark> {
     fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<EncoderMap<Mark>, String> {
-        todo!()
+        let len = d.u32()? as usize;
+        let mut map = BiMap::new();
+        if len > u16::MAX as usize {
+            for _ in 0..len {
+                let mark = Mark::decode(d, _ctx)?;
+                let mark_id = d.u32()?;
+                map.insert(mark, mark_id as u32);
+            }
+        } else if len > u8::MAX as usize {
+            for _ in 0..len {
+                let mark = Mark::decode(d, _ctx)?;
+                let mark_id = d.u16()?;
+                map.insert(mark, mark_id as u32);
+            }
+        } else {
+            for _ in 0..len {
+                let mark = Mark::decode(d, _ctx)?;
+                let mark_id = d.u8()?;
+                map.insert(mark, mark_id as u32);
+            }
+        }
+
+        Ok(Self { map })
     }
 }
 

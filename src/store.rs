@@ -311,7 +311,6 @@ impl<T: Encode + Clone + WithId + Decode + Debug> Encode for IdStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.data.len() as u32);
         for (_, value) in self.data.iter() {
-            // println!("value: {:?}", value);
             value.encode(e, ctx);
         }
     }

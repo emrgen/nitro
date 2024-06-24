@@ -206,12 +206,20 @@ trait IdDiff {
     fn diff(&self, state: ClientState, id_map: &IdRangeMap) -> Self::Target;
 }
 
+pub(crate) trait ClientStoreEntry:
+    Default + WithId + Clone + Encode + Decode + Eq + PartialEq
+{
+}
+
+// blanket implementation for all types that implement dependencies
+impl<T: Default + WithId + Clone + Encode + Decode + Eq + PartialEq> ClientStoreEntry for T {}
+
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
-pub struct ClientStore<T: WithId + Clone + Encode + Decode + Eq + PartialEq> {
+pub struct ClientStore<T: ClientStoreEntry> {
     pub(crate) items: HashMap<ClientId, IdStore<T>>,
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> ClientStore<T> {
+impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn find(&self, id: Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
@@ -238,9 +246,7 @@ impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> ClientStore
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> std::iter::IntoIterator
-    for ClientStore<T>
-{
+impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
     type Item = (ClientId, IdStore<T>);
     type IntoIter = std::collections::hash_map::IntoIter<ClientId, IdStore<T>>;
 
@@ -249,9 +255,7 @@ impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> std::iter::
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Debug + Eq + PartialEq> Encode
-    for ClientStore<T>
-{
+impl<T: ClientStoreEntry> Encode for ClientStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.items.len() as u32);
         for (client, store) in self.items.iter() {
@@ -275,12 +279,17 @@ impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for 
     }
 }
 
+pub(crate) trait IdStoreEntry: WithId + Clone + Encode + Decode + Eq + PartialEq {}
+
+// blanket implementation for all types that implement dependencies
+impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStoreEntry for T {}
+
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct IdStore<T: WithId + Clone + Encode + Decode + Eq + PartialEq> {
+pub struct IdStore<T: IdStoreEntry> {
     map: BTreeMap<Id, T>,
 }
 
-impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStore<T> {
+impl<T: IdStoreEntry> IdStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
         self.map.insert(value.id(), value);
     }
@@ -302,7 +311,7 @@ impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStore<T> {
     }
 }
 
-impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IntoIterator for IdStore<T> {
+impl<T: IdStoreEntry> IntoIterator for IdStore<T> {
     type Item = (Id, T);
     type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
 
@@ -311,7 +320,7 @@ impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IntoIterator for IdSt
     }
 }
 
-impl<T: Encode + Clone + WithId + Decode + Debug + Eq + PartialEq> Encode for IdStore<T> {
+impl<T: IdStoreEntry> Encode for IdStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.map.len() as u32);
         for (_, value) in self.map.iter() {
@@ -320,7 +329,7 @@ impl<T: Encode + Clone + WithId + Decode + Debug + Eq + PartialEq> Encode for Id
     }
 }
 
-impl<T: Encode + Clone + WithId + Decode + Eq + PartialEq> Decode for IdStore<T> {
+impl<T: IdStoreEntry> Decode for IdStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<IdStore<T>, String> {
         let len = d.u32()? as usize;
         let mut data = BTreeMap::new();

@@ -1,9 +1,12 @@
 mod bimapid;
 mod codec;
+pub mod codec_v1;
 mod crdt;
+pub mod decoder;
 mod delete;
 mod diff;
 mod doc;
+pub mod encoder;
 mod hash;
 mod id;
 mod item;

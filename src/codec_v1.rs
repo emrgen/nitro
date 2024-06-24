@@ -1,8 +1,8 @@
 use std::cmp::PartialEq;
 use std::ops::Deref;
 
-use crate::codec::decoder::Decoder;
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::Decoder;
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::item::{Content, ItemData, ItemKindFlags};
 
 const VERSION: u8 = 1;

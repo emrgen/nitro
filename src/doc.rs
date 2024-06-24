@@ -7,8 +7,8 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::bimapid::Client;
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::diff::Diff;
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
 use crate::item::{Content, DocContent, ItemKey};
 use crate::mark::Mark;
@@ -240,9 +240,9 @@ mod test {
     use miniz_oxide::deflate::compress_to_vec;
     use rand::random;
 
-    use crate::codec::encoder::{Encode, Encoder};
-    use crate::codec::v1::EncoderV1;
+    use crate::codec_v1::EncoderV1;
     use crate::doc::Doc;
+    use crate::encoder::{Encode, Encoder};
 
     #[test]
     fn test_create_doc() {

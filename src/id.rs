@@ -5,8 +5,8 @@ use std::ops::{Add, Sub};
 use serde::Serialize;
 
 use crate::bimapid::{ClientId, ClientMap};
-use crate::codec::decoder::{Decode, DecodeContext, Decoder};
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 
 pub(crate) type Clock = u32;

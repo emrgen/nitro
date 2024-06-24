@@ -1,6 +1,6 @@
 use crate::bimapid::ClientMap;
-use crate::codec::decoder::{Decode, DecodeContext, Decoder};
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, WithId};
 
 #[derive(Debug, Clone, Default)]

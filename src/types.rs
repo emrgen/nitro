@@ -1,10 +1,10 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::codec::decoder::{Decode, DecodeContext, Decoder};
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemKey, ItemKind, ItemRef};
 use crate::mark::Mark;

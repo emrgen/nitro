@@ -1,8 +1,8 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::codec::decoder::{Decode, DecodeContext, Decoder};
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::IdRange;
 
 #[derive(Debug, Clone, Default)]

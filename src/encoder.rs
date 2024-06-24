@@ -1,4 +1,4 @@
-use crate::codec::decoder::Decoder;
+use crate::decoder::Decoder;
 use crate::item::ItemData;
 
 pub trait Encoder: Clone {

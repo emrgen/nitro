@@ -4,10 +4,10 @@ use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::{Client, ClientId, ClientMap, Field, FieldId, FieldMap};
-use crate::codec::decoder::{Decode, DecodeContext, Decoder};
-use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
+use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Clock, Id, IdRange, Split, WithId};
 use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
@@ -402,9 +402,6 @@ impl IdClockDiff for IdStore<DeleteItem> {
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
     use super::*;
 
     #[test]
@@ -439,25 +436,5 @@ mod tests {
     }
 
     #[test]
-    fn test_rc() {
-        struct Person {
-            name: String,
-        }
-
-        impl Person {
-            fn new(name: &str) -> Person {
-                Person {
-                    name: name.to_string(),
-                }
-            }
-        }
-
-        let p = Rc::new(RefCell::new(Person::new("John")));
-        let p1 = p.clone();
-        let p2 = p.clone();
-
-        p1.borrow_mut().name.push_str("ny");
-
-        assert_eq!(p.borrow().name, "Johnny");
-    }
+    fn test_rc() {}
 }

@@ -52,6 +52,10 @@ impl Id {
 
     pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> Ordering {
         if self.client != other.client {
+            if clients.size() == 0 {
+                panic!("Cannot compare Ids from different clients without a client map")
+            }
+
             let client = clients.get_client(&self.client).unwrap();
             let other_client = clients.get_client(&other.client).unwrap();
             return calculate_hash(client).cmp(&calculate_hash(other_client));

@@ -178,6 +178,9 @@ impl ClientMap {
         }
     }
 
+    pub(crate) fn size(&self) -> u32 {
+        self.map.size() as u32
+    }
     fn insert(&mut self, client_id: Client, client: ClientId) {
         self.map.map.insert(client_id, client);
     }

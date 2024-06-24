@@ -277,28 +277,28 @@ impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for 
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct IdStore<T: WithId + Clone + Encode + Decode + Eq + PartialEq> {
-    data: BTreeMap<Id, T>,
+    map: BTreeMap<Id, T>,
 }
 
 impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
-        self.data.insert(value.id(), value);
+        self.map.insert(value.id(), value);
     }
 
     pub(crate) fn get(&self, value: &Id) -> Option<T> {
-        self.data.get(value).cloned()
+        self.map.get(value).cloned()
     }
 
     pub(crate) fn remove(&mut self, value: &Id) -> Option<T> {
-        self.data.remove(value)
+        self.map.remove(value)
     }
 
     pub(crate) fn contains(&self, value: &Id) -> bool {
-        self.data.contains_key(value)
+        self.map.contains_key(value)
     }
 
     pub(crate) fn size(&self) -> usize {
-        self.data.len()
+        self.map.len()
     }
 }
 
@@ -307,14 +307,14 @@ impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IntoIterator for IdSt
     type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
+        self.map.into_iter()
     }
 }
 
 impl<T: Encode + Clone + WithId + Decode + Debug + Eq + PartialEq> Encode for IdStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
-        e.u32(self.data.len() as u32);
-        for (_, value) in self.data.iter() {
+        e.u32(self.map.len() as u32);
+        for (_, value) in self.map.iter() {
             value.encode(e, ctx);
         }
     }
@@ -328,7 +328,7 @@ impl<T: Encode + Clone + WithId + Decode + Eq + PartialEq> Decode for IdStore<T>
             let value = T::decode(d, ctx)?;
             data.insert(value.id(), value);
         }
-        Ok(IdStore { data })
+        Ok(IdStore { map: data })
     }
 }
 
@@ -342,7 +342,7 @@ impl IdClockDiff for IdStore<ItemRef> {
 
     fn diff(&self, clock: Clock, id_map: &IdRangeMap) -> Self::Target {
         let mut items = IdStore::default();
-        for (id, item) in self.data.iter() {
+        for (id, item) in self.map.iter() {
             let data = item.borrow().data.clone();
             // collect items that are newer than the given clock
             if id.clock > clock {
@@ -368,7 +368,7 @@ impl IdClockDiff for IdStore<Type> {
 
     fn diff(&self, clock: Clock, id_map: &IdRangeMap) -> Self::Target {
         let mut items = IdStore::default();
-        for (id, item) in self.data.iter() {
+        for (id, item) in self.map.iter() {
             let data = item.item_ref().borrow().data.clone();
             // collect items that are newer than the given clock
             if id.clock > clock {
@@ -394,7 +394,7 @@ impl IdClockDiff for IdStore<DeleteItem> {
 
     fn diff(&self, clock: Clock, _id_map: &IdRangeMap) -> Self::Target {
         let mut items = IdStore::default();
-        for (id, item) in self.data.iter() {
+        for (id, item) in self.map.iter() {
             if id.clock > clock {
                 items.insert(item.clone());
             }
@@ -439,6 +439,26 @@ mod tests {
 
         assert_eq!(map.get(&Id::new(1, 8)).unwrap(), &Id::new(1, 8).into());
         assert_eq!(map.get(&Id::new(1, 9)).unwrap(), &Id::new(1, 8).into());
+    }
+
+    #[test]
+    fn test_encode_decode_client_id_store() {
+        let mut store = IdStore::default();
+        let id1 = Id::new(1, 1);
+        let id2 = Id::new(1, 2);
+        let id3 = Id::new(1, 3);
+
+        store.insert(id1);
+        store.insert(id2);
+        store.insert(id3);
+
+        let mut e = EncoderV1::new();
+        store.encode(&mut e, &EncodeContext::default());
+
+        let mut d = e.decoder();
+        let dd = IdStore::<Id>::decode(&mut d, &DecodeContext::default()).unwrap();
+
+        assert_eq!(store, dd);
     }
 
     #[test]

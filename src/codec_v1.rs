@@ -90,8 +90,9 @@ impl Encoder for EncoderV1 {
         self.buf.shrink_to_fit();
     }
 
-    fn decoder(self) -> Box<dyn Decoder> {
-        Box::new(DecoderV1::new(self.buf))
+    fn decoder(&mut self) -> Box<dyn Decoder> {
+        self.trim();
+        Box::new(DecoderV1::new(self.buf.clone()))
     }
 
     fn buffer(self) -> Vec<u8> {

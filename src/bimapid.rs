@@ -14,13 +14,16 @@ pub(crate) trait BiMapEntry:
 {
 }
 
-trait EncoderMapEntry: Encode + Decode + Clone + Default + Eq + PartialEq + Hash {}
+pub(crate) trait EncoderMapEntry:
+    Encode + Decode + Clone + Default + Eq + PartialEq + Hash
+{
+}
 
 impl<T: Encode + Decode + Clone + Default + Eq + PartialEq + Hash> EncoderMapEntry for T {}
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct EncoderMap<L: EncoderMapEntry> {
-    pub map: BiMap<L, u32>,
+    map: BiMap<L, u32>,
 }
 
 impl<T: EncoderMapEntry> EncoderMap<T> {
@@ -163,7 +166,7 @@ impl Decode for EncoderMap<Mark> {
 }
 
 // #[derive(Debug, Clone, Default)]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ClientMap {
     map: EncoderMap<String>,
 }
@@ -285,5 +288,31 @@ impl Decode for FieldMap {
     fn decode<D: Decoder>(decoder: &mut D, ctx: &DecodeContext) -> Result<FieldMap, String> {
         let map = EncoderMap::decode(decoder, ctx)?;
         Ok(FieldMap { map })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::bimapid::ClientMap;
+    use crate::codec_v1::EncoderV1;
+    use crate::decoder::{Decode, DecodeContext};
+    use crate::encoder::{Encode, EncodeContext, Encoder};
+
+    #[test]
+    fn test_encode_decode_client_map() {
+        let mut map = ClientMap::default();
+
+        map.insert("client1".to_string(), 1);
+        map.insert("client2".to_string(), 2);
+        map.insert("client3".to_string(), 3);
+
+        let mut e = EncoderV1::new();
+        map.encode(&mut e, &EncodeContext::default());
+
+        let mut d = e.decoder();
+
+        let dd = ClientMap::decode(&mut d, &DecodeContext::default()).unwrap();
+
+        assert_eq!(map, dd);
     }
 }

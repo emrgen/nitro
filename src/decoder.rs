@@ -11,7 +11,42 @@ pub trait Decoder {
     fn item(&mut self) -> Result<ItemData, String>;
 }
 
-pub(crate) struct DecodeContext {
+impl Decoder for Box<dyn Decoder> {
+    fn u8(&mut self) -> Result<u8, String> {
+        self.as_mut().u8()
+    }
+
+    fn u16(&mut self) -> Result<u16, String> {
+        self.as_mut().u16()
+    }
+
+    fn u32(&mut self) -> Result<u32, String> {
+        self.as_mut().u32()
+    }
+
+    fn u64(&mut self) -> Result<u64, String> {
+        self.as_mut().u64()
+    }
+
+    fn string(&mut self) -> Result<String, String> {
+        self.as_mut().string()
+    }
+
+    fn bytes(&mut self) -> Result<Vec<u8>, String> {
+        self.as_mut().bytes()
+    }
+
+    fn slice(&mut self, len: usize) -> Result<&[u8], String> {
+        self.as_mut().slice(len)
+    }
+
+    fn item(&mut self) -> Result<ItemData, String> {
+        self.as_mut().item()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DecodeContext {
     pub(crate) version: u8,
 }
 

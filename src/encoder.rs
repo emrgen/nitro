@@ -11,13 +11,13 @@ pub trait Encoder: Clone {
     fn slice(&mut self, value: &[u8]);
     fn item(&mut self, ctx: &EncodeContext, value: &ItemData);
     fn trim(&mut self);
-    fn decoder(self) -> Box<dyn Decoder>;
+    fn decoder(&mut self) -> Box<dyn Decoder>;
     fn buffer(self) -> Vec<u8>;
     fn size(&self) -> usize;
 }
 
 #[derive(Clone, Default, Debug)]
-pub(crate) struct EncodeContext {
+pub struct EncodeContext {
     pub(crate) version: u8,
 }
 

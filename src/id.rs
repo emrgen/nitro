@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::{Add, Sub};
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::bimapid::{ClientId, ClientMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
@@ -66,6 +66,15 @@ impl Id {
 
     pub(crate) fn range(&self, size: u32) -> IdRange {
         IdRange::new(self.client, self.clock, self.clock + size - 1)
+    }
+}
+
+impl Serialize for Id {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        format!("Id({}, {})", self.client, self.clock).serialize(serializer)
     }
 }
 
@@ -153,7 +162,7 @@ impl Decode for Id {
     }
 }
 
-#[derive(Clone, Copy, Default, Serialize)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct IdRange {
     pub(crate) client: ClientId,
     pub(crate) start: Clock,
@@ -233,6 +242,15 @@ impl IdRange {
 impl Display for IdRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.client, self.start, self.end)
+    }
+}
+
+impl Serialize for IdRange {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        format!("Range({}, {}, {})", self.client, self.start, self.end).serialize(serializer)
     }
 }
 

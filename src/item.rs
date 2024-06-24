@@ -475,7 +475,7 @@ impl DerefMut for Item {
 
 // item data is encoded and saved into persistent storage
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ItemData {
+pub struct ItemData {
     pub(crate) kind: ItemKind,
     pub(crate) id: Id,
     pub(crate) parent_id: Option<Id>,

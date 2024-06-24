@@ -46,7 +46,7 @@ impl DocStore {
 
     pub(crate) fn update_client(&mut self, client: &Client, clock: Clock) -> ClientId {
         self.client = self.clients.get_or_insert(client);
-        self.clock = clock;
+        self.clock = clock.min(1);
 
         self.client
     }
@@ -95,10 +95,12 @@ impl DocStore {
         self.clients.get_or_insert(client_id)
     }
 
-    pub(crate) fn diff(&self, state: ClientState) -> Diff {
+    pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
         let items = self.items.diff(state.clone(), &self.id_map);
+        // println!("items: {:?}", items);
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
         Diff::from(
+            guid,
             self.clients.clone(),
             self.fields.clone(),
             self.state.clone(),

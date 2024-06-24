@@ -195,21 +195,21 @@ mod tests {
         let yaml = serde_yaml::to_string(&map).unwrap();
         println!("{}", yaml);
 
-        let expect = r#"id: (1, 0)
+        let expect = r#"id: (1, 1)
 kind: map
-parent_id: (0, 0)
+parent_id: (0, 1)
 content:
   a:
     content: a
-    id: (1, 1)
-    kind: atom
-    parent_id: (1, 0)
-  b:
-    content: b
     id: (1, 2)
     kind: atom
-    left_id: (1, 1)
-    parent_id: (1, 0)
+    parent_id: (1, 1)
+  b:
+    content: b
+    id: (1, 3)
+    kind: atom
+    left_id: (1, 2)
+    parent_id: (1, 1)
 "#;
         assert_eq!(yaml, expect);
     }

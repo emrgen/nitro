@@ -12,7 +12,7 @@ pub trait Encoder: Clone {
     fn item(&mut self, ctx: &EncodeContext, value: &ItemData);
     fn trim(&mut self);
     fn decoder(&mut self) -> Box<dyn Decoder>;
-    fn buffer(self) -> Vec<u8>;
+    fn buffer(&self) -> Vec<u8>;
     fn size(&self) -> usize;
 }
 

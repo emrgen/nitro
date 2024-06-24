@@ -165,6 +165,16 @@ impl Encode for MarkContent {
     }
 }
 
+impl Decode for MarkContent {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<MarkContent, String> {
+        println!("decoding mark content");
+        let range = IdRange::decode(d, ctx)?;
+        println!("range: {:?}", range);
+        let data = Mark::decode(d, ctx)?;
+        Ok(MarkContent::new(range, data))
+    }
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Hash)]
 pub(crate) enum Mark {
     Bold,

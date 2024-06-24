@@ -10,7 +10,7 @@ use crate::bimapid::Client;
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
-use crate::item::{Content, DocContent, ItemKey};
+use crate::item::{Content, DocProps, ItemKey};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -51,17 +51,17 @@ impl Doc {
         // doc is always created by the client with clock 0,
         // each doc is created by a new client
 
-        let client = store.get_client(&opts.crated_by);
-        let root_id = Id::new(client, 0);
+        let client = store.get_client(&opts.guid);
+        let root_id = Id::new(client, 1);
 
         let client = Uuid::new_v4().to_string();
-        store.update_client(&client, 0);
+        store.update_client(&client, 1);
 
         let store_ref = Rc::new(RefCell::new(store));
         let weak = Rc::downgrade(&store_ref);
         let root = NMap::new(root_id, weak);
 
-        root.set_content(DocContent::new(opts.guid.clone(), opts.crated_by.clone()));
+        root.set_content(DocProps::new(opts.guid.clone(), opts.crated_by.clone()));
 
         store_ref.borrow_mut().insert(root.clone());
 
@@ -74,7 +74,7 @@ impl Doc {
 
     // create a new doc from a diff
     pub(crate) fn from_diff(diff: &Diff) -> Option<Doc> {
-        if let Some(root) = &diff.root {
+        if let Some(root) = &diff.get_root() {
             if let Content::Doc(content) = &root.content {
                 let doc = Doc::new(DocOpts {
                     guid: content.guid.clone(),
@@ -92,7 +92,7 @@ impl Doc {
 
     #[inline]
     pub fn diff(&self, state: ClientState) -> Diff {
-        self.store.borrow().diff(state)
+        self.store.borrow().diff(self.opts.guid.clone(), state)
     }
 
     pub(crate) fn apply(&self, diff: Diff) {
@@ -225,9 +225,7 @@ impl Serialize for Doc {
 
 impl Encode for Doc {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
-        let mut diff = self.diff(ClientState::default());
-        diff.root = Some(self.root.item_ref().borrow().data.clone());
-
+        let diff = self.diff(ClientState::default());
         diff.encode(e, ctx)
     }
 }

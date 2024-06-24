@@ -741,7 +741,7 @@ pub(crate) enum Content {
     String(String),
     Types(Vec<Type>),
     Embed(Any),
-    Doc(DocContent),
+    Doc(DocProps),
     Null,
 }
 
@@ -809,9 +809,44 @@ impl Encode for Content {
                 // a.encode(e)
             }
             Self::Doc(d) => {
-                // d.encode(e)
+                e.u8(ContentFlags::DOC.bits());
+                d.encode(e, ctx)
             }
             Self::Null => {}
+        }
+    }
+}
+
+impl Decode for Content {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let flags = d.u8()?;
+
+        match flags {
+            0x00 => Ok(Self::Mark(MarkContent::decode(d, ctx)?)),
+            0x01 => Ok(Self::Binary(d.bytes()?)),
+            0x02 => Ok(Self::String(d.string()?)),
+            0x03 => {
+                let len = d.u32()? as usize;
+                let mut types = vec![];
+                for _ in 0..len {
+                    types.push(Type::decode(d, ctx)?);
+                }
+                Ok(Self::Types(types))
+            }
+            0x10 => {
+                // let any = Any::decode(d, ctx)?;
+                // Ok(Self::Embed(any))
+                Ok(Self::Null)
+            }
+            0x11 => {
+                let doc = DocProps::decode(d, ctx)?;
+                Ok(Self::Doc(doc))
+            }
+            0x12 => Ok(Self::Null),
+            _ => Err(format!("Invalid content flags: {}", flags)),
         }
     }
 }
@@ -858,8 +893,8 @@ impl From<Vec<Type>> for Content {
     }
 }
 
-impl From<DocContent> for Content {
-    fn from(d: DocContent) -> Self {
+impl From<DocProps> for Content {
+    fn from(d: DocProps) -> Self {
         Self::Doc(d)
     }
 }
@@ -871,7 +906,7 @@ impl From<Any> for Content {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct DocContent {
+pub(crate) struct DocProps {
     pub(crate) guid: String,
     // user id of the creator
     pub(crate) created_by: String,
@@ -879,13 +914,38 @@ pub(crate) struct DocContent {
     pub(crate) props: Any,
 }
 
-impl DocContent {
+impl DocProps {
     pub(crate) fn new(guid: String, created_by: String) -> Self {
         Self {
             guid,
             created_by,
             props: Any::Null,
         }
+    }
+}
+
+impl Encode for DocProps {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        e.string(&self.guid);
+        e.string(&self.created_by);
+        self.props.encode(e, ctx);
+    }
+}
+
+impl Decode for DocProps {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let guid = d.string()?;
+        let created_by = d.string()?;
+        let props = Any::decode(d, ctx)?;
+
+        Ok(Self {
+            guid,
+            created_by,
+            props,
+        })
     }
 }
 
@@ -936,6 +996,144 @@ impl Any {
                     map.insert(k.clone(), v.to_json());
                 }
                 Value::Object(map)
+            }
+        }
+    }
+}
+
+bitflags! {
+    pub(crate) struct AnyFlags: u8 {
+        const NULL = 0x00;
+        const TRUE = 0x01;
+        const FALSE = 0x02;
+        const FLOAT32 = 0x03;
+        const FLOAT64 = 0x04;
+        const INT8 = 0x05;
+        const INT16 = 0x06;
+        const INT32 = 0x07;
+        const INT64 = 0x08;
+        const UINT8 = 0x09;
+        const UINT16 = 0x0A;
+        const UINT32 = 0x0B;
+        const UINT64 = 0x0C;
+        const STRING = 0x0D;
+        const BINARY = 0x0E;
+        const ARRAY = 0x0F;
+        const MAP = 0x10;
+    }
+}
+
+impl Encode for Any {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        match self {
+            Any::Null => {
+                e.u8(AnyFlags::NULL.bits());
+            }
+            Any::True => {
+                e.u8(AnyFlags::TRUE.bits());
+            }
+            Any::False => {
+                e.u8(AnyFlags::FALSE.bits());
+            }
+            Any::Float32(d) => {
+                e.u8(AnyFlags::FLOAT32.bits());
+                // e.f32(*d);
+            }
+            Any::Float64(d) => {
+                e.u8(AnyFlags::FLOAT64.bits());
+                // e.f64(*d);
+            }
+            Any::Int8(_) => {}
+            Any::Int16(_) => {}
+            Any::Int32(_) => {}
+            Any::Int64(_) => {}
+            Any::Uint8(_) => {}
+            Any::Uint16(_) => {}
+            Any::Uint32(_) => {}
+            Any::Uint64(_) => {}
+            Any::String(_) => {}
+            Any::Binary(_) => {}
+            Any::Array(_) => {}
+            Any::Map(_) => {}
+        }
+    }
+}
+
+impl Decode for Any {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let flags = d.u8()?;
+        match flags {
+            0x00 => Ok(Self::Null),
+            0x01 => Ok(Self::True),
+            0x02 => Ok(Self::False),
+            0x03 => {
+                // let f = d.f32()?;
+                // Ok(Self::Float32(f))
+                Ok(Self::Null)
+            }
+            0x04 => {
+                // let f = d.f64()?;
+                // Ok(Self::Float64(f))
+                Ok(Self::Null)
+            }
+            0x05 => {
+                // let i = d.i8()?;
+                // Ok(Self::Int8(i))
+                Ok(Self::Null)
+            }
+            0x06 => {
+                // let i = d.i16()?;
+                // Ok(Self::Int16(i))
+                Ok(Self::Null)
+            }
+            0x07 => {
+                // let i = d.i32()?;
+                // Ok(Self::Int32(i))
+                Ok(Self::Null)
+            }
+            0x08 => {
+                // let i = d.i64()?;
+                // Ok(Self::Int64(i))
+                Ok(Self::Null)
+            }
+            0x09 => {
+                // let u = d.u8()?;
+                // Ok(Self::Uint8(u))
+                Ok(Self::Null)
+            }
+            0x0A => {
+                // let u = d.u16()?;
+                // Ok(Self::Uint16(u))
+                Ok(Self::Null)
+            }
+            0x0B => {
+                // let u = d.u32()?;
+                // Ok(Self::Uint32(u))
+                Ok(Self::Null)
+            }
+            0x0C => {
+                // let u = d.u64()?;
+                // Ok(Self::Uint64(u))
+                Ok(Self::Null)
+            }
+            0x0D => {
+                // let s = d.string()?;
+                // Ok(Self::String(s))
+                Ok(Self::Null)
+            }
+            0x0E => {
+                // let b = d.bytes()?;
+                // Ok(Self::Binary(b))
+                Ok(Self::Null)
+            }
+            0x0F => {
+                panic!("Array not implemented");
+            }
+            _ => {
+                panic!("Map not implemented");
             }
         }
     }

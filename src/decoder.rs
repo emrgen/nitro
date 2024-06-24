@@ -8,7 +8,7 @@ pub trait Decoder {
     fn string(&mut self) -> Result<String, String>;
     fn bytes(&mut self) -> Result<Vec<u8>, String>;
     fn slice(&mut self, len: usize) -> Result<&[u8], String>;
-    fn item(&mut self) -> Result<ItemData, String>;
+    fn item(&mut self, ctx: &DecodeContext) -> Result<ItemData, String>;
 }
 
 impl Decoder for Box<dyn Decoder> {
@@ -40,8 +40,8 @@ impl Decoder for Box<dyn Decoder> {
         self.as_mut().slice(len)
     }
 
-    fn item(&mut self) -> Result<ItemData, String> {
-        self.as_mut().item()
+    fn item(&mut self, ctx: &DecodeContext) -> Result<ItemData, String> {
+        self.as_mut().item(ctx)
     }
 }
 
@@ -87,8 +87,8 @@ impl Decode for String {
 }
 
 impl Decode for ItemData {
-    fn decode<T: Decoder>(d: &mut T, _ctx: &DecodeContext) -> Result<ItemData, String> {
-        d.item()
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<ItemData, String> {
+        d.item(ctx)
     }
 }
 

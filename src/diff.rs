@@ -1,13 +1,14 @@
 use crate::bimapid::{ClientMap, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
+use crate::id::Id;
 use crate::item::ItemData;
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Diff {
-    pub(crate) root: Option<ItemData>,
+    pub(crate) guid: String,
     pub(crate) fields: FieldMap,
     pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
@@ -16,11 +17,28 @@ pub(crate) struct Diff {
 }
 
 impl Diff {
-    pub(crate) fn new() -> Diff {
-        Default::default()
+    pub(crate) fn has_root(&self) -> bool {
+        self.get_root().is_some()
+    }
+
+    pub(crate) fn get_root(&self) -> Option<ItemData> {
+        let client = self.clients.get_client_id(&self.guid)?;
+        let root = self.items.find(Id::new(client.clone(), 1)); // root id is always 1
+
+        root
+    }
+}
+
+impl Diff {
+    pub(crate) fn new(guid: String) -> Diff {
+        Self {
+            guid,
+            ..Default::default()
+        }
     }
 
     pub(crate) fn from(
+        guid: String,
         clients: ClientMap,
         fields: FieldMap,
         state: ClientState,
@@ -28,6 +46,7 @@ impl Diff {
         deletes: DeleteItemStore,
     ) -> Diff {
         Diff {
+            guid,
             clients,
             fields,
             state,
@@ -81,7 +100,10 @@ impl Diff {
             }
         }
 
+        let guid = self.guid.clone();
+
         Diff::from(
+            guid,
             clients.clone(),
             fields.clone(),
             state.clone(),
@@ -93,39 +115,65 @@ impl Diff {
 
 impl Encode for Diff {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
-        if self.root.is_some() {
-            e.u8(1)
-        } else {
-            e.u8(0)
-        }
-
+        e.string(&self.guid);
         self.clients.encode(e, ctx);
         self.fields.encode(e, ctx);
         self.state.encode(e, ctx);
-        self.items.encode(e, ctx);
         self.deletes.encode(e, ctx);
+        self.items.encode(e, ctx);
     }
 }
 
 impl Decode for Diff {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Diff, String> {
-        let root = match d.u8()? {
-            128 => Some(ItemData::decode(d, ctx)?),
-            _ => None,
-        };
+        let guid = d.string()?;
+
         let clients = ClientMap::decode(d, ctx)?;
         let fields = FieldMap::decode(d, ctx)?;
         let state = ClientState::decode(d, ctx)?;
-        let items = ItemDataStore::decode(d, ctx)?;
         let deletes = DeleteItemStore::decode(d, ctx)?;
+        let items = ItemDataStore::decode(d, ctx)?;
 
         Ok(Diff {
-            root,
+            guid,
             clients,
             fields,
             state,
-            items,
             deletes,
+            items,
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::codec_v1::EncoderV1;
+    use crate::decoder::Decode;
+    use crate::diff::Diff;
+    use crate::doc::Doc;
+    use crate::encoder::{Encode, Encoder};
+    use crate::state::ClientState;
+
+    #[test]
+    fn test_encode_decode_diff() {
+        let doc = Doc::default();
+        let mut encoder = EncoderV1::default();
+
+        let diff = doc.diff(ClientState::default());
+        diff.encode(&mut encoder, &Default::default());
+
+        // println!("diff: {:?}", diff);
+
+        // println!("buffer: {:?}", encoder.buffer());
+
+        let mut d = encoder.decoder();
+
+        let decoded = Diff::decode(&mut d, &Default::default()).unwrap();
+
+        // println!("{:?}", decoded);
+
+        assert_eq!(diff, decoded);
+
+        // println!("{:?}", diff);
     }
 }

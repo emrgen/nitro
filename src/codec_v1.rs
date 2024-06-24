@@ -1,9 +1,10 @@
 use std::cmp::PartialEq;
 use std::ops::Deref;
 
-use crate::decoder::Decoder;
+use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::item::{Content, ItemData, ItemKindFlags};
+use crate::id::Id;
+use crate::item::{Content, ItemData, ItemKind, ItemKindFlags};
 
 const VERSION: u8 = 1;
 const BUF_STEP: usize = 1024;
@@ -12,6 +13,7 @@ const INIT_SIZE: usize = 1024;
 #[derive(Debug, Clone)]
 pub struct EncoderV1 {
     buf: Vec<u8>,
+    pos: usize,
 }
 
 impl Default for EncoderV1 {
@@ -28,11 +30,13 @@ impl EncoderV1 {
     pub(crate) fn with_capacity(size: usize) -> Self {
         Self {
             buf: Vec::with_capacity(size),
+            pos: 0,
         }
         .write_header()
     }
 
     fn ensure_capacity(&mut self, size: usize) {
+        // println!("size: {}, pos: {}, len: {}", size, self.pos, self.buf.len());
         if self.buf.len() + size > self.buf.capacity() {
             self.buf.reserve(BUF_STEP);
         }
@@ -49,37 +53,44 @@ impl Encoder for EncoderV1 {
     fn u8(&mut self, value: u8) {
         self.ensure_capacity(1);
         self.buf.push(value);
+        self.pos += 1;
     }
 
     fn u16(&mut self, value: u16) {
         self.ensure_capacity(2);
         self.buf.extend_from_slice(&value.to_be_bytes());
+        self.pos += 2;
     }
 
     fn u32(&mut self, value: u32) {
         self.ensure_capacity(4);
         self.buf.extend_from_slice(&value.to_be_bytes());
+        self.pos += 4;
     }
 
     fn u64(&mut self, value: u64) {
         self.ensure_capacity(8);
         self.buf.extend_from_slice(&value.to_be_bytes());
+        self.pos += 8;
     }
 
     fn string(&mut self, value: &str) {
-        self.ensure_capacity(value.len() + 4);
         self.u32(value.len() as u32);
+        self.ensure_capacity(value.len());
         self.buf.extend_from_slice(value.as_bytes());
+        self.pos += value.len();
     }
 
     fn bytes(&mut self, value: &[u8]) {
         self.ensure_capacity(value.len() + 4);
         self.u32(value.len() as u32);
         self.buf.extend_from_slice(value);
+        self.pos += value.len();
     }
 
     fn slice(&mut self, value: &[u8]) {
         self.buf.extend_from_slice(value);
+        self.pos += value.len();
     }
 
     fn item(&mut self, ctx: &EncodeContext, value: &ItemData) {
@@ -95,8 +106,8 @@ impl Encoder for EncoderV1 {
         Box::new(DecoderV1::new(self.buf.clone()))
     }
 
-    fn buffer(self) -> Vec<u8> {
-        self.buf
+    fn buffer(&self) -> Vec<u8> {
+        self.buf.clone()
     }
 
     fn size(&self) -> usize {
@@ -109,58 +120,6 @@ impl Deref for EncoderV1 {
 
     fn deref(&self) -> &Self::Target {
         &self.buf
-    }
-}
-
-fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
-    // | kind, content, field, parent | left, right | ...
-
-    let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
-    if !matches!(value.content, Content::Null) {
-        flags |= 1 << 3;
-    }
-
-    if value.field.is_some() {
-        flags |= 1 << 2;
-    }
-
-    // if left_id is not None then we can get the parent_id from left item during integration,
-    // so we don't need to store parent_id in the item
-    if value.left_id.is_some() {
-        flags |= 1 << 1;
-    }
-
-    if value.right_id.is_some() {
-        flags |= 1;
-    }
-
-    e.u8(flags);
-
-    if !matches!(value.content, Content::Null) {
-        value.content.encode(e, ctx);
-    }
-
-    if let Some(field) = value.field {
-        e.u32(field);
-    }
-
-    value.id.encode(e, ctx);
-    if let Some(left_id) = value.left_id {
-        left_id.encode(e, ctx);
-    } else if let Some(parent_id) = value.parent_id {
-        parent_id.encode(e, ctx);
-    }
-
-    if let Some(right_id) = value.right_id {
-        right_id.encode(e, ctx);
-    }
-
-    if let Some(target_id) = value.target_id {
-        target_id.encode(e, ctx);
-    }
-
-    if let Some(mover_id) = value.mover_id {
-        mover_id.encode(e, ctx);
     }
 }
 
@@ -177,10 +136,13 @@ impl DecoderV1 {
             panic!("decoder: invalid version");
         }
 
+        // println!("buffer: {:?}", d.buf);
+
         d
     }
 
     fn ensure_capacity(&mut self, size: usize) {
+        // println!("size: {}, pos: {}, len: {}", size, self.pos, self.buf.len());
         if self.pos + size > self.buf.len() {
             panic!("decoder: out of bounds");
         }
@@ -254,9 +216,127 @@ impl Decoder for DecoderV1 {
         Ok(value)
     }
 
-    fn item(&mut self) -> Result<ItemData, String> {
-        todo!()
+    fn item(&mut self, ctx: &DecodeContext) -> Result<ItemData, String> {
+        return decode_item(self, ctx);
     }
+}
+
+fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
+    // | kind, content, field, parent | left, right | ...
+
+    let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
+    if !matches!(value.content, Content::Null) {
+        flags |= 1 << 3;
+    }
+
+    if value.field.is_some() {
+        flags |= 1 << 2;
+    }
+
+    // if left_id is not None then we can get the parent_id from left item during integration,
+    // so we don't need to store parent_id in the item
+    if value.left_id.is_some() {
+        flags |= 1 << 1;
+    }
+
+    if value.right_id.is_some() {
+        flags |= 1;
+    }
+
+    e.u8(flags);
+    // eprintln!("flags: {:b}", flags);
+
+    if !matches!(value.content, Content::Null) {
+        value.content.encode(e, ctx);
+    }
+
+    if let Some(field) = value.field {
+        e.u32(field);
+    }
+
+    value.id.encode(e, ctx);
+
+    if let Some(left_id) = value.left_id {
+        left_id.encode(e, ctx);
+    } else if let Some(parent_id) = value.parent_id {
+        parent_id.encode(e, ctx);
+    }
+
+    if let Some(right_id) = value.right_id {
+        right_id.encode(e, ctx);
+    }
+
+    if let Some(target_id) = value.target_id {
+        target_id.encode(e, ctx);
+    }
+
+    if let Some(mover_id) = value.mover_id {
+        mover_id.encode(e, ctx);
+    }
+}
+
+fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, String> {
+    let flags = d.u8()?;
+    // println!("flags: {:b}", flags);
+
+    let kind: ItemKind = ItemKindFlags::from_bits(flags >> 4).unwrap().into();
+    let content = if flags & 0b1000 != 0 {
+        Content::decode(d, ctx)?
+    } else {
+        Content::Null
+    };
+
+    let field = if flags & 0b100 != 0 {
+        Some(d.u32()?)
+    } else {
+        None
+    };
+
+    let id = Id::decode(d, ctx)?;
+
+    let is_root = matches!(content, Content::Doc(_));
+
+    let parent_id = if is_root || flags & 0b10 == 0 {
+        None
+    } else {
+        Some(Id::decode(d, ctx)?)
+    };
+
+    let left_id = if !is_root && flags & 0b10 != 0 {
+        Some(Id::decode(d, ctx)?)
+    } else {
+        None
+    };
+
+    let right_id = if flags & 0b1 != 0 {
+        Some(Id::decode(d, ctx)?)
+    } else {
+        None
+    };
+
+    let target_id = if flags & 0b1 != 0 {
+        Some(Id::decode(d, ctx)?)
+    } else {
+        None
+    };
+
+    let mover_id = if flags & 0b1 != 0 {
+        Some(Id::decode(d, ctx)?)
+    } else {
+        None
+    };
+
+    Ok(ItemData {
+        id,
+        kind,
+        content,
+        field,
+        left_id,
+        parent_id,
+        right_id,
+        target_id,
+        mover_id,
+    })
 }
 
 #[cfg(test)]

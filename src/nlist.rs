@@ -172,24 +172,24 @@ mod test {
 
         println!("{}", yaml);
 
-        let expect = r#"id: (1, 0)
+        let expect = r#"id: (1, 1)
 kind: list
-parent_id: (0, 0)
+parent_id: (0, 1)
 content:
 - content: a
-  id: (1, 1)
-  kind: atom
-  parent_id: (1, 0)
-- content: b
   id: (1, 2)
   kind: atom
-  left_id: (1, 1)
-  parent_id: (1, 0)
-- content: c
+  parent_id: (1, 1)
+- content: b
   id: (1, 3)
   kind: atom
   left_id: (1, 2)
-  parent_id: (1, 0)
+  parent_id: (1, 1)
+- content: c
+  id: (1, 4)
+  kind: atom
+  left_id: (1, 3)
+  parent_id: (1, 1)
 "#;
 
         assert_eq!(yaml, expect);
@@ -220,33 +220,32 @@ content:
 
         let root = doc.root.clone();
         let yaml = serde_yaml::to_string(&root).unwrap();
+        // println!("{}", yaml);
 
-        println!("{}", yaml);
-
-        let expect = r#"id: (0, 0)
+        let expect = r#"id: (0, 1)
 kind: map
 content:
   list:
     content:
     - content:
       - content: a
-        id: (1, 2)
+        id: (1, 3)
         kind: atom
-        parent_id: (1, 1)
-      id: (1, 1)
+        parent_id: (1, 2)
+      id: (1, 2)
       kind: list
-      parent_id: (1, 0)
+      parent_id: (1, 1)
     - content: b
-      id: (1, 3)
+      id: (1, 4)
       kind: atom
-      left_id: (1, 1)
-      parent_id: (1, 0)
-    id: (1, 0)
+      left_id: (1, 2)
+      parent_id: (1, 1)
+    id: (1, 1)
     kind: list
-    parent_id: (0, 0)
+    parent_id: (0, 1)
 "#;
         assert_eq!(yaml, expect);
 
-        println!("{}", serde_yaml::to_string(doc).unwrap());
+        // println!("{}", serde_yaml::to_string(doc).unwrap());
     }
 }

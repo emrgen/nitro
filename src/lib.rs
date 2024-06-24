@@ -1,5 +1,4 @@
 mod bimapid;
-mod codec;
 pub mod codec_v1;
 mod crdt;
 pub mod decoder;

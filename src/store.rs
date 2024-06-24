@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
@@ -218,7 +218,7 @@ impl<T: Default + WithId + Clone + Encode + Decode + Eq + PartialEq> ClientStore
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct ClientStore<T: ClientStoreEntry> {
-    pub(crate) items: HashMap<ClientId, IdStore<T>>,
+    pub(crate) items: BTreeMap<ClientId, IdStore<T>>,
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
@@ -250,7 +250,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 
 impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
     type Item = (ClientId, IdStore<T>);
-    type IntoIter = std::collections::hash_map::IntoIter<ClientId, IdStore<T>>;
+    type IntoIter = std::collections::btree_map::IntoIter<ClientId, IdStore<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -270,7 +270,7 @@ impl<T: ClientStoreEntry> Encode for ClientStore<T> {
 impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for ClientStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientStore<T>, String> {
         let len = d.u32()? as usize;
-        let mut items = HashMap::new();
+        let mut items = BTreeMap::new();
         for _ in 0..len {
             let client = d.u32()?;
             let store = IdStore::decode(d, ctx)?;

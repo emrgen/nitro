@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::bimapid::{ClientId, ClientMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
@@ -7,13 +7,13 @@ use crate::id::Clock;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ClientState {
-    pub(crate) clients: HashMap<ClientId, Clock>,
+    pub(crate) clients: BTreeMap<ClientId, Clock>,
 }
 
 impl ClientState {
     pub(crate) fn new() -> ClientState {
         ClientState {
-            clients: HashMap::new(),
+            clients: BTreeMap::new(),
         }
     }
 
@@ -61,7 +61,7 @@ impl Encode for ClientState {
 impl Decode for ClientState {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientState, String> {
         let len = d.u32()? as usize;
-        let mut clients = HashMap::new();
+        let mut clients = BTreeMap::new();
         for _ in 0..len {
             let client = d.u32()?;
             let clock = d.u32()?;
@@ -73,6 +73,8 @@ impl Decode for ClientState {
 
 #[cfg(test)]
 mod tests {
+    use std::default::Default;
+
     use crate::codec_v1::EncoderV1;
 
     use super::*;

@@ -83,6 +83,26 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
     }
 }
 
+// impl<T: PartialEq + Default + Eq + Hash + Clone + Encode + Decode> PartialEq for EncoderMap<T> {
+//     fn eq(&self, other: &Self) -> bool {
+//         return true;
+//         let self_keys: Vec<&T> = self.map.left_values().collect();
+//         let other_keys: Vec<&T> = other.map.left_values().collect();
+//
+//         if self_keys.len() != other_keys.len() {
+//             return false;
+//         }
+//
+//         for key in self_keys {
+//             if !other.map.contains_left(key) {
+//                 return false;
+//             }
+//         }
+//
+//         true
+//     }
+// }
+
 impl Encode for EncoderMap<String> {
     fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
         e.u32(self.size() as u32);

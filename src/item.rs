@@ -658,24 +658,24 @@ impl From<&ItemKind> for ItemKindFlags {
 
 impl From<ItemKindFlags> for ItemKind {
     fn from(flags: ItemKindFlags) -> Self {
-        if flags.contains(ItemKindFlags::MAP) {
-            ItemKind::Map
-        } else if flags.contains(ItemKindFlags::LIST) {
-            ItemKind::List
-        } else if flags.contains(ItemKindFlags::TEXT) {
-            ItemKind::Text
-        } else if flags.contains(ItemKindFlags::STRING) {
-            ItemKind::String
-        } else if flags.contains(ItemKindFlags::ATOM) {
-            ItemKind::Atom
-        } else if flags.contains(ItemKindFlags::PROXY) {
-            ItemKind::Proxy
+        if flags.contains(ItemKindFlags::MARK) {
+            ItemKind::Mark
         } else if flags.contains(ItemKindFlags::MOVE) {
             ItemKind::Move
-        } else if flags.contains(ItemKindFlags::MARK) {
-            ItemKind::Mark
-        } else {
+        } else if flags.contains(ItemKindFlags::PROXY) {
+            ItemKind::Proxy
+        } else if flags.contains(ItemKindFlags::ATOM) {
             ItemKind::Atom
+        } else if flags.contains(ItemKindFlags::STRING) {
+            ItemKind::String
+        } else if flags.contains(ItemKindFlags::TEXT) {
+            ItemKind::Text
+        } else if flags.contains(ItemKindFlags::LIST) {
+            ItemKind::List
+        } else {
+            // NOTE: default to map if no flags are set
+            // otherwise contains always pass for 0x00
+            ItemKind::Map
         }
     }
 }

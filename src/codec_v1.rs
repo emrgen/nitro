@@ -225,6 +225,8 @@ fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
     // | kind, content, field, parent | left, right | ...
 
     let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
+    let is_root = matches!(value.content, Content::Doc(_));
+
     if !matches!(value.content, Content::Null) {
         flags |= 1 << 3;
     }
@@ -296,10 +298,10 @@ fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, Strin
 
     let is_root = matches!(content, Content::Doc(_));
 
-    let parent_id = if is_root || flags & 0b10 == 0 {
-        None
-    } else {
+    let parent_id = if !is_root && flags & 0b10 == 0 {
         Some(Id::decode(d, ctx)?)
+    } else {
+        None
     };
 
     let left_id = if !is_root && flags & 0b10 != 0 {

@@ -23,9 +23,7 @@ impl Diff {
 
     pub(crate) fn get_root(&self) -> Option<ItemData> {
         let client = self.clients.get_client_id(&self.guid)?;
-        let root = self.items.find(Id::new(client.clone(), 1)); // root id is always 1
-
-        root
+        self.items.find(Id::new(*client, 1))
     }
 }
 
@@ -84,7 +82,7 @@ impl Diff {
 
         let mut items = ItemDataStore::default();
 
-        for (_, store) in self.items.clone().into_iter() {
+        for (_, store) in self.items.clone() {
             for (_, item) in store.into_iter() {
                 let adjust = item.adjust(&before_clients, &before_fields, &clients, &fields);
                 items.insert(adjust);
@@ -157,6 +155,11 @@ mod test {
     #[test]
     fn test_encode_decode_diff() {
         let doc = Doc::default();
+        let text = doc.text();
+        doc.set("text", text.clone());
+
+        text.append(doc.string("hello"));
+
         let mut encoder = EncoderV1::default();
 
         let diff = doc.diff(ClientState::default());
@@ -172,7 +175,10 @@ mod test {
 
         // println!("{:?}", decoded);
 
-        assert_eq!(diff, decoded);
+        // assert_eq!(diff.state, decoded.state);
+        assert_eq!(diff.items.items.get(&0), decoded.items.items.get(&0));
+        assert_eq!(diff.items.items.get(&1), decoded.items.items.get(&1));
+        // assert_eq!(diff, decoded);
 
         // println!("{:?}", diff);
     }

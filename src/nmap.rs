@@ -87,8 +87,8 @@ impl NMap {
         let item_ref = item.clone().item_ref();
         let store = item_ref.store.upgrade().unwrap();
         let field_id = store.borrow_mut().get_field_id(&field.into());
-        item_ref.borrow_mut().data.field = Some(field_id);
-        self.item_ref().append(item);
+        // item_ref.borrow_mut().data.field = Some(field_id);
+        // self.item_ref().append(item);
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {

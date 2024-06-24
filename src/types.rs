@@ -1,8 +1,8 @@
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
@@ -272,9 +272,9 @@ impl Type {
         }
     }
 
-    pub fn insert(&self, offset: usize, item: impl Into<Type>) {
+    pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.insert(offset, item.into()),
+            Type::List(n) => n.insert(offset, item),
             _ => panic!("insert: not implemented"),
         }
     }
@@ -357,13 +357,13 @@ impl Serialize for Type {
 }
 
 impl Encode for Type {
-    fn encode<T: Encoder>(&self, e: &mut T) {
-        e.item(&self.item_ref().borrow().data.clone());
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        e.item(ctx, &self.item_ref().borrow().data.clone());
     }
 }
 
 impl Decode for Type {
-    fn decode<T: Decoder>(_d: &mut T) -> Result<Self, String> {
+    fn decode<T: Decoder>(_d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
         Err("Type::decode: not implemented".to_string())
     }
 }

@@ -10,6 +10,11 @@ base64 = "0.22.1"
 serde = { version = "1.0.203", features = ["derive"] }
 indexmap = { version = "2.2.6", features = ["serde"] }
 bitflags = "2.5.0"
+miniz_oxide = "0.7.4"
+zstd = "0.13.1"
+fake = { version = "2.9.2", features = ["derive"] }
+byte-unit = "5.1.4"
+rand = "0.8.5"
 
 [dependencies.serde_json]
 version = "1.0"

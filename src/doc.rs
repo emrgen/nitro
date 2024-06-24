@@ -7,6 +7,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::bimapid::Client;
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::diff::Diff;
 use crate::id::Id;
 use crate::item::{Content, DocContent, ItemKey};
@@ -44,8 +45,6 @@ pub(crate) struct Doc {
     pub(crate) store: StoreRef,
 }
 
-impl Doc {}
-
 impl Doc {
     pub(crate) fn new(opts: DocOpts) -> Self {
         let mut store = DocStore::default();
@@ -74,19 +73,29 @@ impl Doc {
     }
 
     // create a new doc from a diff
-    pub(crate) fn from_diff(diff: Diff, opts: DocOpts) -> Self {
-        let mut doc = Self::new(opts);
-        doc.apply(diff);
+    pub(crate) fn from_diff(diff: &Diff) -> Option<Doc> {
+        if let Some(root) = &diff.root {
+            if let Content::Doc(content) = &root.content {
+                let doc = Doc::new(DocOpts {
+                    guid: content.guid.clone(),
+                    crated_by: content.created_by.clone(),
+                });
 
-        doc
+                doc.apply(diff.clone());
+
+                return Some(doc);
+            }
+        }
+
+        None
     }
 
     #[inline]
     pub fn diff(&self, state: ClientState) -> Diff {
-        self.store.borrow().diff(self.opts.guid.clone(), state)
+        self.store.borrow().diff(state)
     }
 
-    pub(crate) fn apply(&mut self, diff: Diff) {
+    pub(crate) fn apply(&self, diff: Diff) {
         let mut tx = Transaction::new(Rc::downgrade(&self.store), diff);
         tx.commit();
     }
@@ -159,6 +168,7 @@ impl Doc {
         self.root.set(key, item.into());
     }
 
+    #[inline]
     fn remove(&self, key: ItemKey) {
         self.root.remove(key)
     }
@@ -213,8 +223,25 @@ impl Serialize for Doc {
     }
 }
 
+impl Encode for Doc {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        let mut diff = self.diff(ClientState::default());
+        diff.root = Some(self.root.item_ref().borrow().data.clone());
+
+        diff.encode(e, ctx)
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use byte_unit::{AdjustedByte, Byte, Unit};
+    use fake::Fake;
+    use fake::faker::lorem::en::Words;
+    use miniz_oxide::deflate::compress_to_vec;
+    use rand::random;
+
+    use crate::codec::encoder::{Encode, Encoder};
+    use crate::codec::v1::EncoderV1;
     use crate::doc::Doc;
 
     #[test]
@@ -239,4 +266,65 @@ mod test {
         let yaml = serde_yaml::to_string(&doc.to_json()).unwrap();
         println!("{}", yaml);
     }
+
+    fn get_doc_encoding(lines: u32, words: u32) -> Vec<u8> {
+        let words = words as usize;
+        let doc = Doc::default();
+        let list = doc.list();
+        doc.set("list", list.clone());
+        for _ in 0..lines {
+            let text = doc.text();
+            let words: Vec<String> = Words(words..words + 1).fake();
+            words.iter().for_each(|word| {
+                text.append(doc.string(word.to_string()));
+            });
+
+            let size = list.size();
+            if size == 0 {
+                list.append(text);
+            } else {
+                let offset = random::<u32>() % size;
+                list.insert(offset, text);
+            }
+        }
+
+        let mut encoder = EncoderV1::new();
+        doc.encode(&mut encoder, &Default::default());
+
+        encoder.buffer()
+    }
+
+    fn to_unit(size: usize) -> AdjustedByte {
+        let byte = Byte::from_u64(size as u64);
+        byte.get_adjusted_unit(Unit::KB)
+    }
+
+    #[test]
+    fn test_encode_doc_size() {
+        println!(
+            "{:6}   {:6}   {:10}   {:10}   {:8}",
+            "lines", "words", "size", "comp", "ratio"
+        );
+        println!(
+            "{:6}   {:6}   {:10}   {:10}   {:8}",
+            "-----", "-----", "----------", "----------", "--------"
+        );
+        for i in 0..21 {
+            let lines = 10 * i;
+            let words = 20;
+            let buf = get_doc_encoding(lines, words);
+            let comp = compress_to_vec(&buf, 1);
+            println!(
+                "{:6}   {:6}   {:10.2}   {:10.2}   {:8.2}%",
+                lines,
+                lines * words,
+                to_unit(buf.len()),
+                to_unit(comp.len()),
+                100f32 * (buf.len() as f32 / comp.len() as f32 - 1f32)
+            );
+        }
+    }
+
+    #[test]
+    fn test_encode_decode_doc() {}
 }

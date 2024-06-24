@@ -1,6 +1,7 @@
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::IdRange;
 
 #[derive(Debug, Clone, Default)]
@@ -150,7 +151,53 @@ impl Serialize for MarkContent {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+impl Encode for MarkContent {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        self.range.encode(e, ctx);
+        match self.data {
+            Mark::Bold => {
+                e.string("bold");
+            }
+            Mark::Italic => {
+                e.string("italic");
+            }
+            Mark::Underline => {
+                e.string("underline");
+            }
+            Mark::StrikeThrough => {
+                e.string("strikethrough");
+            }
+            Mark::Code => {
+                e.string("code");
+            }
+            Mark::Subscript => {
+                e.string("subscript");
+            }
+            Mark::Superscript => {
+                e.string("superscript");
+            }
+            Mark::Color(ref color) => {
+                e.string("color");
+                e.string(color);
+            }
+            Mark::Background(ref color) => {
+                e.string("background");
+                e.string(color);
+            }
+            Mark::Link(ref url) => {
+                e.string("link");
+                e.string(url);
+            }
+            Mark::Custom(ref name, ref json) => {
+                e.string(name);
+                e.string(json);
+            }
+            Mark::None => {}
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Hash)]
 pub(crate) enum Mark {
     Bold,
     Italic,

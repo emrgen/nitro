@@ -1,6 +1,6 @@
 use crate::bimapid::ClientMap;
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, WithId};
 
 #[derive(Debug, Clone, Default)]
@@ -29,16 +29,16 @@ impl DeleteItem {
 }
 
 impl Encode for DeleteItem {
-    fn encode<E: Encoder>(&self, e: &mut E) {
-        self.id.encode(e);
-        self.range.encode(e);
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        self.id.encode(e, ctx);
+        self.range.encode(e, ctx);
     }
 }
 
 impl Decode for DeleteItem {
-    fn decode<D: Decoder>(d: &mut D) -> Result<DeleteItem, String> {
-        let id = Id::decode(d)?;
-        let range = IdRange::decode(d)?;
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<DeleteItem, String> {
+        let id = Id::decode(d, ctx)?;
+        let range = IdRange::decode(d, ctx)?;
 
         Ok(DeleteItem::new(id, range))
     }

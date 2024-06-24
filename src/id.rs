@@ -5,8 +5,8 @@ use std::ops::{Add, Sub};
 use serde::Serialize;
 
 use crate::bimapid::{ClientId, ClientMap};
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 
 pub(crate) type Clock = u32;
@@ -138,14 +138,14 @@ impl Ord for Id {
 }
 
 impl Encode for Id {
-    fn encode<T: Encoder>(&self, e: &mut T) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
         e.u32(self.client);
         e.u32(self.clock);
     }
 }
 
 impl Decode for Id {
-    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
         let client = d.u32()?;
         let clock = d.u32()?;
 
@@ -237,7 +237,7 @@ impl Display for IdRange {
 }
 
 impl Encode for IdRange {
-    fn encode<T: Encoder>(&self, e: &mut T) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
         e.u32(self.client);
         e.u32(self.start);
         e.u32(self.size());
@@ -245,7 +245,7 @@ impl Encode for IdRange {
 }
 
 impl Decode for IdRange {
-    fn decode<T: Decoder>(d: &mut T) -> Result<Self, String> {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
         let client = d.u32()?;
         let start = d.u32()?;
         let size = d.u32()?;

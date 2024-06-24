@@ -1,10 +1,11 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt::Debug;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::{Client, ClientId, ClientMap, Field, FieldId, FieldMap};
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::{Clock, Id, IdRange, Split, WithId};
@@ -94,7 +95,7 @@ impl DocStore {
         self.clients.get_or_insert(client_id)
     }
 
-    pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
+    pub(crate) fn diff(&self, state: ClientState) -> Diff {
         let items = self.items.diff(state.clone(), &self.id_map);
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
         Diff::from(
@@ -246,22 +247,26 @@ impl<T: WithId + Clone + Default + Encode + Decode> std::iter::IntoIterator for 
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode> Encode for ClientStore<T> {
-    fn encode<E: Encoder>(&self, e: &mut E) {
+impl<T: WithId + Clone + Default + Encode + Decode + Debug> Encode for ClientStore<T> {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        e.u32(self.items.len() as u32);
         for (client, store) in self.items.iter() {
             e.u32(*client);
-            store.encode(e);
+            store.encode(e, ctx);
         }
     }
 }
 
 impl<T: WithId + Clone + Default + Encode + Decode> Decode for ClientStore<T> {
-    fn decode<D: Decoder>(d: &mut D) -> Result<ClientStore<T>, String> {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientStore<T>, String> {
+        let len = d.u32()? as usize;
         let mut items = HashMap::new();
-        while let Ok(client) = d.u32() {
-            let store = IdStore::decode(d)?;
+        for _ in 0..len {
+            let client = d.u32()?;
+            let store = IdStore::decode(d, ctx)?;
             items.insert(client, store);
         }
+
         Ok(ClientStore { items })
     }
 }
@@ -302,21 +307,22 @@ impl<T: WithId + Clone + Encode + Decode> IntoIterator for IdStore<T> {
     }
 }
 
-impl<T: Encode + Clone + WithId + Decode> Encode for IdStore<T> {
-    fn encode<E: Encoder>(&self, e: &mut E) {
+impl<T: Encode + Clone + WithId + Decode + Debug> Encode for IdStore<T> {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.data.len() as u32);
         for (_, value) in self.data.iter() {
-            value.encode(e);
+            // println!("value: {:?}", value);
+            value.encode(e, ctx);
         }
     }
 }
 
 impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
-    fn decode<D: Decoder>(d: &mut D) -> Result<IdStore<T>, String> {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<IdStore<T>, String> {
         let len = d.u32()? as usize;
         let mut data = BTreeMap::new();
         for _ in 0..len {
-            let value = T::decode(d)?;
+            let value = T::decode(d, ctx)?;
             data.insert(value.id(), value);
         }
         Ok(IdStore { data })

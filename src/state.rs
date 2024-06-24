@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::bimapid::{ClientId, ClientMap};
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Clock;
 
 #[derive(Debug, Clone, Default)]
@@ -49,7 +49,7 @@ impl ClientState {
 }
 
 impl Encode for ClientState {
-    fn encode<E: Encoder>(&self, e: &mut E) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.clients.len() as u32);
         for (client, clock) in &self.clients {
             e.u32(*client);
@@ -59,7 +59,7 @@ impl Encode for ClientState {
 }
 
 impl Decode for ClientState {
-    fn decode<D: Decoder>(d: &mut D) -> Result<ClientState, String> {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientState, String> {
         let len = d.u32()? as usize;
         let mut clients = HashMap::new();
         for _ in 0..len {

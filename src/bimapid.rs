@@ -2,8 +2,9 @@ use std::hash::Hash;
 
 use bimap::BiMap;
 
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::mark::Mark;
 
 pub type Client = String;
 pub type ClientId = u32;
@@ -14,39 +15,43 @@ pub(crate) trait BiMapEntry:
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct EncoderMap {
-    pub map: BiMap<String, u32>,
+pub(crate) struct EncoderMap<T: Clone + Default + PartialEq + Eq + Hash> {
+    pub map: BiMap<T, u32>,
 }
 
-impl EncoderMap {
-    pub fn new() -> EncoderMap {
+impl<T: Clone + Default + PartialEq + Eq + Hash> EncoderMap<T> {
+    pub fn new() -> EncoderMap<T> {
         EncoderMap { map: BiMap::new() }
     }
 
-    pub fn insert(&mut self, key: String, value: u32) {
+    pub fn size(&self) -> usize {
+        self.map.len()
+    }
+
+    pub fn insert(&mut self, key: T, value: u32) {
         self.map.insert(key, value);
     }
 
-    pub fn get_or_insert(&mut self, key: &str) -> u32 {
+    pub fn get_or_insert(&mut self, key: &T) -> u32 {
         match self.map.get_by_left(key) {
             Some(&id) => id,
             None => {
                 let id = self.map.len() as u32;
-                self.map.insert(key.to_string(), id);
+                self.map.insert(key.clone(), id);
                 id
             }
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<&u32> {
+    pub fn get(&self, key: &T) -> Option<&u32> {
         self.map.get_by_left(key)
     }
 
-    pub fn get_key(&self, id: &u32) -> Option<&String> {
+    pub fn get_key(&self, id: &u32) -> Option<&T> {
         self.map.get_by_right(id)
     }
 
-    pub fn adjust(&self, other: &EncoderMap) -> EncoderMap {
+    pub fn adjust(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
         let mut adjust = EncoderMap::new();
         let mut clone = self.clone();
         for (key, _) in other.map.iter() {
@@ -57,7 +62,7 @@ impl EncoderMap {
         adjust
     }
 
-    pub(crate) fn merge(&self, other: &EncoderMap) -> Self {
+    pub(crate) fn merge(&self, other: &EncoderMap<T>) -> Self {
         let mut merged = Self::default();
         for (client, client_id) in self.map.iter() {
             merged.insert(client.clone(), *client_id);
@@ -71,22 +76,30 @@ impl EncoderMap {
     }
 }
 
-impl Encode for EncoderMap {
-    fn encode<E: Encoder>(&self, encoder: &mut E) {
-        encoder.u32(self.map.len() as ClientId);
+impl Encode for EncoderMap<String> {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
+        e.u32(self.size() as u32);
         for (client_id, client) in self.map.iter() {
-            encoder.string(client_id);
-            encoder.u32(*client);
+            let size = client_id.len();
+            let client_id = client_id.as_bytes();
+            e.u8(size as u8);
+            e.slice(client_id);
+            e.u32(*client);
         }
     }
 }
 
-impl Decode for EncoderMap {
-    fn decode<D: Decoder>(decoder: &mut D) -> Result<EncoderMap, String> {
+impl Decode for EncoderMap<String> {
+    fn decode<D: Decoder>(
+        decoder: &mut D,
+        _ctx: &DecodeContext,
+    ) -> Result<EncoderMap<String>, String> {
         let len = decoder.u32()? as usize;
         let mut map = BiMap::new();
         for _ in 0..len {
-            let client_id = decoder.string()?;
+            let size = decoder.u8()? as usize;
+            let slice = decoder.slice(size)?;
+            let client_id = String::from_utf8(slice.into()).map_err(|e| e.to_string())?;
             let client = decoder.u32()?;
             map.insert(client_id, client);
         }
@@ -94,10 +107,29 @@ impl Decode for EncoderMap {
     }
 }
 
+impl Encode for EncoderMap<Mark> {
+    fn encode<T: Encoder>(&self, e: &mut T, _ctx: &EncodeContext) {
+        e.u32(self.size() as u32);
+        for (client_id, client) in self.map.iter() {
+            // let size = client_id.len();
+            // let client_id = client_id.as_bytes();
+            // e.u8(size as u8);
+            // e.slice(client_id);
+            // e.u32(*client);
+        }
+    }
+}
+
+impl Decode for EncoderMap<Mark> {
+    fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<EncoderMap<Mark>, String> {
+        todo!()
+    }
+}
+
 // #[derive(Debug, Clone, Default)]
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ClientMap {
-    map: EncoderMap,
+    map: EncoderMap<String>,
 }
 
 impl ClientMap {
@@ -139,15 +171,25 @@ impl ClientMap {
 }
 
 impl Encode for ClientMap {
-    fn encode<E: Encoder>(&self, encoder: &mut E) {
-        self.map.encode(encoder);
+    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &EncodeContext) {
+        self.map.encode(encoder, ctx);
     }
 }
 
 impl Decode for ClientMap {
-    fn decode<D: Decoder>(decoder: &mut D) -> Result<ClientMap, String> {
-        let map = EncoderMap::decode(decoder)?;
-        Ok(ClientMap { map })
+    fn decode<D: Decoder>(decoder: &mut D, _ctx: &DecodeContext) -> Result<ClientMap, String> {
+        let len = decoder.u32()? as usize;
+        let mut map = BiMap::new();
+        for _ in 0..len {
+            let size = decoder.u8()? as usize;
+            let slice = decoder.slice(size)?;
+            let client_id = String::from_utf8(slice.into()).map_err(|e| e.to_string())?;
+            let client = decoder.u32()?;
+            map.insert(client_id, client);
+        }
+        Ok(Self {
+            map: EncoderMap { map },
+        })
     }
 }
 
@@ -156,7 +198,7 @@ pub(crate) type FieldId = u32;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct FieldMap {
-    map: EncoderMap,
+    map: EncoderMap<String>,
 }
 
 impl FieldMap {
@@ -198,14 +240,14 @@ impl FieldMap {
 }
 
 impl Encode for FieldMap {
-    fn encode<E: Encoder>(&self, encoder: &mut E) {
-        self.map.encode(encoder);
+    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &EncodeContext) {
+        self.map.encode(encoder, ctx);
     }
 }
 
 impl Decode for FieldMap {
-    fn decode<D: Decoder>(decoder: &mut D) -> Result<FieldMap, String> {
-        let map = EncoderMap::decode(decoder)?;
+    fn decode<D: Decoder>(decoder: &mut D, ctx: &DecodeContext) -> Result<FieldMap, String> {
+        let map = EncoderMap::decode(decoder, ctx)?;
         Ok(FieldMap { map })
     }
 }

@@ -1,3 +1,4 @@
+use std::default::Default;
 use std::ops::Deref;
 
 use serde::ser::{Serialize, SerializeStruct};
@@ -7,9 +8,10 @@ use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct NList {
     item: ItemRef,
+    cache: Option<Vec<Type>>,
 }
 
 impl NList {
@@ -22,6 +24,7 @@ impl NList {
 
         Self {
             item: ItemRef::new(data.into(), store),
+            cache: None,
         }
     }
 
@@ -60,13 +63,16 @@ impl NList {
         self.item.append(item.into())
     }
 
-    pub(crate) fn insert(&self, offset: usize, item: Type) {
+    pub(crate) fn insert(&self, offset: u32, item: impl Into<Type>) {
+        let items = self.borrow().as_list();
         if offset == 0 {
-            self.prepend(item);
-        } else if offset >= self.size() as usize {
-            self.append(item);
+            self.prepend(item.into());
+        } else if offset >= items.len() as u32 {
+            self.append(item.into());
         } else {
-            // self.item.insert(offset, item)
+            let next = items[offset as usize].clone();
+
+            next.insert_before(item.into());
         }
     }
 
@@ -136,7 +142,10 @@ impl WithIdRange for NList {
 
 impl From<ItemRef> for NList {
     fn from(item: ItemRef) -> Self {
-        Self { item }
+        Self {
+            item,
+            ..Default::default()
+        }
     }
 }
 

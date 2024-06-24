@@ -1,11 +1,13 @@
 use crate::bimapid::{ClientMap, FieldMap};
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
+use crate::item::ItemData;
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Diff {
+    pub(crate) root: Option<ItemData>,
     pub(crate) fields: FieldMap,
     pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
@@ -31,6 +33,7 @@ impl Diff {
             state,
             items,
             deletes,
+            ..Default::default()
         }
     }
 
@@ -89,24 +92,35 @@ impl Diff {
 }
 
 impl Encode for Diff {
-    fn encode<E: Encoder>(&self, e: &mut E) {
-        self.clients.encode(e);
-        self.fields.encode(e);
-        self.state.encode(e);
-        self.items.encode(e);
-        self.deletes.encode(e);
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        if self.root.is_some() {
+            e.u8(1)
+        } else {
+            e.u8(0)
+        }
+
+        self.clients.encode(e, ctx);
+        self.fields.encode(e, ctx);
+        self.state.encode(e, ctx);
+        self.items.encode(e, ctx);
+        self.deletes.encode(e, ctx);
     }
 }
 
 impl Decode for Diff {
-    fn decode<D: Decoder>(d: &mut D) -> Result<Diff, String> {
-        let clients = ClientMap::decode(d)?;
-        let fields = FieldMap::decode(d)?;
-        let state = ClientState::decode(d)?;
-        let items = ItemDataStore::decode(d)?;
-        let deletes = DeleteItemStore::decode(d)?;
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Diff, String> {
+        let root = match d.u8()? {
+            128 => Some(ItemData::decode(d, ctx)?),
+            _ => None,
+        };
+        let clients = ClientMap::decode(d, ctx)?;
+        let fields = FieldMap::decode(d, ctx)?;
+        let state = ClientState::decode(d, ctx)?;
+        let items = ItemDataStore::decode(d, ctx)?;
+        let deletes = DeleteItemStore::decode(d, ctx)?;
 
         Ok(Diff {
+            root,
             clients,
             fields,
             state,

@@ -5,13 +5,14 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
+use bitflags::bitflags;
 use indexmap::IndexMap;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
-use crate::codec::decoder::{Decode, Decoder};
-use crate::codec::encoder::{Encode, Encoder};
+use crate::codec::decoder::{Decode, DecodeContext, Decoder};
+use crate::codec::encoder::{Encode, EncodeContext, Encoder};
 use crate::delete::DeleteItem;
 use crate::id::{Id, Split, WithId};
 use crate::mark::MarkContent;
@@ -110,13 +111,13 @@ impl Deref for ItemRef {
 }
 
 impl Encode for ItemRef {
-    fn encode<E: Encoder>(&self, e: &mut E) {
-        self.borrow().data.encode(e);
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        self.borrow().data.encode(e, ctx);
     }
 }
 
 impl Decode for ItemRef {
-    fn decode<D: Decoder>(d: &mut D) -> Result<Self, String> {
+    fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<Self, String> {
         Err("ItemRef::decode not implemented".to_string())
     }
 }
@@ -489,6 +490,20 @@ pub(crate) struct ItemData {
 }
 
 impl ItemData {
+    pub(crate) fn new(kind: ItemKind, id: Id) -> Self {
+        Self {
+            kind,
+            id,
+            parent_id: None,
+            left_id: None,
+            right_id: None,
+            target_id: None,
+            mover_id: None,
+            field: None,
+            content: Content::Null,
+        }
+    }
+
     pub(crate) fn adjust(
         &self,
         before_clients: &ClientMap,
@@ -523,21 +538,9 @@ impl ItemData {
 
         data
     }
-}
 
-impl ItemData {
-    pub(crate) fn new(kind: ItemKind, id: Id) -> Self {
-        Self {
-            kind,
-            id,
-            parent_id: None,
-            left_id: None,
-            right_id: None,
-            target_id: None,
-            mover_id: None,
-            field: None,
-            content: Content::Null,
-        }
+    pub(crate) fn is_root(&self) -> bool {
+        matches!(&self.content, Content::Doc(_))
     }
 }
 
@@ -599,13 +602,13 @@ impl From<ItemData> for ItemRefInner {
 }
 
 impl Encode for ItemData {
-    fn encode<E: Encoder>(&self, e: &mut E) {
-        e.item(self)
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        e.item(ctx, self)
     }
 }
 
 impl Decode for ItemData {
-    fn decode<D: Decoder>(d: &mut D) -> Result<ItemData, String> {
+    fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<ItemData, String> {
         let item = d.item()?;
         Ok(item)
     }
@@ -621,6 +624,73 @@ pub(crate) enum ItemKind {
     Proxy,
     Move,
     Mark,
+}
+
+bitflags! {
+    pub(crate) struct ItemKindFlags: u8 {
+        const MAP = 0x00;
+        const LIST = 0x01;
+        const TEXT = 0x02;
+        const STRING = 0x03;
+        const ATOM = 0x10;
+        const PROXY = 0x11;
+        const MOVE = 0x12;
+        const MARK = 0x13;
+    }
+}
+
+impl From<ItemKind> for ItemKindFlags {
+    fn from(kind: ItemKind) -> Self {
+        match kind {
+            ItemKind::Map => Self::MAP,
+            ItemKind::List => Self::LIST,
+            ItemKind::Text => Self::TEXT,
+            ItemKind::String => Self::STRING,
+            ItemKind::Atom => Self::ATOM,
+            ItemKind::Proxy => Self::PROXY,
+            ItemKind::Move => Self::MOVE,
+            ItemKind::Mark => Self::MARK,
+        }
+    }
+}
+
+impl From<&ItemKind> for ItemKindFlags {
+    fn from(kind: &ItemKind) -> Self {
+        match kind {
+            ItemKind::Map => Self::MAP,
+            ItemKind::List => Self::LIST,
+            ItemKind::Text => Self::TEXT,
+            ItemKind::String => Self::STRING,
+            ItemKind::Atom => Self::ATOM,
+            ItemKind::Proxy => Self::PROXY,
+            ItemKind::Move => Self::MOVE,
+            ItemKind::Mark => Self::MARK,
+        }
+    }
+}
+
+impl From<ItemKindFlags> for ItemKind {
+    fn from(flags: ItemKindFlags) -> Self {
+        if flags.contains(ItemKindFlags::MAP) {
+            ItemKind::Map
+        } else if flags.contains(ItemKindFlags::LIST) {
+            ItemKind::List
+        } else if flags.contains(ItemKindFlags::TEXT) {
+            ItemKind::Text
+        } else if flags.contains(ItemKindFlags::STRING) {
+            ItemKind::String
+        } else if flags.contains(ItemKindFlags::ATOM) {
+            ItemKind::Atom
+        } else if flags.contains(ItemKindFlags::PROXY) {
+            ItemKind::Proxy
+        } else if flags.contains(ItemKindFlags::MOVE) {
+            ItemKind::Move
+        } else if flags.contains(ItemKindFlags::MARK) {
+            ItemKind::Mark
+        } else {
+            ItemKind::Atom
+        }
+    }
 }
 
 impl Display for ItemKind {
@@ -688,6 +758,18 @@ pub(crate) enum Content {
     Null,
 }
 
+bitflags! {
+    pub(crate) struct ContentFlags: u8 {
+        const MARK = 0x00;
+        const BINARY = 0x01;
+        const STRING = 0x02;
+        const TYPES = 0x03;
+        const EMBED = 0x10;
+        const DOC = 0x11;
+        const NULL = 0x12;
+    }
+}
+
 impl Content {
     pub(crate) fn to_json(&self) -> Value {
         match self {
@@ -714,6 +796,35 @@ impl Serialize for Content {
             Self::Doc(d) => serializer.serialize_str(&d.guid),
             Self::Null => serializer.serialize_none(),
             _ => serializer.serialize_none(),
+        }
+    }
+}
+
+impl Encode for Content {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        match self {
+            Self::Mark(m) => {
+                e.u8(ContentFlags::MARK.bits());
+                m.encode(e, ctx)
+            }
+            Self::Binary(b) => {
+                e.u8(ContentFlags::BINARY.bits());
+                e.bytes(b)
+            }
+            Self::String(s) => {
+                e.u8(ContentFlags::STRING.bits());
+                e.string(s)
+            }
+            Self::Types(t) => {
+                // e.array(t)
+            }
+            Self::Embed(a) => {
+                // a.encode(e)
+            }
+            Self::Doc(d) => {
+                // d.encode(e)
+            }
+            Self::Null => {}
         }
     }
 }

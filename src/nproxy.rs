@@ -81,7 +81,7 @@ impl NProxy {
         }
     }
 
-    fn insert(&self, offset: usize, item: Type) {
+    fn insert(&self, offset: u32, item: Type) {
         if let Some(target) = self.target.as_ref() {
             target.insert(offset, item);
         }

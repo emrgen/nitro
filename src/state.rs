@@ -73,6 +73,8 @@ impl Decode for ClientState {
 
 #[cfg(test)]
 mod tests {
+    use crate::codec_v1::EncoderV1;
+
     use super::*;
 
     #[test]
@@ -84,5 +86,21 @@ mod tests {
         assert_eq!(state.clients.get(&1), Some(&2));
         state.update(2, 1);
         assert_eq!(state.clients.get(&2), Some(&1));
+    }
+
+    #[test]
+    fn test_encode_decode_state() {
+        let mut state = ClientState::new();
+        state.update(1, 1);
+        state.update(2, 2);
+
+        let mut encoder = EncoderV1::default();
+        state.encode(&mut encoder, &EncodeContext::default());
+
+        let mut d = encoder.decoder();
+
+        let decoded = ClientState::decode(&mut d, &DecodeContext::default()).unwrap();
+
+        assert_eq!(state, decoded);
     }
 }

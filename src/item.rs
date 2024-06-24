@@ -474,7 +474,7 @@ impl DerefMut for Item {
 }
 
 // item data is encoded and saved into persistent storage
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct ItemData {
     pub(crate) kind: ItemKind,
     pub(crate) id: Id,
@@ -734,7 +734,7 @@ impl From<usize> for ItemKey {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) enum Content {
     Mark(MarkContent),
     Binary(Vec<u8>),
@@ -870,7 +870,7 @@ impl From<Any> for Content {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocContent {
     pub(crate) guid: String,
     // user id of the creator
@@ -889,7 +889,7 @@ impl DocContent {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) enum Any {
     #[default]
     Null,
@@ -940,3 +940,5 @@ impl Any {
         }
     }
 }
+
+impl Eq for Any {}

@@ -5,7 +5,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Clock;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ClientState {
     pub(crate) clients: HashMap<ClientId, Clock>,
 }

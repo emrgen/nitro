@@ -5,7 +5,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::IdRange;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct MarkContent {
     pub(crate) range: IdRange,
     pub(crate) data: Mark,

@@ -206,12 +206,12 @@ trait IdDiff {
     fn diff(&self, state: ClientState, id_map: &IdRangeMap) -> Self::Target;
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct ClientStore<T: WithId + Clone + Encode + Decode> {
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
+pub struct ClientStore<T: WithId + Clone + Encode + Decode + Eq + PartialEq> {
     pub(crate) items: HashMap<ClientId, IdStore<T>>,
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> ClientStore<T> {
     pub(crate) fn find(&self, id: Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
@@ -238,7 +238,9 @@ impl<T: WithId + Clone + Default + Encode + Decode> ClientStore<T> {
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode> std::iter::IntoIterator for ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> std::iter::IntoIterator
+    for ClientStore<T>
+{
     type Item = (ClientId, IdStore<T>);
     type IntoIter = std::collections::hash_map::IntoIter<ClientId, IdStore<T>>;
 
@@ -247,7 +249,9 @@ impl<T: WithId + Clone + Default + Encode + Decode> std::iter::IntoIterator for 
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Debug> Encode for ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode + Debug + Eq + PartialEq> Encode
+    for ClientStore<T>
+{
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.items.len() as u32);
         for (client, store) in self.items.iter() {
@@ -257,7 +261,7 @@ impl<T: WithId + Clone + Default + Encode + Decode + Debug> Encode for ClientSto
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode> Decode for ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for ClientStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientStore<T>, String> {
         let len = d.u32()? as usize;
         let mut items = HashMap::new();
@@ -271,12 +275,12 @@ impl<T: WithId + Clone + Default + Encode + Decode> Decode for ClientStore<T> {
     }
 }
 
-#[derive(Default, Debug, Clone)]
-pub struct IdStore<T: WithId + Clone + Encode + Decode> {
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct IdStore<T: WithId + Clone + Encode + Decode + Eq + PartialEq> {
     data: BTreeMap<Id, T>,
 }
 
-impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
+impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
         self.data.insert(value.id(), value);
     }
@@ -298,7 +302,7 @@ impl<T: WithId + Clone + Encode + Decode> IdStore<T> {
     }
 }
 
-impl<T: WithId + Clone + Encode + Decode> IntoIterator for IdStore<T> {
+impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IntoIterator for IdStore<T> {
     type Item = (Id, T);
     type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
 
@@ -307,7 +311,7 @@ impl<T: WithId + Clone + Encode + Decode> IntoIterator for IdStore<T> {
     }
 }
 
-impl<T: Encode + Clone + WithId + Decode + Debug> Encode for IdStore<T> {
+impl<T: Encode + Clone + WithId + Decode + Debug + Eq + PartialEq> Encode for IdStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.data.len() as u32);
         for (_, value) in self.data.iter() {
@@ -316,7 +320,7 @@ impl<T: Encode + Clone + WithId + Decode + Debug> Encode for IdStore<T> {
     }
 }
 
-impl<T: Encode + Clone + WithId + Decode> Decode for IdStore<T> {
+impl<T: Encode + Clone + WithId + Decode + Eq + PartialEq> Decode for IdStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<IdStore<T>, String> {
         let len = d.u32()? as usize;
         let mut data = BTreeMap::new();
@@ -402,6 +406,8 @@ impl IdClockDiff for IdStore<DeleteItem> {
 
 #[cfg(test)]
 mod tests {
+    use crate::codec_v1::EncoderV1;
+
     use super::*;
 
     #[test]
@@ -436,5 +442,22 @@ mod tests {
     }
 
     #[test]
-    fn test_rc() {}
+    fn test_encode_decode_client_store() {
+        let mut store = ClientStore::default();
+        let id1 = Id::new(1, 1);
+        let id2 = Id::new(2, 2);
+        let id3 = Id::new(3, 3);
+
+        store.insert(id1);
+        store.insert(id2);
+        store.insert(id3);
+
+        let mut e = EncoderV1::new();
+        store.encode(&mut e, &EncodeContext::default());
+
+        let mut d = e.decoder();
+        let dd = ClientStore::<Id>::decode(&mut d, &DecodeContext::default()).unwrap();
+
+        assert_eq!(store, dd);
+    }
 }

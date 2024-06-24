@@ -235,7 +235,7 @@ impl Decode for ClientMap {
 pub(crate) type Field = String;
 pub(crate) type FieldId = u32;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct FieldMap {
     map: EncoderMap<String>,
 }

@@ -487,3 +487,11 @@ impl From<Type> for ItemRef {
         }
     }
 }
+
+impl PartialEq<Self> for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.id() == other.id()
+    }
+}
+
+impl Eq for Type {}

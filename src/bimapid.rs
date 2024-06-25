@@ -35,6 +35,10 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         self.map.len()
     }
 
+    pub fn remove_by_right(&mut self, right: &u32) {
+        self.map.remove_by_right(right);
+    }
+
     pub fn insert(&mut self, key: T, value: u32) {
         self.map.insert(key, value);
     }
@@ -189,6 +193,18 @@ impl Decode for EncoderMap<Mark> {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ClientMap {
     map: EncoderMap<String>,
+}
+
+impl ClientMap {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &u32)> {
+        self.map.map.iter()
+    }
+}
+
+impl ClientMap {
+    pub(crate) fn remove(&mut self, id: &ClientId) {
+        self.map.remove_by_right(id);
+    }
 }
 
 impl ClientMap {

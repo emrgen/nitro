@@ -474,7 +474,7 @@ impl DerefMut for Item {
 }
 
 // item data is encoded and saved into persistent storage
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Eq)]
 pub struct ItemData {
     pub(crate) kind: ItemKind,
     pub(crate) id: Id,
@@ -544,6 +544,18 @@ impl ItemData {
     }
 }
 
+impl Optimize for ItemData {
+    fn optimize(&mut self) {
+        if self.left_id.is_some() && self.parent_id.is_some() {
+            self.parent_id = None;
+        }
+    }
+}
+
+pub(crate) trait Optimize {
+    fn optimize(&mut self);
+}
+
 impl Split for ItemData {
     type Target = ItemData;
     fn split(&self, offset: u32) -> Result<(Self, Self), String> {
@@ -589,6 +601,45 @@ impl Split for ItemData {
     }
 }
 
+impl PartialEq for ItemData {
+    fn eq(&self, other: &Self) -> bool {
+        if self.kind != other.kind {
+            return false;
+        }
+
+        if self.id != other.id {
+            return false;
+        }
+
+        // item with left_id might not store parent_id, so we need to compare left_id
+        if self.parent_id != other.parent_id && self.left_id != other.left_id {
+            return false;
+        }
+
+        if self.right_id != other.right_id {
+            return false;
+        }
+
+        if self.target_id != other.target_id {
+            return false;
+        }
+
+        if self.mover_id != other.mover_id {
+            return false;
+        }
+
+        if self.field != other.field {
+            return false;
+        }
+
+        if self.content != other.content {
+            return false;
+        }
+
+        true
+    }
+}
+
 impl From<ItemData> for Item {
     fn from(data: ItemData) -> Self {
         Self::new(data)
@@ -615,14 +666,14 @@ pub(crate) enum ItemKind {
 
 bitflags! {
     pub(crate) struct ItemKindFlags: u8 {
-        const MAP = 0x00;
-        const LIST = 0x01;
-        const TEXT = 0x02;
-        const STRING = 0x03;
-        const ATOM = 0x10;
-        const PROXY = 0x11;
-        const MOVE = 0x12;
-        const MARK = 0x13;
+        const MAP = 0x0;
+        const LIST = 0x1;
+        const TEXT = 0x2;
+        const STRING = 0x3;
+        const ATOM = 0x4;
+        const PROXY = 0x5;
+        const MOVE = 0x6;
+        const MARK = 0x7;
     }
 }
 
@@ -644,11 +695,11 @@ impl From<ItemKind> for ItemKindFlags {
 impl From<&ItemKind> for ItemKindFlags {
     fn from(kind: &ItemKind) -> Self {
         match kind {
+            ItemKind::Atom => Self::ATOM,
             ItemKind::Map => Self::MAP,
             ItemKind::List => Self::LIST,
             ItemKind::Text => Self::TEXT,
             ItemKind::String => Self::STRING,
-            ItemKind::Atom => Self::ATOM,
             ItemKind::Proxy => Self::PROXY,
             ItemKind::Move => Self::MOVE,
             ItemKind::Mark => Self::MARK,
@@ -658,24 +709,17 @@ impl From<&ItemKind> for ItemKindFlags {
 
 impl From<ItemKindFlags> for ItemKind {
     fn from(flags: ItemKindFlags) -> Self {
-        if flags.contains(ItemKindFlags::MARK) {
-            ItemKind::Mark
-        } else if flags.contains(ItemKindFlags::MOVE) {
-            ItemKind::Move
-        } else if flags.contains(ItemKindFlags::PROXY) {
-            ItemKind::Proxy
-        } else if flags.contains(ItemKindFlags::ATOM) {
-            ItemKind::Atom
-        } else if flags.contains(ItemKindFlags::STRING) {
-            ItemKind::String
-        } else if flags.contains(ItemKindFlags::TEXT) {
-            ItemKind::Text
-        } else if flags.contains(ItemKindFlags::LIST) {
-            ItemKind::List
-        } else {
-            // NOTE: default to map if no flags are set
-            // otherwise contains always pass for 0x00
-            ItemKind::Map
+        let flag = flags.bits();
+        match flag {
+            0x00 => ItemKind::Map,
+            0x01 => ItemKind::List,
+            0x02 => ItemKind::Text,
+            0x03 => ItemKind::String,
+            0x10 => ItemKind::Atom,
+            0x11 => ItemKind::Proxy,
+            0x12 => ItemKind::Move,
+            0x13 => ItemKind::Mark,
+            _ => ItemKind::Atom,
         }
     }
 }

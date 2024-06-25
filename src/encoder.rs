@@ -1,5 +1,6 @@
 use crate::decoder::Decoder;
 use crate::item::ItemData;
+use crate::store::WeakStoreRef;
 
 pub trait Encoder: Clone {
     fn u8(&mut self, value: u8);
@@ -19,6 +20,13 @@ pub trait Encoder: Clone {
 #[derive(Clone, Default, Debug)]
 pub struct EncodeContext {
     pub(crate) version: u8,
+    pub(crate) store: WeakStoreRef,
+}
+
+impl EncodeContext {
+    pub(crate) fn new(version: u8, store: WeakStoreRef) -> EncodeContext {
+        EncodeContext { version, store }
+    }
 }
 
 pub trait Encode {
@@ -65,8 +73,14 @@ impl<T: Encode> Encode for Option<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         match self {
             Some(value) => value.encode(e, ctx),
-            None => e.u8(0),
+            None => {}
         }
+    }
+}
+
+impl<T: Encode> Encode for &T {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+        (*self).encode(e, ctx);
     }
 }
 
@@ -85,12 +99,6 @@ impl<T: Encode> Encode for [T] {
         for value in self {
             value.encode(e, ctx);
         }
-    }
-}
-
-impl<T: Encode> Encode for &T {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
-        (*self).encode(e, ctx);
     }
 }
 

@@ -16,7 +16,7 @@ use crate::types::Type;
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocStore {
     pub(crate) client: ClientId,
     pub(crate) clock: Clock,
@@ -99,9 +99,18 @@ impl DocStore {
         let items = self.items.diff(state.clone(), &self.id_map);
         // println!("items: {:?}", items);
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
+
+        let mut clients = self.clients.clone();
+
+        for (_, client_id) in clients.clone().iter() {
+            if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
+                clients.remove(client_id);
+            }
+        }
+
         Diff::from(
             guid,
-            self.clients.clone(),
+            clients,
             self.fields.clone(),
             self.state.clone(),
             items,
@@ -117,7 +126,7 @@ pub(crate) struct ReadyStore {
     pub(crate) delete_items: DeleteItemStore,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PendingStore {
     pub(crate) items: ItemDataStore,
     pub(crate) delete_items: DeleteItemStore,
@@ -127,7 +136,7 @@ pub(crate) type ItemDataStore = ClientStore<ItemData>;
 pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
 pub(crate) type ItemStore = ClientStore<Type>;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IdRangeMap {
     pub(crate) map: BTreeSet<IdRange>,
 }
@@ -222,6 +231,23 @@ pub struct ClientStore<T: ClientStoreEntry> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    pub(crate) fn client_size(&self, id: &ClientId) -> usize {
+        self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
+    }
+}
+
+// impl<T: ClientStoreEntry> std::iter::Iterator for ClientStore<T> {
+//     type Item = (ClientId, IdStore<T>);
+//
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.items
+//             .iter()
+//             .next()
+//             .map(|(client, store)| (*client, store.clone()))
+//     }
+// }
+
+impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn find(&self, id: Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
@@ -230,6 +256,14 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         let id = item.id();
         let store = self.items.entry(id.client).or_default();
         store.insert(item);
+    }
+
+    pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, IdStore<T>> {
+        self.items.keys()
+    }
+
+    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, IdStore<T>> {
+        self.items.iter()
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -292,8 +326,18 @@ pub struct IdStore<T: IdStoreEntry> {
 }
 
 impl<T: IdStoreEntry> IdStore<T> {
+    pub(crate) fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<Id, T> {
+        self.map.iter_mut()
+    }
+}
+
+impl<T: IdStoreEntry> IdStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
         self.map.insert(value.id(), value);
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 
     pub(crate) fn get(&self, value: &Id) -> Option<T> {

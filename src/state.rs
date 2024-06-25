@@ -21,6 +21,10 @@ impl ClientState {
         self.clients.get(client)
     }
 
+    pub(crate) fn remove(&mut self, client: &ClientId) {
+        self.clients.remove(client);
+    }
+
     pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.max(current));

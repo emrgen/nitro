@@ -7,6 +7,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::bimapid::Client;
+use crate::decoder::Decode;
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
@@ -22,7 +23,7 @@ use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DocOpts {
     pub(crate) guid: String,
     pub(crate) crated_by: Client,
@@ -38,7 +39,7 @@ impl Default for DocOpts {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Doc {
     pub(crate) opts: DocOpts,
     pub(crate) root: NMap,
@@ -92,7 +93,10 @@ impl Doc {
 
     #[inline]
     pub fn diff(&self, state: ClientState) -> Diff {
-        self.store.borrow().diff(self.opts.guid.clone(), state)
+        let mut diff = self.store.borrow().diff(self.opts.guid.clone(), state);
+        diff.optimize();
+
+        diff
     }
 
     pub(crate) fn apply(&self, diff: Diff) {
@@ -230,6 +234,20 @@ impl Encode for Doc {
     }
 }
 
+pub(crate) trait CloneDeep {
+    fn clone_deep(&self) -> Self;
+}
+
+impl CloneDeep for Doc {
+    fn clone_deep(&self) -> Self {
+        let doc = Doc::new(self.opts.clone());
+        let diff = self.diff(ClientState::default());
+        doc.apply(diff);
+
+        doc
+    }
+}
+
 #[cfg(test)]
 mod test {
     use byte_unit::{AdjustedByte, Byte, Unit};
@@ -239,7 +257,7 @@ mod test {
     use rand::random;
 
     use crate::codec_v1::EncoderV1;
-    use crate::doc::Doc;
+    use crate::doc::{CloneDeep, Doc};
     use crate::encoder::{Encode, Encoder};
 
     #[test]
@@ -323,6 +341,44 @@ mod test {
         }
     }
 
+    fn eq_doc(a: &Doc, b: &Doc) -> bool {
+        let mut e1 = EncoderV1::new();
+        let mut e2 = EncoderV1::new();
+
+        let d1 = a.diff(Default::default());
+        let d2 = b.diff(Default::default());
+
+        // a.encode(&mut e1, &Default::default());
+        // b.encode(&mut e2, &Default::default());
+        // let ad1 = Diff::decode(&mut e1.decoder(), &Default::default()).unwrap();
+        // let ad2 = Diff::decode(&mut e2.decoder(), &Default::default()).unwrap();
+
+        println!("d1: {:?}", d1);
+        println!("d2: {:?}", d2);
+
+        // println!("ad1: {:?}", ad1);
+        // println!("ad2: {:?}", ad2);
+
+        d1 == d2
+    }
+
+    fn print_doc(doc: &Doc) {
+        let yaml = serde_yaml::to_string(&doc).unwrap();
+        println!("{}", yaml);
+    }
+
     #[test]
-    fn test_encode_decode_doc() {}
+    fn test_clone_doc() {
+        let d1 = Doc::default();
+        // let text = d1.text();
+        // doc.set("text", text);
+
+        print_doc(&d1);
+
+        let d2 = d1.clone_deep();
+
+        print_doc(&d2);
+
+        assert!(eq_doc(&d1, &d2));
+    }
 }

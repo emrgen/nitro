@@ -2,7 +2,7 @@ use crate::bimapid::{ClientMap, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
-use crate::item::ItemData;
+use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
@@ -50,7 +50,6 @@ impl Diff {
             state,
             items,
             deletes,
-            ..Default::default()
         }
     }
 
@@ -68,6 +67,8 @@ impl Diff {
         }
     }
 
+    // adjust the diff to the current state of the store
+    // this is used when applying a diff to a store
     pub(crate) fn adjust(&mut self, store: &DocStore) -> Diff {
         let before_clients = store.clients.clone();
         let before_fields = store.fields.clone();
@@ -108,6 +109,14 @@ impl Diff {
             items,
             deletes,
         )
+    }
+
+    pub(crate) fn optimize(&mut self) {
+        for (_, store) in self.items.items.iter_mut() {
+            for (_, item) in store.iter_mut() {
+                item.optimize();
+            }
+        }
     }
 }
 
@@ -156,30 +165,23 @@ mod test {
     fn test_encode_decode_diff() {
         let doc = Doc::default();
         let text = doc.text();
-        doc.set("text", text.clone());
-
         text.append(doc.string("hello"));
+
+        doc.set("string", doc.string("str"));
+        doc.set("text", text.clone());
+        doc.set("props", doc.map());
+        doc.set("k1", doc.atom("fe"));
+        doc.set("k2", doc.list());
 
         let mut encoder = EncoderV1::default();
 
         let diff = doc.diff(ClientState::default());
         diff.encode(&mut encoder, &Default::default());
 
-        // println!("diff: {:?}", diff);
-
-        // println!("buffer: {:?}", encoder.buffer());
-
         let mut d = encoder.decoder();
 
         let decoded = Diff::decode(&mut d, &Default::default()).unwrap();
 
-        // println!("{:?}", decoded);
-
-        // assert_eq!(diff.state, decoded.state);
-        assert_eq!(diff.items.items.get(&0), decoded.items.items.get(&0));
-        assert_eq!(diff.items.items.get(&1), decoded.items.items.get(&1));
-        // assert_eq!(diff, decoded);
-
-        // println!("{:?}", diff);
+        assert_eq!(diff, decoded);
     }
 }

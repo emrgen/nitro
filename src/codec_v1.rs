@@ -1,4 +1,3 @@
-use std::cmp::PartialEq;
 use std::ops::Deref;
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
@@ -217,16 +216,16 @@ impl Decoder for DecoderV1 {
     }
 
     fn item(&mut self, ctx: &DecodeContext) -> Result<ItemData, String> {
-        return decode_item(self, ctx);
+        decode_item(self, ctx)
     }
 }
 
 fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
     // | kind, content, field, parent | left, right | ...
-
+    // println!("encode_item: {}, {:?}", value.kind, value.id);
     let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
-    let is_root = matches!(value.content, Content::Doc(_));
 
+    // let is_root = matches!(value.content, Content::Doc(_));
     if !matches!(value.content, Content::Null) {
         flags |= 1 << 3;
     }
@@ -246,7 +245,7 @@ fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
     }
 
     e.u8(flags);
-    // eprintln!("flags: {:b}", flags);
+    // println!("flags: {:b}", flags);
 
     if !matches!(value.content, Content::Null) {
         value.content.encode(e, ctx);

@@ -10,7 +10,7 @@ use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct NMap {
     pub(crate) item: ItemRef,
 }

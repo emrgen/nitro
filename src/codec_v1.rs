@@ -327,6 +327,8 @@ fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, Strin
         None
     };
 
+    // println!("id: {:?}, field: {:?}", id, field);
+
     Ok(ItemData {
         id,
         kind,

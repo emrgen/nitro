@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use std::collections::btree_map::IterMut;
 use std::fmt::Debug;
+use std::ops::Add;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::{Client, ClientId, ClientMap, Field, FieldId, FieldMap};
@@ -65,9 +67,13 @@ impl DocStore {
         id
     }
 
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.items.find(id).is_some()
+    }
+
     pub(crate) fn find(&self, id: Id) -> Option<Type> {
         let key = self.id_map.find(&id);
-        self.items.find(key)
+        self.items.find(&key)
     }
 
     pub(crate) fn insert(&mut self, item: impl Into<Type>) {
@@ -121,15 +127,139 @@ impl DocStore {
 
 #[derive(Default, Debug, Clone)]
 pub(crate) struct ReadyStore {
+    pub(crate) id_range_map: IdRangeMap,
     pub(crate) queue: Vec<ItemData>,
     pub(crate) items: ItemDataStore,
     pub(crate) delete_items: DeleteItemStore,
+}
+
+impl ReadyStore {
+    pub(crate) fn insert(&mut self, item: ItemData) {
+        self.queue.push(item.clone());
+        self.items.insert(item);
+    }
+
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.find_item(id).is_some()
+    }
+
+    pub(crate) fn find_item(&self, id: &Id) -> Option<ItemData> {
+        let id = self.id_range_map.find(id);
+        self.items.find(&id)
+    }
+    pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
+        self.delete_items.insert(item);
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.items.remove(id);
+    }
+
+    pub(crate) fn remove_delete(&mut self, id: &Id) {
+        self.delete_items.remove(id);
+    }
+
+    pub(crate) fn iter_items(
+        &self,
+    ) -> std::collections::btree_map::Iter<ClientId, IdStore<ItemData>> {
+        self.items.iter()
+    }
+
+    pub(crate) fn iter_delete_items(
+        &self,
+    ) -> std::collections::btree_map::Iter<ClientId, IdStore<DeleteItem>> {
+        self.delete_items.iter()
+    }
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PendingStore {
     pub(crate) items: ItemDataStore,
     pub(crate) delete_items: DeleteItemStore,
+}
+
+impl PendingStore {
+    pub(crate) fn insert(&mut self, item: ItemData) {
+        self.items.insert(item);
+    }
+
+    pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
+        self.delete_items.insert(item);
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.items.remove(id);
+    }
+
+    pub(crate) fn take_first(&mut self, client_id: &ClientId) -> Option<ItemData> {
+        let store = self.items.items.get_mut(client_id)?;
+        let (_, item) = store.iter_mut().next()?;
+        let item = item.clone();
+        store.remove(&item.id());
+        Some(item)
+    }
+
+    pub(crate) fn remove_delete(&mut self, id: &Id) {
+        self.delete_items.remove(id);
+    }
+
+    pub(crate) fn iter_items(
+        &self,
+    ) -> std::collections::btree_map::Iter<ClientId, IdStore<ItemData>> {
+        self.items.iter()
+    }
+
+    pub(crate) fn iter_mut_items(
+        &mut self,
+    ) -> std::collections::btree_map::IterMut<ClientId, IdStore<ItemData>> {
+        self.items.iter_mut()
+    }
+
+    pub(crate) fn iter_delete_items(
+        &self,
+    ) -> std::collections::btree_map::Iter<ClientId, IdStore<DeleteItem>> {
+        self.delete_items.iter()
+    }
+
+    pub(crate) fn extend(&mut self, other: PendingStore) {
+        for (_, store) in other.items.iter() {
+            for (_, item) in store.iter() {
+                self.items.insert(item.clone());
+            }
+        }
+
+        for (_, store) in other.delete_items.iter() {
+            for (_, item) in store.iter() {
+                self.delete_items.insert(item.clone());
+            }
+        }
+    }
+}
+
+impl Add<PendingStore> for PendingStore {
+    type Output = PendingStore;
+
+    fn add(self, rhs: PendingStore) -> Self::Output {
+        let mut items = self.items.clone();
+        let mut delete_items = self.delete_items.clone();
+
+        for (_, store) in rhs.items.iter() {
+            for (_, item) in store.iter() {
+                items.insert(item.clone());
+            }
+        }
+
+        for (_, store) in rhs.delete_items.iter() {
+            for (_, item) in store.iter() {
+                delete_items.insert(item.clone());
+            }
+        }
+
+        PendingStore {
+            items,
+            delete_items,
+        }
+    }
 }
 
 pub(crate) type ItemDataStore = ClientStore<ItemData>;
@@ -236,19 +366,8 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     }
 }
 
-// impl<T: ClientStoreEntry> std::iter::Iterator for ClientStore<T> {
-//     type Item = (ClientId, IdStore<T>);
-//
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.items
-//             .iter()
-//             .next()
-//             .map(|(client, store)| (*client, store.clone()))
-//     }
-// }
-
 impl<T: ClientStoreEntry> ClientStore<T> {
-    pub(crate) fn find(&self, id: Id) -> Option<T> {
+    pub(crate) fn find(&self, id: &Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
 
@@ -264,6 +383,10 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 
     pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, IdStore<T>> {
         self.items.iter()
+    }
+
+    pub(crate) fn iter_mut(&mut self) -> IterMut<ClientId, IdStore<T>> {
+        self.items.iter_mut()
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -328,6 +451,10 @@ pub struct IdStore<T: IdStoreEntry> {
 impl<T: IdStoreEntry> IdStore<T> {
     pub(crate) fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<Id, T> {
         self.map.iter_mut()
+    }
+
+    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<Id, T> {
+        self.map.iter()
     }
 }
 

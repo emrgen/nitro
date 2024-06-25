@@ -99,7 +99,7 @@ impl Doc {
     }
 
     pub(crate) fn apply(&self, diff: Diff) {
-        let mut tx = Transaction::new(Rc::downgrade(&self.store), diff);
+        let mut tx = Transaction::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }
 
@@ -379,6 +379,9 @@ mod test {
 
         print_doc(&d2);
 
-        assert_eq!(d1, d2);
+        assert_eq!(
+            serde_yaml::to_string(&d1).unwrap(),
+            serde_yaml::to_string(&d2).unwrap()
+        );
     }
 }

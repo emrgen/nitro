@@ -23,7 +23,7 @@ impl Diff {
 
     pub(crate) fn get_root(&self) -> Option<ItemData> {
         let client = self.clients.get_client_id(&self.guid)?;
-        self.items.find(Id::new(*client, 1))
+        self.items.find(&Id::new(*client, 1))
     }
 }
 

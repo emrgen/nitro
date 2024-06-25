@@ -652,7 +652,7 @@ impl From<ItemData> for ItemRefInner {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub(crate) enum ItemKind {
     Map,
     List,

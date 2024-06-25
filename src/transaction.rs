@@ -1,8 +1,5 @@
-use log::log;
-
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
-use crate::doc::Doc;
 use crate::item::ItemData;
 use crate::store::{PendingStore, ReadyStore, WeakStoreRef};
 

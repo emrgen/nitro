@@ -7,7 +7,6 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::bimapid::Client;
-use crate::decoder::Decode;
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
@@ -39,7 +38,7 @@ impl Default for DocOpts {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub(crate) struct Doc {
     pub(crate) opts: DocOpts,
     pub(crate) root: NMap,
@@ -209,6 +208,15 @@ impl Default for Doc {
     }
 }
 
+impl PartialEq for Doc {
+    fn eq(&self, other: &Self) -> bool {
+        let d1 = self.diff(ClientState::default());
+        let d2 = other.diff(ClientState::default());
+
+        d1 == d2
+    }
+}
+
 impl Serialize for Doc {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -348,16 +356,8 @@ mod test {
         let d1 = a.diff(Default::default());
         let d2 = b.diff(Default::default());
 
-        // a.encode(&mut e1, &Default::default());
-        // b.encode(&mut e2, &Default::default());
-        // let ad1 = Diff::decode(&mut e1.decoder(), &Default::default()).unwrap();
-        // let ad2 = Diff::decode(&mut e2.decoder(), &Default::default()).unwrap();
-
         println!("d1: {:?}", d1);
         println!("d2: {:?}", d2);
-
-        // println!("ad1: {:?}", ad1);
-        // println!("ad2: {:?}", ad2);
 
         d1 == d2
     }
@@ -370,8 +370,8 @@ mod test {
     #[test]
     fn test_clone_doc() {
         let d1 = Doc::default();
-        // let text = d1.text();
-        // doc.set("text", text);
+        let text = d1.text();
+        d1.set("text", text);
 
         print_doc(&d1);
 
@@ -379,6 +379,6 @@ mod test {
 
         print_doc(&d2);
 
-        assert!(eq_doc(&d1, &d2));
+        assert_eq!(d1, d2);
     }
 }

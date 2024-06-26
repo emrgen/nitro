@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -63,7 +63,6 @@ impl ItemRef {
 
             end.item_ref().borrow_mut().right = Some(item.clone());
             self.borrow_mut().end = Some(item.clone());
-            println!("left id: {:?}", end.id());
         } else {
             self.borrow_mut().start = Some(item.clone());
             self.borrow_mut().end = Some(item.clone());
@@ -255,9 +254,9 @@ impl Item {
         &mut self.data.content
     }
 
-    pub(crate) fn as_map(&self, store: WeakStoreRef) -> BTreeMap<String, Type> {
+    pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {
         let items = self.items();
-        let mut map = BTreeMap::new();
+        let mut map = HashMap::new();
 
         for item in items.clone() {
             if let Some(field) = item.item_ref().borrow().field(store.clone()) {
@@ -268,7 +267,7 @@ impl Item {
         // remove items that are moved or deleted
         for item in items.iter() {
             if !item.is_visible() {
-                map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
+                // map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
             }
         }
 
@@ -291,7 +290,7 @@ impl Item {
             }
         }
 
-        marks.into_iter().map(|(_, v)| v).collect()
+        marks.into_values().collect()
     }
 
     // all marks need to match for adjacent string items to be merged into a single string
@@ -531,9 +530,9 @@ impl ItemData {
             .mover_id
             .map(|id| id.adjust(before_clients, after_clients));
 
-        let field = data.field.map(|field_id| {
+        let field = data.field.and_then(|field_id| {
             let field = before_fields.get_field(&field_id).unwrap();
-            after_fields.get_field_id(field).unwrap()
+            after_fields.get_field_id(field)
         });
 
         data.field = field.copied();

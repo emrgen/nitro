@@ -356,8 +356,8 @@ mod test {
         let d1 = a.diff(Default::default());
         let d2 = b.diff(Default::default());
 
-        println!("d1: {:?}", d1);
-        println!("d2: {:?}", d2);
+        // println!("d1: {:?}", d1);
+        // println!("d2: {:?}", d2);
 
         d1 == d2
     }
@@ -370,22 +370,38 @@ mod test {
     #[test]
     fn test_clone_doc() {
         let d1 = Doc::default();
-        let text = d1.text();
-        d1.set("text", text);
+        let list = d1.list();
+        d1.set("list", list.clone());
 
-        d1.set("atom", d1.atom("crdt"));
-
-        print_doc(&d1);
+        list.append(d1.atom("a"));
+        list.append(d1.atom("b"));
 
         let d2 = d1.clone_deep();
-
-        print_doc(&d2);
 
         let left = serde_yaml::to_string(&d1).unwrap();
         let right = serde_yaml::to_string(&d2).unwrap();
 
-        println!("left: {}", left);
-        println!("right: {}", right);
+        // println!("left: {}", left);
+        // println!("right: {}", right);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_clone_doc_with_map() {
+        let d1 = Doc::default();
+        d1.set("a", d1.atom("a"));
+        d1.set("b", d1.atom("b"));
+        d1.set("c", d1.atom("c"));
+        d1.set("d", d1.atom("d"));
+
+        let d2 = d1.clone_deep();
+
+        let left = serde_yaml::to_string(&d1).unwrap();
+        let right = serde_yaml::to_string(&d2).unwrap();
+
+        // println!("left: {}", left);
+        // println!("right: {}", right);
 
         assert_eq!(left, right);
     }

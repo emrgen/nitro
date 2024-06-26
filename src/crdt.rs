@@ -17,6 +17,8 @@ pub(crate) fn integrate<F>(
 where
     F: FnOnce(Option<Type>) -> Result<(), String>,
 {
+    // println!("integrating item: {:?}", data);
+
     let item: Type = ItemRef::new(data.into(), store.clone()).into();
     let mut left = item.left_origin();
     let right = item.right_origin();
@@ -60,10 +62,11 @@ where
 
         let conflict_left_id = conflict.clone().unwrap().left().map(|l| l.id());
         let item_left_id = item.left().map(|l| l.id());
+
         if Id::eq_opt(&conflict_left_id, &item_left_id) {
             if curr_conflict.id().compare(&item_id, &clients) == Ordering::Greater {
-                left = conflict.clone();
-                conflict_items.insert(curr_conflict.id());
+                left.clone_from(&conflict);
+                conflict_items.clear();
             } else if Id::eq_opt(&curr_conflict.right_id(), &item.right_id()) {
                 break;
             }
@@ -71,20 +74,17 @@ where
             && items_before_origin.contains(&conflict_left_id.unwrap())
         {
             if !conflict_items.contains(&conflict_left_id.unwrap()) {
-                left = conflict.clone();
+                left.clone_from(&conflict);
                 conflict_items.clear();
             }
         } else {
             break;
         }
+
+        conflict.clone_from(&curr_conflict.right());
     }
 
-    // if (left.is_none() && right.is_none()) {}
-
-    // println!("integrate: left: {:?}, right: {:?}", left, right);
-
     if let Some(left) = &left {
-        println!("-------------------------------");
         integrate_after(left.clone(), item.clone());
     } else {
         if let Some(start) = start {

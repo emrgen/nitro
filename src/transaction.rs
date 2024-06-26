@@ -23,6 +23,9 @@ pub(crate) struct Transaction {
 
 impl Transaction {
     pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Transaction {
+        let mut_store = store.upgrade().unwrap();
+        let store_ref = mut_store.borrow_mut();
+        let diff = diff.adjust(&store_ref);
         Transaction {
             store,
             diff,
@@ -33,11 +36,12 @@ impl Transaction {
     }
 
     pub(crate) fn commit(&mut self) {
-        self.prepare();
-        self.apply().unwrap_or_else(|err| {
-            log::error!("Tx commit error: {}", err);
-            self.rollback();
-        });
+        self.prepare()
+            .and_then(|_| self.apply())
+            .unwrap_or_else(|err| {
+                log::error!("Tx commit error: {}", err);
+                self.rollback();
+            });
     }
 
     pub(crate) fn prepare(&mut self) -> Result<(), String> {
@@ -74,9 +78,8 @@ impl Transaction {
 
         let mut progress = false;
         let mut count = 0;
-        let mut stage_size = stage.len();
         loop {
-            if stage_size == 0 {
+            if stage.is_empty() {
                 break;
             }
 
@@ -98,22 +101,18 @@ impl Transaction {
                     }
 
                     if progress {
-                        stage_size -= 1;
                         if let Some(data) = self.pending.take_first(&client_id) {
                             stage.insert(client_id, data);
-                            stage_size += 1;
                         } else {
                             stage.remove(&client_id);
                         }
                     }
 
                     count += 1;
-                    if count > 4 {
+                    if count > 6 {
                         println!("Item: {:?}", id);
                         panic!("Infinite loop while collecting client ready items");
                     }
-                    println!("Item: {:?}", id);
-                    println!("Item: {:?}", clone);
                 }
             }
 

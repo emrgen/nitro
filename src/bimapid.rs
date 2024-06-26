@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::hash::Hash;
 
 use bimap::BiMap;
@@ -15,11 +16,11 @@ pub(crate) trait BiMapEntry:
 }
 
 pub(crate) trait EncoderMapEntry:
-    Encode + Decode + Clone + Default + Eq + PartialEq + Hash
+    Debug + Encode + Decode + Clone + Default + Eq + PartialEq + Hash
 {
 }
 
-impl<T: Encode + Decode + Clone + Default + Eq + PartialEq + Hash> EncoderMapEntry for T {}
+impl<T: Debug + Encode + Decode + Clone + Default + Eq + PartialEq + Hash> EncoderMapEntry for T {}
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct EncoderMap<L: EncoderMapEntry> {
@@ -63,14 +64,16 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
     }
 
     pub fn adjust(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
-        let mut adjust = EncoderMap::new();
-        let mut clone = self.clone();
-        for (key, _) in other.map.iter() {
-            let id = clone.get_or_insert(key);
-            adjust.map.insert(key.clone(), id);
+        let mut clone = other.clone();
+        let mut entries = other.map.iter().collect::<Vec<_>>();
+        entries.sort_by(|a, b| a.1.cmp(b.1));
+
+        for (l, _) in entries {
+            clone.get_or_insert(l);
         }
 
-        adjust
+        // println!("final: {:?}", clone);
+        clone
     }
 
     pub(crate) fn merge(&self, other: &EncoderMap<T>) -> Self {

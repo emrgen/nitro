@@ -1,3 +1,5 @@
+use std::cell::RefMut;
+
 use crate::bimapid::{ClientMap, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -69,10 +71,7 @@ impl Diff {
 
     // adjust the diff to the current state of the store
     // this is used when applying a diff to a store
-    pub(crate) fn adjust(&mut self, store: &DocStore) -> Diff {
-        let before_clients = store.clients.clone();
-        let before_fields = store.fields.clone();
-
+    pub(crate) fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
         let clients = store.clients.adjust(&self.clients);
         let fields = store.fields.adjust(&self.fields);
         let state = store.state.adjust(
@@ -83,9 +82,9 @@ impl Diff {
 
         let mut items = ItemDataStore::default();
 
-        for (_, store) in self.items.clone() {
-            for (_, item) in store.into_iter() {
-                let adjust = item.adjust(&before_clients, &before_fields, &clients, &fields);
+        for (_, store) in self.items.iter() {
+            for (_, item) in store.iter() {
+                let adjust = item.adjust(&self.clients, &self.fields, &clients, &fields);
                 items.insert(adjust);
             }
         }
@@ -94,7 +93,7 @@ impl Diff {
 
         for (_, store) in self.deletes.clone().into_iter() {
             for (_, item) in store.into_iter() {
-                let adjust = item.adjust(&before_clients, &clients);
+                let adjust = item.adjust(&self.clients, &clients);
                 deletes.insert(adjust);
             }
         }

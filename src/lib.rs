@@ -1,3 +1,6 @@
+// allow warnings for now
+#![allow(warnings)]
+
 mod bimapid;
 pub mod codec_v1;
 mod crdt;

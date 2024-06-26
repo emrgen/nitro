@@ -9,7 +9,8 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::item::Content;
 use crate::state::ClientState;
 use crate::store::{
-  DeleteItemStore, DocStore, IdRangeMap, ItemDataStore, PendingStore, ReadyStore, WeakStoreRef,
+    DeleteItemStore, DocStore, IdDiff, IdRangeMap, ItemDataStore, PendingStore, ReadyStore,
+    WeakStoreRef,
 };
 
 pub(crate) type StrongStoreDataRef = Rc<RefCell<DocStoreData>>;
@@ -36,6 +37,25 @@ impl DocStoreData {
         let mut doc_store = DocStoreData::default();
 
         doc_store
+    }
+
+    pub(crate) fn diff(&self, state: &ClientState) -> Diff {
+        let guid = self.doc_id.clone();
+        let state = state.as_per(&self.state);
+
+        let items = self.items.diff(state.clone(), &self.id_map);
+
+        let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
+
+        let mut clients = self.state.clients.clone();
+
+        for (_, client_id) in clients.clone().iter() {
+            if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
+                // clients.remove(client_id);
+            }
+        }
+
+        Diff::from(guid, self.fields.clone(), state.clone(), items, deletes)
     }
 }
 

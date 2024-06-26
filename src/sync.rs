@@ -176,4 +176,7 @@ mod test {
 
         assert!(equal_docs(&doc1, &doc2));
     }
+
+    // #[test]
+    // fn test_inser
 }

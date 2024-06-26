@@ -163,4 +163,40 @@ mod tests {
         let yaml = serde_yaml::to_string(&text).unwrap();
         println!("{}", yaml);
     }
+
+    #[test]
+    fn test_insert_between_string() {
+        let doc = Doc::default();
+        let text = doc.text();
+        doc.set("text", text.clone());
+
+        let s1 = doc.string("hello");
+        text.append(s1.clone());
+
+        let s2 = doc.string("world");
+        text.prepend(s2.clone());
+
+        let s3 = doc.string("foo");
+        text.insert(3, s3.clone());
+
+        // let yaml = serde_yaml::to_string(&text).unwrap();
+        // println!("{}", yaml);
+
+        assert_eq!(text.item_ref().borrow().items().len(), 4);
+
+        let text_ref = &text.item_ref();
+        let text_ref = text_ref.borrow();
+        let items = text_ref.items().clone();
+        let first = items.first().unwrap();
+        assert_eq!(
+            items.first().unwrap().content().to_json(),
+            "wor".to_string()
+        );
+        assert_eq!(items.get(1).unwrap().content().to_json(), "foo".to_string());
+        assert_eq!(items.get(2).unwrap().content().to_json(), "ld".to_string());
+        assert_eq!(
+            items.get(3).unwrap().content().to_json(),
+            "hello".to_string()
+        );
+    }
 }

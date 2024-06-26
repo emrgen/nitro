@@ -20,6 +20,8 @@ mod nstring;
 mod ntext;
 mod state;
 mod store;
+mod sync;
 mod transaction;
 mod types;
+mod utils;
 mod z_list;

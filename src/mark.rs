@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_json::Value;
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
@@ -175,7 +175,7 @@ impl Decode for MarkContent {
     }
 }
 
-#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Hash)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub(crate) enum Mark {
     Bold,
     Italic,
@@ -191,6 +191,34 @@ pub(crate) enum Mark {
     #[default]
     None,
     Id(u32),
+}
+
+impl Serialize for Mark {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Mark::Bold => "bold".serialize(serializer),
+            Mark::Italic => "italic".serialize(serializer),
+            Mark::Underline => "underline".serialize(serializer),
+            Mark::StrikeThrough => "strikethrough".serialize(serializer),
+            Mark::Code => "code".serialize(serializer),
+            Mark::Subscript => "subscript".serialize(serializer),
+            Mark::Superscript => "superscript".serialize(serializer),
+            Mark::Color(ref color) => color.serialize(serializer),
+            Mark::Background(ref color) => color.serialize(serializer),
+            Mark::Link(ref url) => url.serialize(serializer),
+            Mark::Custom(ref name, ref json) => {
+                let mut map = serde_json::Map::new();
+                map.insert("name".to_string(), name.to_string().into());
+                map.insert("json".to_string(), json.to_string().into());
+                serde_json::Value::Object(map).serialize(serializer)
+            }
+            Mark::Id(id) => id.serialize(serializer),
+            Mark::None => "_".serialize(serializer),
+        }
+    }
 }
 
 impl Encode for Mark {

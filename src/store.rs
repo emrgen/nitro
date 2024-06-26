@@ -5,7 +5,10 @@ use std::fmt::Debug;
 use std::ops::Add;
 use std::rc::{Rc, Weak};
 
-use crate::bimapid::{Client, ClientId, ClientMap, Field, FieldId, FieldMap};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+
+use crate::bimapid::{Client, ClientId, Field, FieldId, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
@@ -23,11 +26,9 @@ pub(crate) struct DocStore {
     pub(crate) client: ClientId,
     pub(crate) clock: Clock,
 
-    pub(crate) state: ClientState,
-
     pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
-    pub(crate) clients: ClientMap,
+    pub(crate) state: ClientState,
 
     pub(crate) items: ItemStore,
     pub(crate) deleted_items: DeleteItemStore,
@@ -43,11 +44,11 @@ impl DocStore {
     }
 
     pub(crate) fn get_client(&mut self, client_id: &Client) -> ClientId {
-        self.clients.get_or_insert(client_id)
+        self.state.clients.get_or_insert(client_id)
     }
 
     pub(crate) fn update_client(&mut self, client: &Client, clock: Clock) -> ClientId {
-        self.client = self.clients.get_or_insert(client);
+        self.client = self.state.clients.get_or_insert(client);
         self.clock = clock.max(1);
 
         self.client
@@ -82,7 +83,10 @@ impl DocStore {
             self.id_map.insert(item.id().range(item.size()));
         }
 
+        let id = item.id();
         self.items.insert(item);
+
+        self.state.update(id.client, id.clock);
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -98,25 +102,28 @@ impl DocStore {
     }
 
     pub(crate) fn client(&mut self, client_id: &Client) -> ClientId {
-        self.clients.get_or_insert(client_id)
+        self.state.get_or_insert(client_id)
     }
 
     pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
+        let state = self.state.adjust(&state);
+
+        println!(" => state: {:?}", state);
+
         let items = self.items.diff(state.clone(), &self.id_map);
-        // println!("items: {:?}", items);
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
 
-        let mut clients = self.clients.clone();
+        let mut clients = self.state.clients.clone();
 
-        for (_, client_id) in clients.clone().iter() {
-            if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
-                clients.remove(client_id);
-            }
-        }
+        println!("clients x: {:?}", clients);
+        // for (_, client_id) in clients.clone().iter() {
+        //     if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
+        //         clients.remove(client_id);
+        //     }
+        // }
 
         Diff::from(
             guid,
-            clients,
             self.fields.clone(),
             self.state.clone(),
             items,
@@ -332,6 +339,7 @@ impl IdDiff for ItemStore {
 
         for (client, store) in self.items.iter() {
             let clock = state.get(client).unwrap_or(&0);
+            println!("client: {:?} clock: {:?}", client, clock);
             let items = store.diff(*clock, id_map);
             if items.size() > 0 {
                 diff.items.insert(*client, items);
@@ -348,12 +356,15 @@ trait IdDiff {
 }
 
 pub(crate) trait ClientStoreEntry:
-    Default + WithId + Clone + Encode + Decode + Eq + PartialEq
+    Default + WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize
 {
 }
 
 // blanket implementation for all types that implement dependencies
-impl<T: Default + WithId + Clone + Encode + Decode + Eq + PartialEq> ClientStoreEntry for T {}
+impl<T: Default + WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize> ClientStoreEntry
+    for T
+{
+}
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct ClientStore<T: ClientStoreEntry> {
@@ -414,6 +425,15 @@ impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
     }
 }
 
+impl<T: ClientStoreEntry> Serialize for ClientStore<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.items.serialize(serializer)
+    }
+}
+
 impl<T: ClientStoreEntry> Encode for ClientStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.items.len() as u32);
@@ -424,7 +444,9 @@ impl<T: ClientStoreEntry> Encode for ClientStore<T> {
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for ClientStore<T> {
+impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq + Serialize> Decode
+    for ClientStore<T>
+{
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientStore<T>, String> {
         let len = d.u32()? as usize;
         let mut items = BTreeMap::new();
@@ -438,10 +460,13 @@ impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq> Decode for 
     }
 }
 
-pub(crate) trait IdStoreEntry: WithId + Clone + Encode + Decode + Eq + PartialEq {}
+pub(crate) trait IdStoreEntry:
+    WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize
+{
+}
 
 // blanket implementation for all types that implement dependencies
-impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq> IdStoreEntry for T {}
+impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize> IdStoreEntry for T {}
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct IdStore<T: IdStoreEntry> {
@@ -490,6 +515,15 @@ impl<T: IdStoreEntry> IntoIterator for IdStore<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.into_iter()
+    }
+}
+
+impl<T: IdStoreEntry> Serialize for IdStore<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.map.serialize(serializer)
     }
 }
 

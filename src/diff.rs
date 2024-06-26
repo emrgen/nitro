@@ -1,6 +1,10 @@
 use std::cell::RefMut;
+use std::ops::Add;
 
-use crate::bimapid::{ClientMap, FieldMap};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+
+use crate::bimapid::FieldMap;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
@@ -12,7 +16,6 @@ use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 pub(crate) struct Diff {
     pub(crate) guid: String,
     pub(crate) fields: FieldMap,
-    pub(crate) clients: ClientMap,
     pub(crate) state: ClientState,
     pub(crate) items: ItemDataStore,
     pub(crate) deletes: DeleteItemStore,
@@ -24,8 +27,26 @@ impl Diff {
     }
 
     pub(crate) fn get_root(&self) -> Option<ItemData> {
-        let client = self.clients.get_client_id(&self.guid)?;
+        let client = self.state.clients.get_client_id(&self.guid)?;
         self.items.find(&Id::new(*client, 1))
+    }
+}
+
+impl Add<&ClientState> for &ClientState {
+    type Output = ClientState;
+
+    fn add(self, rhs: &ClientState) -> Self::Output {
+        let mut clone = self.clone();
+
+        for (client, clock) in rhs.state.iter() {
+            clone.update(*client, *clock);
+        }
+
+        for (client, clock) in rhs.clients.iter() {
+            clone.clients.insert(client.clone(), *clock);
+        }
+
+        clone
     }
 }
 
@@ -39,7 +60,6 @@ impl Diff {
 
     pub(crate) fn from(
         guid: String,
-        clients: ClientMap,
         fields: FieldMap,
         state: ClientState,
         items: ItemDataStore,
@@ -47,7 +67,6 @@ impl Diff {
     ) -> Diff {
         Diff {
             guid,
-            clients,
             fields,
             state,
             items,
@@ -72,19 +91,24 @@ impl Diff {
     // adjust the diff to the current state of the store
     // this is used when applying a diff to a store
     pub(crate) fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
-        let clients = store.clients.adjust(&self.clients);
-        let fields = store.fields.adjust(&self.fields);
-        let state = store.state.adjust(
-            &self.state,
-            &self.clients,
-            &store.clients.merge(&self.clients),
-        );
+        let state = self.state.adjust(&store.state);
 
+        let next_state = &self.state + &state;
+
+        let fields = store.fields.adjust(&self.fields);
         let mut items = ItemDataStore::default();
 
-        for (_, store) in self.items.iter() {
-            for (_, item) in store.iter() {
-                let adjust = item.adjust(&self.clients, &self.fields, &clients, &fields);
+        // println!("before clients: {:?}", self.state.clients);
+        // println!("after clients: {:?}", store.state.clients);
+
+        for (_, id_store) in self.items.iter() {
+            for (_, item) in id_store.iter() {
+                let adjust = item.adjust(
+                    &self.state.clients,
+                    &self.fields,
+                    &next_state.clients,
+                    &store.fields,
+                );
                 items.insert(adjust);
             }
         }
@@ -93,21 +117,14 @@ impl Diff {
 
         for (_, store) in self.deletes.clone().into_iter() {
             for (_, item) in store.into_iter() {
-                let adjust = item.adjust(&self.clients, &clients);
+                let adjust = item.adjust(&self.state.clients, &next_state.clients);
                 deletes.insert(adjust);
             }
         }
 
         let guid = self.guid.clone();
 
-        Diff::from(
-            guid,
-            clients.clone(),
-            fields.clone(),
-            state.clone(),
-            items,
-            deletes,
-        )
+        Diff::from(guid, fields.clone(), state.clone(), items, deletes)
     }
 
     pub(crate) fn optimize(&mut self) {
@@ -119,10 +136,24 @@ impl Diff {
     }
 }
 
+impl Serialize for Diff {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("Diff", 6)?;
+        s.serialize_field("guid", &self.guid)?;
+        s.serialize_field("fields", &serde_json::to_value(&self.fields).unwrap())?;
+        s.serialize_field("state", &serde_json::to_value(&self.state).unwrap())?;
+        s.serialize_field("deletes", &serde_json::to_value(&self.deletes).unwrap())?;
+        s.serialize_field("items", &serde_json::to_value(&self.items).unwrap())?;
+        s.end()
+    }
+}
+
 impl Encode for Diff {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.string(&self.guid);
-        self.clients.encode(e, ctx);
         self.fields.encode(e, ctx);
         self.state.encode(e, ctx);
         self.deletes.encode(e, ctx);
@@ -134,7 +165,6 @@ impl Decode for Diff {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Diff, String> {
         let guid = d.string()?;
 
-        let clients = ClientMap::decode(d, ctx)?;
         let fields = FieldMap::decode(d, ctx)?;
         let state = ClientState::decode(d, ctx)?;
         let deletes = DeleteItemStore::decode(d, ctx)?;
@@ -142,7 +172,6 @@ impl Decode for Diff {
 
         Ok(Diff {
             guid,
-            clients,
             fields,
             state,
             deletes,

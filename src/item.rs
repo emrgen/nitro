@@ -7,7 +7,8 @@ use std::rc::Rc;
 
 use bitflags::bitflags;
 use indexmap::IndexMap;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
@@ -108,6 +109,15 @@ impl Deref for ItemRef {
 
     fn deref(&self) -> &Self::Target {
         &self.item
+    }
+}
+
+impl Serialize for ItemRef {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Type::from(self.clone()).serialize(serializer)
     }
 }
 
@@ -369,28 +379,7 @@ impl Item {
     where
         S: serde::ser::SerializeStruct,
     {
-        s.serialize_field("id", &self.data.id.to_string())?;
-        s.serialize_field("kind", &self.data.kind.to_string())?;
-
-        if let Some(parent) = &self.parent {
-            s.serialize_field("parent_id", &parent.id().to_string())?;
-        }
-
-        if let Some(left) = &self.left_id {
-            s.serialize_field("left_id", &left.id().to_string())?;
-        }
-
-        if let Some(right) = &self.right_id {
-            s.serialize_field("right_id", &right.id().to_string())?;
-        }
-
-        if let Some(target) = &self.target_id {
-            s.serialize_field("target_id", &target.id().to_string())?;
-        }
-
-        if let Some(mover) = &self.mover_id {
-            s.serialize_field("mover_id", &mover.id().to_string())?;
-        }
+        self.data.serialize(s)?;
 
         let marks_map = self.get_marks();
         let mut map = serde_json::Map::new();
@@ -409,25 +398,9 @@ impl Item {
     }
 
     pub(crate) fn serialize_size(&self) -> usize {
-        let mut size = 2_usize;
-
-        if self.parent_id.is_some() {
-            size += 1;
-        }
-
-        if self.left_id.is_some() {
-            size += 1;
-        }
-
-        if self.right_id.is_some() {
-            size += 1;
-        }
-
-        if self.target_id.is_some() {
-            size += 1;
-        }
-
-        if self.mover_id.is_some() {
+        let mut size = self.data.serialize_size();
+        let marks = self.get_marks();
+        if !marks.is_empty() {
             size += 1;
         }
 
@@ -435,29 +408,20 @@ impl Item {
     }
 }
 
-// impl OriginIds for Item {
-//     fn left_id(&self) -> Option<Id> {
-//         self.data.left_id
-//     }
-//
-//     fn right_id(&self) -> Option<Id> {
-//         self.data.right_id
-//     }
-// }
-//
+impl Serialize for ItemData {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("ItemData", self.serialize_size())?;
+        self.serialize(&mut s)?;
+        s.end()
+    }
+}
+
 // pub(crate) trait OriginIds {
 //     fn left_id(&self) -> Option<Id>;
 //     fn right_id(&self) -> Option<Id>;
-// }
-
-// impl<T: Deref<Target = ItemRefInner>> OriginIds for T {
-//     fn left_id(&self) -> Option<Id> {
-//         self.borrow().left_id()
-//     }
-//
-//     fn right_id(&self) -> Option<Id> {
-//         self.borrow().right_id()
-//     }
 // }
 
 impl Deref for Item {
@@ -531,17 +495,75 @@ impl ItemData {
             .map(|id| id.adjust(before_clients, after_clients));
 
         let field = data.field.and_then(|field_id| {
-            let field = before_fields.get_field(&field_id).unwrap();
-            after_fields.get_field_id(field)
+            let field = before_fields.get_field(&field_id);
+            field.and_then(|field| after_fields.get_field_id(field))
         });
 
-        data.field = field.copied();
+        if let Some(field) = field {
+            data.field = Some(*field);
+        }
 
         data
     }
 
     pub(crate) fn is_root(&self) -> bool {
         matches!(&self.content, Content::Doc(_))
+    }
+
+    pub(crate) fn serialize<S>(&self, s: &mut S) -> Result<(), S::Error>
+    where
+        S: serde::ser::SerializeStruct,
+    {
+        s.serialize_field("id", &self.id.to_string())?;
+        s.serialize_field("kind", &self.kind.to_string())?;
+
+        if let Some(parent) = &self.parent_id {
+            s.serialize_field("parent_id", &parent.id().to_string())?;
+        }
+
+        if let Some(left) = &self.left_id {
+            s.serialize_field("left_id", &left.id().to_string())?;
+        }
+
+        if let Some(right) = &self.right_id {
+            s.serialize_field("right_id", &right.id().to_string())?;
+        }
+
+        if let Some(target) = &self.target_id {
+            s.serialize_field("target_id", &target.id().to_string())?;
+        }
+
+        if let Some(mover) = &self.mover_id {
+            s.serialize_field("mover_id", &mover.id().to_string())?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn serialize_size(&self) -> usize {
+        let mut size = 2_usize;
+
+        if self.parent_id.is_some() {
+            size += 1;
+        }
+
+        if self.left_id.is_some() {
+            size += 1;
+        }
+
+        if self.right_id.is_some() {
+            size += 1;
+        }
+
+        if self.target_id.is_some() {
+            size += 1;
+        }
+
+        if self.mover_id.is_some() {
+            size += 1;
+        }
+
+        size
     }
 }
 

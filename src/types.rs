@@ -498,7 +498,7 @@ impl Ord for Type {
     fn cmp(&self, other: &Self) -> Ordering {
         let store = self.store().upgrade().unwrap();
         let store = store.borrow();
-        self.id().compare(&other.id(), &store.clients)
+        self.id().compare(&other.id(), &store.state.clients)
     }
 }
 impl PartialOrd for Type {

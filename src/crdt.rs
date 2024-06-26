@@ -50,7 +50,7 @@ where
 
     let mut conflict_items = BTreeSet::new();
     let mut items_before_origin = BTreeSet::new();
-    let clients = store.upgrade().unwrap().borrow().clients.clone();
+    let clients = store.upgrade().unwrap().borrow().state.clone();
 
     let item_id = item.id();
 
@@ -64,7 +64,7 @@ where
         let item_left_id = item.left().map(|l| l.id());
 
         if Id::eq_opt(&conflict_left_id, &item_left_id) {
-            if curr_conflict.id().compare(&item_id, &clients) == Ordering::Greater {
+            if curr_conflict.id().compare(&item_id, &clients.clients) == Ordering::Greater {
                 left.clone_from(&conflict);
                 conflict_items.clear();
             } else if Id::eq_opt(&curr_conflict.right_id(), &item.right_id()) {

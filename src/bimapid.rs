@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::ops::Add;
 
 use bimap::BiMap;
+use serde::{Serialize, Serializer};
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -64,7 +67,7 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
     }
 
     pub fn adjust(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
-        let mut clone = other.clone();
+        let mut clone = self.clone();
         let mut entries = other.map.iter().collect::<Vec<_>>();
         entries.sort_by(|a, b| a.1.cmp(b.1));
 
@@ -87,6 +90,28 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         }
 
         merged
+    }
+}
+
+impl<T: EncoderMapEntry> Add<EncoderMap<T>> for EncoderMap<T> {
+    type Output = EncoderMap<T>;
+
+    fn add(self, rhs: EncoderMap<T>) -> Self::Output {
+        &self + &rhs
+    }
+}
+
+impl<T: EncoderMapEntry> Add<&EncoderMap<T>> for &EncoderMap<T> {
+    type Output = EncoderMap<T>;
+
+    fn add(self, rhs: &EncoderMap<T>) -> Self::Output {
+        let mut clone = self.clone();
+
+        for (client, client_id) in rhs.map.iter() {
+            clone.insert(client.clone(), *client_id);
+        }
+
+        clone
     }
 }
 
@@ -220,7 +245,7 @@ impl ClientMap {
     pub(crate) fn size(&self) -> u32 {
         self.map.size() as u32
     }
-    fn insert(&mut self, client_id: Client, client: ClientId) {
+    pub(crate) fn insert(&mut self, client_id: Client, client: ClientId) {
         self.map.map.insert(client_id, client);
     }
 
@@ -248,6 +273,16 @@ impl ClientMap {
 
     pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &u32)> {
         self.map.map.iter()
+    }
+}
+
+impl Serialize for ClientMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let map = self.map.map.iter().collect::<HashMap<_, _>>();
+        map.serialize(serializer)
     }
 }
 
@@ -317,6 +352,16 @@ impl FieldMap {
 
     pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &u32)> {
         self.map.map.iter()
+    }
+}
+
+impl Serialize for FieldMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let map = self.map.map.iter().collect::<HashMap<_, _>>();
+        map.serialize(serializer)
     }
 }
 

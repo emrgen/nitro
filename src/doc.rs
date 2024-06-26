@@ -21,6 +21,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
+use crate::utils::print_yaml;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DocOpts {
@@ -43,6 +44,15 @@ pub(crate) struct Doc {
     pub(crate) opts: DocOpts,
     pub(crate) root: NMap,
     pub(crate) store: StoreRef,
+}
+
+impl Doc {
+    pub(crate) fn state(&self) -> ClientState {
+        let store = self.store.borrow();
+
+        let state = &store.state;
+        store.state.clone()
+    }
 }
 
 impl Doc {
@@ -91,8 +101,11 @@ impl Doc {
     }
 
     #[inline]
-    pub fn diff(&self, state: ClientState) -> Diff {
-        let mut diff = self.store.borrow().diff(self.opts.guid.clone(), state);
+    pub fn diff(&self, state: impl Into<ClientState>) -> Diff {
+        let mut diff = self
+            .store
+            .borrow()
+            .diff(self.opts.guid.clone(), state.into());
         diff.optimize();
 
         diff
@@ -105,6 +118,14 @@ impl Doc {
 
     pub fn find_by_id(&self, id: Id) -> Option<Type> {
         self.store.borrow().find(id)
+    }
+
+    pub fn update_client(&self) -> String {
+        let mut store = self.store.borrow_mut();
+        let client_id = Uuid::new_v4().to_string();
+        store.update_client(&client_id, 1);
+
+        client_id
     }
 
     pub fn list(&self) -> NList {
@@ -207,6 +228,17 @@ impl Default for Doc {
         Doc::new(Default::default())
     }
 }
+impl From<Doc> for ClientState {
+    fn from(value: Doc) -> Self {
+        value.state()
+    }
+}
+
+impl From<&Doc> for ClientState {
+    fn from(value: &Doc) -> Self {
+        value.state()
+    }
+}
 
 impl PartialEq for Doc {
     fn eq(&self, other: &Self) -> bool {
@@ -250,6 +282,8 @@ impl CloneDeep for Doc {
     fn clone_deep(&self) -> Self {
         let doc = Doc::new(self.opts.clone());
         let diff = self.diff(ClientState::default());
+
+        print_yaml(&diff);
         doc.apply(diff);
 
         doc
@@ -267,6 +301,8 @@ mod test {
     use crate::codec_v1::EncoderV1;
     use crate::doc::{CloneDeep, Doc};
     use crate::encoder::{Encode, Encoder};
+    use crate::state::ClientState;
+    use crate::utils::print_yaml;
 
     #[test]
     fn test_create_doc() {
@@ -353,8 +389,8 @@ mod test {
         let mut e1 = EncoderV1::new();
         let mut e2 = EncoderV1::new();
 
-        let d1 = a.diff(Default::default());
-        let d2 = b.diff(Default::default());
+        let d1 = a.diff(ClientState::default());
+        let d2 = b.diff(ClientState::default());
 
         // println!("d1: {:?}", d1);
         // println!("d2: {:?}", d2);
@@ -397,11 +433,11 @@ mod test {
 
         let d2 = d1.clone_deep();
 
+        print_yaml(&d1);
+        print_yaml(&d2);
+
         let left = serde_yaml::to_string(&d1).unwrap();
         let right = serde_yaml::to_string(&d2).unwrap();
-
-        // println!("left: {}", left);
-        // println!("right: {}", right);
 
         assert_eq!(left, right);
     }

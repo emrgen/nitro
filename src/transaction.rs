@@ -192,16 +192,20 @@ impl Transaction {
     }
 
     pub(crate) fn merge(&self) -> Result<(), String> {
-        let store = self.store.upgrade().unwrap();
-        let mut store = store.borrow_mut();
-        store.fields.extend(&self.diff.fields);
-        store.state.clients.extend(&self.diff.state.clients);
+        if let Some(store) = self.store.upgrade() {
+            let mut store = store.borrow_mut();
 
+            store.fields.extend(&self.diff.fields);
+            store.state.clients.extend(&self.diff.state.clients);
+            store.pending.extend(&self.pending);
+        }
         Ok(())
     }
 
     pub(crate) fn rollback(&mut self) {
-        log::info!("Tx rollback");
+        println!("-----------------------------------------------------");
+        println!("|            Rolling back transaction                ");
+        println!("-----------------------------------------------------");
     }
 
     pub(crate) fn is_ready(&self, data: &ItemData, store: &Ref<DocStore>) -> bool {

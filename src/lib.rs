@@ -21,6 +21,7 @@ mod nmove;
 mod nproxy;
 mod nstring;
 mod ntext;
+mod persist;
 mod state;
 mod store;
 mod sync;

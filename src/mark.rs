@@ -167,9 +167,7 @@ impl Encode for MarkContent {
 
 impl Decode for MarkContent {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<MarkContent, String> {
-        println!("decoding mark content");
         let range = IdRange::decode(d, ctx)?;
-        println!("range: {:?}", range);
         let data = Mark::decode(d, ctx)?;
         Ok(MarkContent::new(range, data))
     }
@@ -187,7 +185,7 @@ pub(crate) enum Mark {
     Color(String),
     Background(String),
     Link(String),
-    Custom(String, String),
+    Custom(String, String), // name, json
     #[default]
     None,
     Id(u32),

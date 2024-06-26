@@ -23,6 +23,9 @@ pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocStore {
+    pub(crate) doc_id: String,
+    pub(crate) created_by: Client,
+
     pub(crate) client: ClientId,
     pub(crate) clock: Clock,
 
@@ -222,7 +225,7 @@ impl PendingStore {
         self.delete_items.iter()
     }
 
-    pub(crate) fn extend(&mut self, other: PendingStore) {
+    pub(crate) fn extend(&mut self, other: &PendingStore) {
         for (_, store) in other.items.iter() {
             for (_, item) in store.iter() {
                 self.items.insert(item.clone());
@@ -234,6 +237,28 @@ impl PendingStore {
                 self.delete_items.insert(item.clone());
             }
         }
+    }
+}
+
+impl Encode for PendingStore {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        self.items.encode(e, ctx);
+        self.delete_items.encode(e, ctx);
+    }
+}
+
+impl Decode for PendingStore {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let items = ItemDataStore::decode(d, ctx)?;
+        let delete_items = DeleteItemStore::decode(d, ctx)?;
+
+        Ok(PendingStore {
+            items,
+            delete_items,
+        })
     }
 }
 
@@ -264,6 +289,20 @@ impl Add<PendingStore> for PendingStore {
 }
 
 pub(crate) type ItemDataStore = ClientStore<ItemData>;
+
+impl From<ItemStore> for ItemDataStore {
+    fn from(value: ItemStore) -> Self {
+        let mut store = ItemDataStore::default();
+        for (_, items) in value.items.iter() {
+            for (_, item) in items.iter() {
+                store.insert(item.item_ref().borrow().data.clone());
+            }
+        }
+
+        store
+    }
+}
+
 pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
 pub(crate) type ItemStore = ClientStore<Type>;
 

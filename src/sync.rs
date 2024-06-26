@@ -142,8 +142,11 @@ mod test {
         let text2 = doc2.get("text").unwrap().as_text().unwrap();
         let text1 = doc1.get("text").unwrap().as_text().unwrap();
 
-        // character vector
-        let chars = vec!['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+        // character vector 26
+        let chars = vec![
+            'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q',
+            'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+        ];
         // shuffle the characters
         let mut chars1 = chars.clone();
         let mut rng = rand::thread_rng();

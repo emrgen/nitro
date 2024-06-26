@@ -57,6 +57,10 @@ impl Doc {
 impl Doc {
     pub(crate) fn new(opts: DocOpts) -> Self {
         let mut store = DocStore::default();
+
+        store.doc_id = opts.guid.clone();
+        store.created_by = opts.crated_by.clone();
+
         // doc is always created by the client with clock 0,
         // each doc is created by a new client
 

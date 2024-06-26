@@ -87,8 +87,7 @@ impl ClientState {
         let clients = self.clients.adjust(&other.clients);
 
         let mut state = ClientIdState::default();
-
-        for (client, client_id) in clients.iter() {
+        for (_, client_id) in clients.iter() {
             let self_clock = self.state.get(client_id);
             let other_clock = other.state.get(client_id);
             match (self_clock, other_clock) {

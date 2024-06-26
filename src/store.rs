@@ -377,6 +377,19 @@ pub struct ClientStore<T: ClientStoreEntry> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.items
+            .get(&id.client)
+            .map(|store| store.contains(id))
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
+impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn client_size(&self, id: &ClientId) -> usize {
         self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
     }

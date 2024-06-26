@@ -23,6 +23,11 @@ fn sync_docs(d1: &Doc, d2: &Doc) {
     d2.apply(diff1);
 }
 
+fn sync_first_doc(d1: &Doc, d2: &Doc) {
+    let diff1 = d2.diff(d1);
+    d1.apply(diff1);
+}
+
 #[cfg(test)]
 mod test {
     use crate::doc::{CloneDeep, Doc};
@@ -87,6 +92,37 @@ mod test {
         // print_yaml(&doc1);
         // print_yaml(&doc2);
 
+        assert!(equal_docs(&doc1, &doc2));
+    }
+
+    #[test]
+    fn test_sync_with_text() {
+        let doc1 = Doc::default();
+        let doc2 = doc1.clone_deep();
+        doc2.update_client();
+
+        let text1 = doc1.text();
+        doc1.set("text", text1.clone());
+
+        sync_docs(&doc1, &doc2);
+        assert!(equal_docs(&doc1, &doc2));
+
+        text1.insert(0, doc1.string("a"));
+
+        sync_docs(&doc1, &doc2);
+        assert!(equal_docs(&doc1, &doc2));
+
+        let text2 = doc2.get("text").unwrap().as_text().unwrap();
+        let text1 = doc1.get("text").unwrap().as_text().unwrap();
+
+        text2.insert(1, doc2.string("b"));
+        text2.insert(0, doc2.string("c"));
+
+        text1.insert(1, doc1.string("d"));
+
+        sync_docs(&doc1, &doc2);
+        // print_yaml(&doc1);
+        // print_yaml(&doc2);
         assert!(equal_docs(&doc1, &doc2));
     }
 }

@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 
 use crate::id::{Id, WithId};
 use crate::item::{ItemData, ItemRef};
-use crate::store::WeakStoreRef;
+use crate::store::{ClientStore, WeakStoreRef};
 use crate::types::Type;
 
 // integrate an item into the list of items
@@ -50,8 +49,8 @@ where
         }
     }
 
-    let mut conflict_items = BTreeSet::new();
-    let mut items_before_origin = BTreeSet::new();
+    let mut conflict_items = ClientStore::default();
+    let mut items_before_origin = ClientStore::default();
     let clients = store.upgrade().unwrap().borrow().state.clone();
 
     let item_id = item.id();
@@ -63,7 +62,11 @@ where
         conflict_items.insert(conflict.clone().unwrap().id());
 
         let conflict_left_id = conflict.clone().unwrap().left().map(|l| l.id());
-        let item_left_id = item.left().map(|l| l.id());
+        let item_left_id = item.left_id();
+
+        // println!("conflict_left_id: {:?}", conflict_left_id);
+        // println!("item_left_id: {:?}", item_left_id);
+        // println!("conflict: {:?}", curr_conflict.id());
 
         if Id::eq_opt(&conflict_left_id, &item_left_id) {
             if curr_conflict.id().compare(&item_id, &clients.clients) == Ordering::Greater {

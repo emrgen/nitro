@@ -6,6 +6,7 @@ use serde::Serialize;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
+use crate::types::Type;
 
 #[derive(Clone, Debug)]
 pub(crate) struct NText {
@@ -40,6 +41,48 @@ impl NText {
 
     pub(crate) fn size(&self) -> u32 {
         self.borrow().as_list().iter().map(|item| item.size()).sum()
+    }
+
+    pub(crate) fn insert(&self, offset: u32, item: impl Into<Type>) {
+        let items = self.borrow().as_list();
+        let item = item.into();
+
+        if offset == 0 {
+            self.prepend(item);
+        } else if offset >= self.size() {
+            self.append(item);
+        } else {
+            // find the target item offset
+            let mut target_offset = 0;
+            let mut target = None;
+
+            for item in items.iter() {
+                let size = item.size();
+                if target_offset + size > offset {
+                    target = Some(item);
+                    break;
+                }
+                target_offset += size;
+            }
+
+            if let Some(target) = target {
+                let target_offset = offset - target_offset;
+                if target_offset == 0 {
+                    target.insert_before(item);
+                } else if target_offset >= target.size() {
+                    target.insert_after(item);
+                } else {
+                    let items = target.split(target_offset);
+                    self.store
+                        .upgrade()
+                        .unwrap()
+                        .borrow_mut()
+                        .replace(target, items.clone());
+
+                    items.0.insert_after(item);
+                }
+            }
+        }
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {

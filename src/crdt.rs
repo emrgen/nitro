@@ -88,8 +88,8 @@ where
         integrate_after(left.clone(), item.clone());
     } else {
         if let Some(start) = start {
-            start.set_right(item.clone());
-            item.set_left(start);
+            start.set_left(item.clone());
+            item.set_right(start);
         }
         set_start(Some(item.clone()))?;
         item.set_parent(parent.clone());

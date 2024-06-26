@@ -368,7 +368,26 @@ mod test {
     }
 
     #[test]
-    fn test_clone_doc() {
+    fn test_clone_doc_with_map() {
+        let d1 = Doc::default();
+        d1.set("a", d1.atom("a"));
+        d1.set("b", d1.atom("b"));
+        d1.set("c", d1.atom("c"));
+        d1.set("d", d1.atom("d"));
+
+        let d2 = d1.clone_deep();
+
+        let left = serde_yaml::to_string(&d1).unwrap();
+        let right = serde_yaml::to_string(&d2).unwrap();
+
+        // println!("left: {}", left);
+        // println!("right: {}", right);
+
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_clone_doc_with_list() {
         let d1 = Doc::default();
         let list = d1.list();
         d1.set("list", list.clone());
@@ -388,12 +407,16 @@ mod test {
     }
 
     #[test]
-    fn test_clone_doc_with_map() {
+    fn test_clone_doc_with_text() {
         let d1 = Doc::default();
-        d1.set("a", d1.atom("a"));
-        d1.set("b", d1.atom("b"));
-        d1.set("c", d1.atom("c"));
-        d1.set("d", d1.atom("d"));
+        let text = d1.text();
+        d1.set("text", text.clone());
+
+        text.append(d1.string("a"));
+        text.append(d1.string("b"));
+        text.append(d1.string("c"));
+        text.prepend(d1.string("d"));
+        text.insert(1, d1.string("e"));
 
         let d2 = d1.clone_deep();
 

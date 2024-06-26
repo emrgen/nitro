@@ -117,11 +117,10 @@ impl Split for NString {
             right_item.set_right(right);
         }
 
-        self.store
-            .upgrade()
-            .unwrap()
-            .borrow_mut()
-            .replace(self.clone().into(), (left_item.clone(), right_item.clone()));
+        self.store.upgrade().unwrap().borrow_mut().replace(
+            &self.clone().into(),
+            (left_item.clone(), right_item.clone()),
+        );
 
         Ok((left_item, right_item))
     }

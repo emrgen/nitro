@@ -93,7 +93,7 @@ impl DocStore {
         self.deleted_items.insert(item);
     }
 
-    pub(crate) fn replace(&mut self, item: Type, items: (Type, Type)) {
+    pub(crate) fn replace(&mut self, item: &Type, items: (Type, Type)) {
         self.items.replace(item, items);
     }
 
@@ -395,7 +395,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         }
     }
 
-    pub(crate) fn replace(&mut self, item: T, items: (T, T)) {
+    pub(crate) fn replace(&mut self, item: &T, items: (T, T)) {
         let id = item.id();
         let store = self.items.get_mut(&id.client).unwrap();
         store.remove(&item.id());

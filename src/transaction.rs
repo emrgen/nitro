@@ -109,7 +109,7 @@ impl Transaction {
                     }
 
                     count += 1;
-                    if count > 6 {
+                    if count > 1000 {
                         println!("Item: {:?}", id);
                         panic!("Infinite loop while collecting client ready items");
                     }

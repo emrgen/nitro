@@ -7,15 +7,17 @@ use crate::store::WeakStoreRef;
 use crate::types::Type;
 
 // integrate an item into the list of items
-pub(crate) fn integrate<F>(
+pub(crate) fn integrate<SF, EF>(
     data: ItemData,
     store: &WeakStoreRef,
     parent: Type,
     start: Option<Type>,
-    set_start: F,
+    set_start: SF,
+    set_end: EF,
 ) -> Result<(), String>
 where
-    F: FnOnce(Option<Type>) -> Result<(), String>,
+    SF: FnOnce(Option<Type>) -> Result<(), String>,
+    EF: FnOnce(Option<Type>) -> Result<(), String>,
 {
     let item: Type = ItemRef::new(data.into(), store.clone()).into();
     let mut left = item.left_origin();
@@ -99,6 +101,9 @@ where
         // println!("integrated at start, {:?}", item.id());
     }
 
+    if item.right().is_none() {
+        set_end(Some(item.clone()))?;
+    }
     store.upgrade().unwrap().borrow_mut().insert(item.clone());
 
     Ok(())

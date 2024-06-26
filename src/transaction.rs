@@ -180,6 +180,10 @@ impl Transaction {
                         parent.set_start(start);
                         Ok(())
                     },
+                    |end| {
+                        parent.set_end(end);
+                        Ok(())
+                    },
                 )?;
             }
         }

@@ -58,6 +58,7 @@ impl ItemRef {
     pub(crate) fn append(&self, value: impl Into<Type>) {
         let end = self.borrow().end.clone();
         let item = value.into();
+
         if let Some(ref end) = end {
             item.item_ref().borrow_mut().left = Some(end.clone());
             item.item_ref().borrow_mut().data.left_id = Some(end.end_id());

@@ -27,4 +27,3 @@ mod sync;
 mod transaction;
 mod types;
 mod utils;
-mod z_list;

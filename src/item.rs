@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -58,10 +58,12 @@ impl ItemRef {
         let end = self.borrow().end.clone();
         let item = value.into();
         if let Some(ref end) = end {
-            end.item_ref().borrow_mut().right = Some(item.clone());
             item.item_ref().borrow_mut().left = Some(end.clone());
-            self.borrow_mut().end = Some(item.clone());
             item.item_ref().borrow_mut().data.left_id = Some(end.end_id());
+
+            end.item_ref().borrow_mut().right = Some(item.clone());
+            self.borrow_mut().end = Some(item.clone());
+            println!("left id: {:?}", end.id());
         } else {
             self.borrow_mut().start = Some(item.clone());
             self.borrow_mut().end = Some(item.clone());
@@ -253,9 +255,9 @@ impl Item {
         &mut self.data.content
     }
 
-    pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {
+    pub(crate) fn as_map(&self, store: WeakStoreRef) -> BTreeMap<String, Type> {
         let items = self.items();
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
 
         for item in items.clone() {
             if let Some(field) = item.item_ref().borrow().field(store.clone()) {

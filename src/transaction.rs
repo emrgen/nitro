@@ -85,6 +85,7 @@ impl Transaction {
             for client_id in clients {
                 if let Some(item) = stage.get(&client_id) {
                     let id = item.id;
+                    let clone = item.clone();
 
                     if self.is_integrated(item, &store) {
                         progress = true;
@@ -107,10 +108,12 @@ impl Transaction {
                     }
 
                     count += 1;
-                    if count > 1000 {
+                    if count > 4 {
                         println!("Item: {:?}", id);
-                        panic!("Infinite loop");
+                        panic!("Infinite loop while collecting client ready items");
                     }
+                    println!("Item: {:?}", id);
+                    println!("Item: {:?}", clone);
                 }
             }
 
@@ -120,7 +123,7 @@ impl Transaction {
             }
 
             if count > 1000 {
-                panic!("Infinite loop");
+                panic!("Infinite loop while collecting ready items");
             }
 
             progress = false;

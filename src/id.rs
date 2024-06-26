@@ -36,7 +36,7 @@ impl Id {
         Id { client, clock }
     }
 
-    pub(crate) fn eq_opt(a: Option<Id>, b: Option<Id>) -> bool {
+    pub(crate) fn eq_opt(a: &Option<Id>, b: &Option<Id>) -> bool {
         match (a, b) {
             (Some(a), Some(b)) => {
                 a.client == b.client && a.compare_without_client(&b) == std::cmp::Ordering::Equal

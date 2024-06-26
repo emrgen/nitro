@@ -373,15 +373,20 @@ mod test {
         let text = d1.text();
         d1.set("text", text);
 
+        d1.set("atom", d1.atom("crdt"));
+
         print_doc(&d1);
 
         let d2 = d1.clone_deep();
 
         print_doc(&d2);
 
-        assert_eq!(
-            serde_yaml::to_string(&d1).unwrap(),
-            serde_yaml::to_string(&d2).unwrap()
-        );
+        let left = serde_yaml::to_string(&d1).unwrap();
+        let right = serde_yaml::to_string(&d2).unwrap();
+
+        println!("left: {}", left);
+        println!("right: {}", right);
+
+        assert_eq!(left, right);
     }
 }

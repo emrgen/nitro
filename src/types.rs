@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use serde::Serialize;
 use serde_json::Value;
 
@@ -78,11 +80,15 @@ impl Type {
     }
 
     pub(crate) fn start_id(&self) -> Id {
-        self.item_ref().id().range(0).start_id()
+        self.item_ref().id().range(1).start_id()
     }
 
     pub(crate) fn end_id(&self) -> Id {
-        self.item_ref().id().range(self.size() as u32).end_id()
+        if let ItemKind::String = self.kind() {
+            self.item_ref().id().range(self.size()).end_id()
+        } else {
+            self.item_ref().id().range(1).end_id()
+        }
     }
 
     pub(crate) fn set_parent(&self, parent: impl Into<Option<Type>>) {
@@ -485,6 +491,19 @@ impl From<Type> for ItemRef {
             Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
+    }
+}
+
+impl Ord for Type {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let store = self.store().upgrade().unwrap();
+        let store = store.borrow();
+        self.id().compare(&other.id(), &store.clients)
+    }
+}
+impl PartialOrd for Type {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

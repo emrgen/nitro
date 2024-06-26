@@ -48,7 +48,7 @@ impl DocStore {
 
     pub(crate) fn update_client(&mut self, client: &Client, clock: Clock) -> ClientId {
         self.client = self.clients.get_or_insert(client);
-        self.clock = clock.min(1);
+        self.clock = clock.max(1);
 
         self.client
     }

@@ -151,14 +151,14 @@ impl Ord for Id {
 }
 
 impl Encode for Id {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, _ctx: &EncodeContext) {
         e.u32(self.client);
         e.u32(self.clock);
     }
 }
 
 impl Decode for Id {
-    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
+    fn decode<T: Decoder>(d: &mut T, _ctx: &DecodeContext) -> Result<Self, String> {
         let client = d.u32()?;
         let clock = d.u32()?;
 
@@ -267,7 +267,7 @@ impl Encode for IdRange {
 }
 
 impl Decode for IdRange {
-    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
+    fn decode<T: Decoder>(d: &mut T, _ctx: &DecodeContext) -> Result<Self, String> {
         let client = d.u32()?;
         let start = d.u32()?;
         let size = d.u32()?;

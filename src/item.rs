@@ -869,10 +869,10 @@ impl Encode for Content {
                 e.u8(ContentFlags::STRING.bits());
                 e.string(s)
             }
-            Self::Types(t) => {
+            Self::Types(_) => {
                 // e.array(t)
             }
-            Self::Embed(a) => {
+            Self::Embed(_) => {
                 // a.encode(e)
             }
             Self::Doc(d) => {
@@ -1102,11 +1102,11 @@ impl Encode for Any {
             Any::False => {
                 e.u8(AnyFlags::FALSE.bits());
             }
-            Any::Float32(d) => {
+            Any::Float32(_) => {
                 e.u8(AnyFlags::FLOAT32.bits());
                 // e.f32(*d);
             }
-            Any::Float64(d) => {
+            Any::Float64(d_) => {
                 e.u8(AnyFlags::FLOAT64.bits());
                 // e.f64(*d);
             }
@@ -1127,7 +1127,7 @@ impl Encode for Any {
 }
 
 impl Decode for Any {
-    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    fn decode<T: Decoder>(d: &mut T, _ctx: &DecodeContext) -> Result<Self, String>
     where
         Self: Sized,
     {

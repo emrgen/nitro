@@ -136,7 +136,7 @@ impl Serialize for ClientIdState {
 }
 
 impl Encode for ClientIdState {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
         e.u32(self.clients.len() as u32);
         for (client, clock) in &self.clients {
             e.u32(*client);

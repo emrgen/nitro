@@ -369,7 +369,7 @@ impl Encode for Type {
 }
 
 impl Decode for Type {
-    fn decode<T: Decoder>(_d: &mut T, ctx: &DecodeContext) -> Result<Self, String> {
+    fn decode<T: Decoder>(_d: &mut T, _ctx: &DecodeContext) -> Result<Self, String> {
         Err("Type::decode: not implemented".to_string())
     }
 }

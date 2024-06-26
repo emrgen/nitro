@@ -30,6 +30,9 @@ fn sync_first_doc(d1: &Doc, d2: &Doc) {
 
 #[cfg(test)]
 mod test {
+    use rand::prelude::SliceRandom;
+    use rand::Rng;
+
     use crate::doc::{CloneDeep, Doc};
     use crate::sync::{equal_docs, sync_docs};
 
@@ -123,6 +126,54 @@ mod test {
         sync_docs(&doc1, &doc2);
         // print_yaml(&doc1);
         // print_yaml(&doc2);
+        assert!(equal_docs(&doc1, &doc2));
+    }
+
+    #[test]
+    fn test_sync_with_text2() {
+        let doc1 = Doc::default();
+        let doc2 = doc1.clone_deep();
+        doc2.update_client();
+
+        let text = doc1.text();
+        doc1.set("text", text.clone());
+        sync_docs(&doc1, &doc2);
+
+        let text2 = doc2.get("text").unwrap().as_text().unwrap();
+        let text1 = doc1.get("text").unwrap().as_text().unwrap();
+
+        // character vector
+        let chars = vec!['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
+        // shuffle the characters
+        let mut chars1 = chars.clone();
+        let mut rng = rand::thread_rng();
+        chars1.shuffle(&mut rng);
+
+        let mut chars2 = chars.clone();
+        let mut rng = rand::thread_rng();
+        chars2.shuffle(&mut rng);
+
+        for (a, b) in chars1.iter().zip(chars2.iter()) {
+            let size1 = text1.size();
+            let size2 = text2.size();
+            // randomly insert the characters
+            let pos1 = rng.gen_range(0..size1 + 1);
+            let pos2 = rng.gen_range(0..size2 + 1);
+            text1.insert(pos1, doc1.string(&a.to_string()));
+            text2.insert(pos2, doc2.string(&b.to_string()));
+
+            // random bool
+            let sync = rng.gen_bool(0.5);
+            if sync {
+                sync_docs(&doc1, &doc2);
+            }
+        }
+
+        sync_docs(&doc1, &doc2);
+
+        // print_yaml(&doc1);
+        // print_yaml(&doc2);
+
         assert!(equal_docs(&doc1, &doc2));
     }
 }

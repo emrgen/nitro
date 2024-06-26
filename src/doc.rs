@@ -21,7 +21,6 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
-use crate::utils::print_yaml;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DocOpts {
@@ -283,7 +282,6 @@ impl CloneDeep for Doc {
         let doc = Doc::new(self.opts.clone());
         let diff = self.diff(ClientState::default());
 
-        print_yaml(&diff);
         doc.apply(diff);
 
         doc
@@ -302,7 +300,6 @@ mod test {
     use crate::doc::{CloneDeep, Doc};
     use crate::encoder::{Encode, Encoder};
     use crate::state::ClientState;
-    use crate::utils::print_yaml;
 
     #[test]
     fn test_create_doc() {
@@ -433,8 +430,8 @@ mod test {
 
         let d2 = d1.clone_deep();
 
-        print_yaml(&d1);
-        print_yaml(&d2);
+        // print_yaml(&d1);
+        // print_yaml(&d2);
 
         let left = serde_yaml::to_string(&d1).unwrap();
         let right = serde_yaml::to_string(&d2).unwrap();

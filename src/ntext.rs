@@ -103,7 +103,7 @@ impl Serialize for NText {
         S: serde::ser::Serializer,
     {
         let mut s = serializer.serialize_struct("Text", self.borrow().serialize_size() + 1)?;
-        self.borrow().serialize(&mut s)?;
+        self.borrow().serialize_with(&mut s)?;
 
         let items = self.borrow().as_list();
         let content = items

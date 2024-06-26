@@ -224,6 +224,14 @@ pub(crate) struct ClientMap {
 }
 
 impl ClientMap {
+    pub(crate) fn extend(&mut self, other: &ClientMap) {
+        for (client, client_id) in other.iter() {
+            self.map.insert(client.clone(), *client_id);
+        }
+    }
+}
+
+impl ClientMap {
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &u32)> {
         self.map.map.iter()
     }
@@ -251,6 +259,14 @@ impl ClientMap {
 
     pub(crate) fn get_or_insert(&mut self, client_id: &Client) -> ClientId {
         self.map.get_or_insert(client_id)
+    }
+
+    pub(crate) fn contains_client(&self, client: &Client) -> bool {
+        self.map.get(client).is_some()
+    }
+
+    pub(crate) fn remove_client(&mut self, client: &Client) {
+        self.map.map.remove_by_left(client);
     }
 
     pub(crate) fn get_client_id(&self, client_id: &Client) -> Option<&ClientId> {
@@ -318,6 +334,14 @@ pub(crate) struct FieldMap {
 }
 
 impl FieldMap {
+    pub(crate) fn extend(&mut self, other: &FieldMap) {
+        for (field, field_id) in other.iter() {
+            self.map.insert(field.clone(), *field_id);
+        }
+    }
+}
+
+impl FieldMap {
     pub(crate) fn new() -> FieldMap {
         FieldMap {
             map: EncoderMap::new(),
@@ -350,7 +374,7 @@ impl FieldMap {
         FieldMap { map }
     }
 
-    pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &u32)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &u32)> {
         self.map.map.iter()
     }
 }

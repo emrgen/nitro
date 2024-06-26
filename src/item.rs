@@ -104,6 +104,52 @@ impl ItemRef {
     }
 }
 
+impl ItemRef {
+    pub(crate) fn serialize_with<S>(&self, s: &mut S) -> Result<(), S::Error>
+    where
+        S: serde::ser::SerializeStruct,
+    {
+        s.serialize_field("id", &self.id().to_string())?;
+        s.serialize_field("kind", &self.kind().to_string())?;
+        let data = &self.borrow().data;
+
+        if let Some(parent) = &data.parent_id {
+            s.serialize_field("parent_id", &parent.id().to_string())?;
+        }
+
+        if let Some(left) = &data.left_id {
+            s.serialize_field("left_id", &left.id().to_string())?;
+        }
+
+        if let Some(right) = &data.right_id {
+            s.serialize_field("right_id", &right.id().to_string())?;
+        }
+
+        if let Some(target) = &data.target_id {
+            s.serialize_field("target_id", &target.id().to_string())?;
+        }
+
+        if let Some(mover) = &data.mover_id {
+            s.serialize_field("mover_id", &mover.id().to_string())?;
+        }
+
+        let marks_map = self.borrow().get_marks();
+        let mut map = serde_json::Map::new();
+        for mark in marks_map.iter() {
+            if let Content::Mark(mark) = mark.content() {
+                let (k, v) = mark.get_key_value();
+                map.insert(k, v);
+            }
+        }
+        if !map.is_empty() {
+            let marks = serde_json::to_value(map).unwrap_or_default();
+            s.serialize_field("marks", &marks)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl Deref for ItemRef {
     type Target = ItemRefInner;
 
@@ -214,6 +260,12 @@ impl Item {
         let store = store.borrow();
         let field = store.get_field(&self.data.field.unwrap());
 
+        // let k: String = rand::thread_rng()
+        //     .sample_iter(&Alphanumeric)
+        //     .take(7)
+        //     .map(char::from)
+        //     .collect();
+        //
         field.map(|s| s.to_string())
     }
 
@@ -270,6 +322,7 @@ impl Item {
 
         for item in items.clone() {
             if let Some(field) = item.item_ref().borrow().field(store.clone()) {
+                // println!("field: {}, id: {:?}", field, item.id());
                 map.insert(field, item.clone());
             }
         }
@@ -277,7 +330,7 @@ impl Item {
         // remove items that are moved or deleted
         for item in items.iter() {
             if !item.is_visible() {
-                // map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
+                map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
             }
         }
 
@@ -375,11 +428,11 @@ impl Item {
         map
     }
 
-    pub(crate) fn serialize<S>(&self, s: &mut S) -> Result<(), S::Error>
+    pub(crate) fn serialize_with<S>(&self, s: &mut S) -> Result<(), S::Error>
     where
         S: serde::ser::SerializeStruct,
     {
-        self.data.serialize(s)?;
+        self.data.serialize_with(s)?;
 
         let marks_map = self.get_marks();
         let mut map = serde_json::Map::new();
@@ -414,7 +467,7 @@ impl Serialize for ItemData {
         S: Serializer,
     {
         let mut s = serializer.serialize_struct("ItemData", self.serialize_size())?;
-        self.serialize(&mut s)?;
+        self.serialize_with(&mut s)?;
         s.end()
     }
 }
@@ -510,7 +563,7 @@ impl ItemData {
         matches!(&self.content, Content::Doc(_))
     }
 
-    pub(crate) fn serialize<S>(&self, s: &mut S) -> Result<(), S::Error>
+    pub(crate) fn serialize_with<S>(&self, s: &mut S) -> Result<(), S::Error>
     where
         S: serde::ser::SerializeStruct,
     {
@@ -535,6 +588,10 @@ impl ItemData {
 
         if let Some(mover) = &self.mover_id {
             s.serialize_field("mover_id", &mover.id().to_string())?;
+        }
+
+        if let Some(field) = &self.field {
+            s.serialize_field("field", &field.to_string())?;
         }
 
         Ok(())

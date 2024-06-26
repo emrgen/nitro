@@ -33,7 +33,11 @@ impl ClientState {
     }
 
     pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
-        self.state.update(client, clock);
+        self.state.update_max(client, clock);
+    }
+
+    pub(crate) fn get_client_id(&self, client: &ClientId) -> Option<&Client> {
+        self.clients.get_client(client)
     }
 
     pub(crate) fn get_or_insert(&mut self, client: &Client) -> Clock {
@@ -42,11 +46,63 @@ impl ClientState {
         *clock
     }
 
-    pub(crate) fn adjust(&self, other: &ClientState) -> ClientState {
+    pub(crate) fn adjust_max(&self, other: &ClientState) -> ClientState {
         let clients = self.clients.adjust(&other.clients);
-        let state = self.state.adjust(&other.state);
+        let state = other
+            .state
+            .iter()
+            .fold(self.state.clone(), |mut state, (client_id, clock)| {
+                let client = other.clients.get_client(client_id).unwrap();
+                let client_id = clients.get_client_id(client).unwrap();
+                state.update_max(*client_id, *clock);
+                state
+            });
 
         ClientState { state, clients }
+    }
+
+    pub(crate) fn adjust_min(&self, other: &ClientState) -> ClientState {
+        let clients = self.clients.adjust(&other.clients);
+        let state = other
+            .state
+            .iter()
+            .fold(self.state.clone(), |mut state, (client_id, clock)| {
+                let client = other.clients.get_client(client_id).unwrap();
+                let client_id = clients.get_client_id(client).unwrap();
+                if let Some(current) = state.get(client_id) {
+                    if *clock < *current {
+                        state.update_max(*client_id, *clock);
+                    }
+                } else {
+                    state.update_max(*client_id, *clock);
+                }
+
+                state
+            });
+
+        ClientState { state, clients }
+    }
+
+    pub(crate) fn as_per(&self, other: &ClientState) -> ClientState {
+        let clients = self.clients.adjust(&other.clients);
+
+        let mut state = ClientIdState::default();
+
+        for (client, client_id) in clients.iter() {
+            let self_clock = self.state.get(client_id);
+            let other_clock = other.state.get(client_id);
+            match (self_clock, other_clock) {
+                (Some(self_clock), Some(other_clock)) => {
+                    state.update(*client_id, *self_clock);
+                }
+                (None, Some(other_clock)) => {
+                    state.update(*client_id, 0);
+                }
+                _ => {}
+            }
+        }
+
+        ClientState { clients, state }
     }
 }
 
@@ -55,6 +111,24 @@ impl Add<ClientState> for ClientState {
 
     fn add(self, rhs: ClientState) -> Self::Output {
         &self + &rhs
+    }
+}
+
+impl Add<&ClientState> for &ClientState {
+    type Output = ClientState;
+
+    fn add(self, rhs: &ClientState) -> Self::Output {
+        let mut clone = self.clone();
+
+        for (client, clock) in rhs.state.iter() {
+            clone.update(*client, *clock);
+        }
+
+        for (client, clock) in rhs.clients.iter() {
+            clone.clients.insert(client.clone(), *clock);
+        }
+
+        clone
     }
 }
 
@@ -105,20 +179,18 @@ impl ClientIdState {
         self.clients.remove(client);
     }
 
-    pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
+    pub(crate) fn update_max(&mut self, client: ClientId, clock: Clock) {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.max(current));
     }
 
-    pub(crate) fn adjust(&self, other: &ClientIdState) -> Self {
-        let mut adjust = ClientIdState::new();
+    pub(crate) fn update_min(&mut self, client: ClientId, clock: Clock) {
+        let current = *self.clients.entry(client).or_default();
+        self.clients.insert(client, clock.min(current));
+    }
 
-        for (client, clock) in &self.clients {
-            let other_clock = other.get(client).unwrap_or(&0);
-            adjust.update(*client, *clock.min(other_clock));
-        }
-
-        adjust
+    pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
+        self.clients.insert(client, clock);
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (&ClientId, &Clock)> {
@@ -169,19 +241,19 @@ mod tests {
     #[test]
     fn test_client_state() {
         let mut state = ClientIdState::new();
-        state.update(1, 1);
+        state.update_max(1, 1);
         assert_eq!(state.clients.get(&1), Some(&1));
-        state.update(1, 2);
+        state.update_max(1, 2);
         assert_eq!(state.clients.get(&1), Some(&2));
-        state.update(2, 1);
+        state.update_max(2, 1);
         assert_eq!(state.clients.get(&2), Some(&1));
     }
 
     #[test]
     fn test_encode_decode_state() {
         let mut state = ClientIdState::new();
-        state.update(1, 1);
-        state.update(2, 2);
+        state.update_max(1, 1);
+        state.update_max(2, 2);
 
         let mut encoder = EncoderV1::default();
         state.encode(&mut encoder, &EncodeContext::default());

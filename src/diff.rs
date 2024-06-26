@@ -32,24 +32,6 @@ impl Diff {
     }
 }
 
-impl Add<&ClientState> for &ClientState {
-    type Output = ClientState;
-
-    fn add(self, rhs: &ClientState) -> Self::Output {
-        let mut clone = self.clone();
-
-        for (client, clock) in rhs.state.iter() {
-            clone.update(*client, *clock);
-        }
-
-        for (client, clock) in rhs.clients.iter() {
-            clone.clients.insert(client.clone(), *clock);
-        }
-
-        clone
-    }
-}
-
 impl Diff {
     pub(crate) fn new(guid: String) -> Diff {
         Self {
@@ -91,24 +73,20 @@ impl Diff {
     // adjust the diff to the current state of the store
     // this is used when applying a diff to a store
     pub(crate) fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
-        let state = self.state.adjust(&store.state);
+        let state = self.state.adjust_min(&store.state);
 
-        let next_state = &self.state + &state;
+        // let next_state = &self.state + &state;
 
         let fields = store.fields.adjust(&self.fields);
         let mut items = ItemDataStore::default();
 
         // println!("before clients: {:?}", self.state.clients);
-        // println!("after clients: {:?}", store.state.clients);
+        // println!("after clients: {:?}", self.items);
 
         for (_, id_store) in self.items.iter() {
             for (_, item) in id_store.iter() {
-                let adjust = item.adjust(
-                    &self.state.clients,
-                    &self.fields,
-                    &next_state.clients,
-                    &store.fields,
-                );
+                let adjust =
+                    item.adjust(&self.state.clients, &self.fields, &state.clients, &fields);
                 items.insert(adjust);
             }
         }
@@ -117,7 +95,7 @@ impl Diff {
 
         for (_, store) in self.deletes.clone().into_iter() {
             for (_, item) in store.into_iter() {
-                let adjust = item.adjust(&self.state.clients, &next_state.clients);
+                let adjust = item.adjust(&self.state.clients, &state.clients);
                 deletes.insert(adjust);
             }
         }

@@ -55,7 +55,7 @@ impl Serialize for NAtom {
         S: serde::ser::Serializer,
     {
         let mut s = serializer.serialize_struct("Atom", self.borrow().serialize_size() + 1)?;
-        self.borrow().serialize(&mut s)?;
+        self.serialize_with(&mut s)?;
 
         let content = serde_json::to_value(self.content()).unwrap_or_default();
         s.serialize_field("content", &content)?;

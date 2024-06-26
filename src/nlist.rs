@@ -115,7 +115,7 @@ impl Serialize for NList {
         S: serde::ser::Serializer,
     {
         let mut s = serializer.serialize_struct("List", self.borrow().serialize_size() + 1)?;
-        self.borrow().serialize(&mut s)?;
+        self.serialize_with(&mut s)?;
 
         let items = self.borrow().as_list();
         let content = items

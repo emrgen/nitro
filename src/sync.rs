@@ -4,7 +4,7 @@ fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     let left = serde_json::to_string(d1).unwrap();
     let right = serde_json::to_string(d2).unwrap();
 
-    println!("left: {}", left);
+    // println!("left: {}", left);
     // println!("right: {}", right);
 
     left == right
@@ -12,21 +12,21 @@ fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
 
 fn sync_docs(d1: &Doc, d2: &Doc) {
     let diff1 = d1.diff(d2);
-    // let diff2 = d2.diff(d1);
+    let diff2 = d2.diff(d1);
 
-    println!("xxxxxx {:?}", diff1.items);
-    println!("xxxxxx {:?}", diff1.state.clients);
+    // println!("diff1");
+    // print_yaml(&diff1);
+    // println!("diff2");
+    // print_yaml(&diff2);
 
-    println!("{}", serde_yaml::to_string(&diff1).unwrap());
-
-    // d1.apply(diff2);
-    // d2.apply(diff2);
+    d1.apply(diff2);
+    d2.apply(diff1);
 }
 
 #[cfg(test)]
 mod test {
     use crate::doc::{CloneDeep, Doc};
-    use crate::sync::sync_docs;
+    use crate::sync::{equal_docs, sync_docs};
 
     #[test]
     fn test_sync() {
@@ -39,13 +39,9 @@ mod test {
 
         sync_docs(&doc1, &doc2);
 
-        // let left = serde_yaml::to_string(&doc1).unwrap();
-        // println!("left: {}", left);
+        // print_yaml(&doc1);
+        // print_yaml(&doc2);
 
-        let right = serde_yaml::to_string(&doc2).unwrap();
-        println!("right: {}", right);
-
-        // assert_eq!(doc1, doc2);
-        // assert!(equal_docs(&doc1, &doc2));
+        assert!(equal_docs(&doc1, &doc2));
     }
 }

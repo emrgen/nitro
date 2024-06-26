@@ -17,11 +17,11 @@ pub(crate) fn integrate<F>(
 where
     F: FnOnce(Option<Type>) -> Result<(), String>,
 {
-    // println!("integrating item: {:?}", data);
-
     let item: Type = ItemRef::new(data.into(), store.clone()).into();
     let mut left = item.left_origin();
     let right = item.right_origin();
+
+    // print_yaml(&item);
 
     let left_conflict = {
         let next = item.right();
@@ -86,13 +86,17 @@ where
 
     if let Some(left) = &left {
         integrate_after(left.clone(), item.clone());
+        // println!("integrated after left");
     } else {
-        if let Some(start) = start {
+        // println!("parent start: {:?}", parent.id());
+        if let Some(start) = parent.start() {
             start.set_left(item.clone());
             item.set_right(start);
+            // println!("has existing start item");
         }
         set_start(Some(item.clone()))?;
         item.set_parent(parent.clone());
+        // println!("integrated at start, {:?}", item.id());
     }
 
     store.upgrade().unwrap().borrow_mut().insert(item.clone());

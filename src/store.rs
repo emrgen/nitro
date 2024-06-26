@@ -68,10 +68,12 @@ impl DocStore {
         id
     }
 
+    #[inline]
     pub(crate) fn contains(&self, id: &Id) -> bool {
         self.items.find(id).is_some()
     }
 
+    #[inline]
     pub(crate) fn find(&self, id: Id) -> Option<Type> {
         let key = self.id_map.find(&id);
         self.items.find(&key)
@@ -106,29 +108,21 @@ impl DocStore {
     }
 
     pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
-        let state = self.state.adjust(&state);
-
-        println!(" => state: {:?}", state);
+        let state = state.as_per(&self.state);
 
         let items = self.items.diff(state.clone(), &self.id_map);
+
         let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
 
         let mut clients = self.state.clients.clone();
 
-        println!("clients x: {:?}", clients);
-        // for (_, client_id) in clients.clone().iter() {
-        //     if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
-        //         clients.remove(client_id);
-        //     }
-        // }
+        for (_, client_id) in clients.clone().iter() {
+            if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
+                // clients.remove(client_id);
+            }
+        }
 
-        Diff::from(
-            guid,
-            self.fields.clone(),
-            self.state.clone(),
-            items,
-            deletes,
-        )
+        Diff::from(guid, self.fields.clone(), state.clone(), items, deletes)
     }
 }
 
@@ -275,12 +269,15 @@ pub(crate) type ItemStore = ClientStore<Type>;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IdRangeMap {
-    pub(crate) map: BTreeSet<IdRange>,
+    pub(crate) map: BTreeMap<ClientId, BTreeSet<IdRange>>,
 }
 
 impl IdRangeMap {
     pub(crate) fn find(&self, id: &Id) -> Id {
-        let e = self.map.get(&id.range(1));
+        let e = self
+            .map
+            .get(&id.client)
+            .and_then(|set| set.get(&id.range(1)));
         if let Some(range) = e {
             range.id()
         } else {
@@ -291,25 +288,34 @@ impl IdRangeMap {
 
 impl IdRangeMap {
     pub(crate) fn insert(&mut self, id: IdRange) {
-        self.map.insert(id);
+        let set = self.map.entry(id.client).or_default();
+        set.insert(id);
     }
 
     pub(crate) fn has(&self, id: &Id) -> bool {
-        self.map.contains(&id.range(1))
+        self.map
+            .get(&id.client)
+            .map(|set| set.contains(&id.range(1)))
+            .unwrap_or(false)
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
-        self.map.remove(&id.range(1));
+        if let Some(set) = self.map.get_mut(&id.client) {
+            set.remove(&id.range(1));
+        }
     }
 
     pub(crate) fn get(&self, id: &Id) -> Option<&IdRange> {
-        self.map.get(&id.range(1))
+        self.map
+            .get(&id.client)
+            .and_then(|set| set.get(&id.range(1)))
     }
 
     pub(crate) fn replace(&mut self, id: IdRange, with: (IdRange, IdRange)) {
-        self.map.remove(&id);
-        self.insert(with.0);
-        self.insert(with.1);
+        let set = self.map.entry(id.client).or_default();
+        set.remove(&id);
+        set.insert(with.0);
+        set.insert(with.1);
     }
 }
 
@@ -339,7 +345,6 @@ impl IdDiff for ItemStore {
 
         for (client, store) in self.items.iter() {
             let clock = state.get(client).unwrap_or(&0);
-            println!("client: {:?} clock: {:?}", client, clock);
             let items = store.diff(*clock, id_map);
             if items.size() > 0 {
                 diff.items.insert(*client, items);
@@ -622,6 +627,10 @@ impl IdClockDiff for IdStore<DeleteItem> {
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Sub;
+
+    use uuid::Uuid;
+
     use crate::codec_v1::EncoderV1;
 
     use super::*;
@@ -695,5 +704,82 @@ mod tests {
         let dd = ClientStore::<Id>::decode(&mut d, &DecodeContext::default()).unwrap();
 
         assert_eq!(store, dd);
+    }
+
+    impl Sub for &ClientState {
+        type Output = ClientState;
+
+        fn sub(self, rhs: Self) -> Self::Output {
+            let mut clone = self.clone();
+
+            for (client, clock) in rhs.state.iter() {
+                let c = clone.state.get(client);
+                if let Some(c) = c {
+                    if clock > c {
+                        clone.state.update_max(*client, *c);
+                    } else {
+                        clone.state.update_max(*client, *c - clock);
+                    }
+                } else {
+                    clone.state.remove(client);
+                }
+            }
+
+            for (client, clock) in rhs.clients.iter() {
+                if !self.clients.contains_client(client) {
+                    clone.clients.remove_client(client);
+                }
+            }
+
+            clone
+        }
+    }
+
+    impl Sub for ClientState {
+        type Output = ClientState;
+
+        fn sub(self, rhs: Self) -> Self::Output {
+            &self - &rhs
+        }
+    }
+
+    #[test]
+    fn test_adjust_client_state() {
+        let mut s1 = ClientState::default();
+        let mut s2 = ClientState::default();
+        let u1 = Uuid::new_v4().to_string();
+        let u2 = Uuid::new_v4().to_string();
+        let u3 = Uuid::new_v4().to_string();
+        let u4 = Uuid::new_v4().to_string();
+
+        let uid1 = s1.clients.get_or_insert(&u1);
+        let uid2 = s1.clients.get_or_insert(&u2);
+        s1.state.update_max(uid1, 1);
+        s1.state.update_max(uid1, 2);
+        s1.state.update_max(uid2, 1);
+        s1.state.update_max(uid2, 2);
+
+        let uid3 = s2.clients.get_or_insert(&u3);
+        let uid4 = s2.clients.get_or_insert(&u4);
+
+        s2.state.update_max(uid3, 1);
+        s2.state.update_max(uid3, 2);
+        s2.state.update_max(uid4, 1);
+
+        let s12 = &s1 + &s2;
+
+        let d1 = s1.adjust_max(&s2);
+        let sd1 = &(&d1 - &s1) + &s1;
+
+        // print_yaml(&s1);
+        // print_yaml(&s2);
+        //
+        // print_yaml(&sd1);
+        // print_yaml(&d1);
+        //
+        // print_yaml(&s12);
+
+        assert_eq!(sd1, d1);
+        assert_ne!(s12, d1);
     }
 }

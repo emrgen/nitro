@@ -37,6 +37,7 @@ impl Transaction {
 
     pub(crate) fn commit(&mut self) {
         self.prepare()
+            .and_then(|_| self.merge())
             .and_then(|_| self.apply())
             .unwrap_or_else(|err| {
                 log::error!("Tx commit error: {}", err);
@@ -146,7 +147,7 @@ impl Transaction {
         Ok(())
     }
     pub(crate) fn apply(&mut self) -> Result<(), String> {
-        println!("ready count: {}", self.ready.queue.len());
+        // println!("[items ready to integrate: {}]", self.ready.queue.len());
 
         let fields = self.store.upgrade().unwrap().borrow().fields.clone();
 
@@ -182,6 +183,15 @@ impl Transaction {
                 )?;
             }
         }
+
+        Ok(())
+    }
+
+    pub(crate) fn merge(&self) -> Result<(), String> {
+        let store = self.store.upgrade().unwrap();
+        let mut store = store.borrow_mut();
+        store.fields.extend(&self.diff.fields);
+        store.state.clients.extend(&self.diff.state.clients);
 
         Ok(())
     }

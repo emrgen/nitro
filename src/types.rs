@@ -36,6 +36,37 @@ pub(crate) enum Type {
 }
 
 impl Type {
+    pub(crate) fn replace(&self, items: (Type, Type)) {
+        let store = self.store().upgrade().unwrap();
+        let mut store = store.borrow_mut();
+
+        if let Some(left) = self.left() {
+            left.set_right(Some(items.0.clone()));
+        }
+
+        if let Some(right) = self.right() {
+            right.set_left(Some(items.1.clone()));
+        }
+
+        if let Some(parent) = self.parent() {
+            items.0.set_parent(Some(parent.clone()));
+            items.1.set_parent(Some(parent.clone()));
+        }
+
+        store.items.replace(&self.clone(), items);
+    }
+}
+
+impl Type {
+    pub(crate) fn slice(&self, start: u32, end: u32) -> Vec<Type> {
+        match self {
+            Type::Text(n) => n.slice(start, end),
+            _ => panic!("slice: not implemented"),
+        }
+    }
+}
+
+impl Type {
     pub(crate) fn as_list(&self) -> Option<NList> {
         match self {
             Type::List(n) => Some(n.clone()),
@@ -346,6 +377,7 @@ impl Type {
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         match self {
             Type::List(n) => n.insert(offset, item),
+            Type::Text(n) => n.insert(offset, item),
             _ => panic!("insert: not implemented"),
         }
     }

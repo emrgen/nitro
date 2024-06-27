@@ -10,7 +10,7 @@ fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     left == right
 }
 
-fn sync_docs(d1: &Doc, d2: &Doc) {
+pub(crate) fn sync_docs(d1: &Doc, d2: &Doc) {
     let diff1 = d1.diff(d2);
     let diff2 = d2.diff(d1);
 

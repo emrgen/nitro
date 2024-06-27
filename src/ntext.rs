@@ -1,9 +1,10 @@
+use std::io::BufRead;
 use std::ops::Deref;
 
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -11,6 +12,26 @@ use crate::types::Type;
 #[derive(Clone, Debug)]
 pub(crate) struct NText {
     pub(crate) item: ItemRef,
+}
+
+impl NText {
+    pub(crate) fn slice(&self, start: u32, end: u32) -> Vec<Type> {
+        let start = self.find_at_offset(start);
+        let end = self.find_at_offset(end);
+
+        let store = self.store.upgrade().unwrap();
+        if let Some(item) = &end.0 {
+            let items = item.split(end.1);
+            item.replace(items.clone());
+        }
+
+        if let Some(item) = &start.0 {
+            let items = item.split(start.1);
+            item.replace(items.clone());
+        }
+
+        Vec::new()
+    }
 }
 
 impl NText {
@@ -53,35 +74,49 @@ impl NText {
             self.append(item);
         } else {
             // find the target item offset
-            let mut target_offset = 0;
-            let mut target = None;
-
-            for item in items.iter() {
-                let size = item.size();
-                if target_offset + size > offset {
-                    target = Some(item);
-                    break;
-                }
-                target_offset += size;
-            }
+            let (target, offset) = self.find_at_offset(offset);
 
             if let Some(target) = target {
-                let target_offset = offset - target_offset;
-                if target_offset == 0 {
+                if offset == 0 {
                     target.insert_before(item);
-                } else if target_offset >= target.size() {
+                } else if offset >= target.size() {
                     target.insert_after(item);
                 } else {
-                    let items = target.split(target_offset);
+                    let items = target.split(offset);
                     self.store
                         .upgrade()
                         .unwrap()
                         .borrow_mut()
-                        .replace(target, items.clone());
+                        .replace(&target, items.clone());
 
                     items.0.insert_after(item);
                 }
             }
+        }
+    }
+
+    fn find_at_offset(&self, offset: u32) -> (Option<Type>, u32) {
+        let items = self.borrow().as_list();
+        let mut target_offset = 0;
+        let mut target = None;
+
+        if offset == 0 {
+            return (items.first().cloned(), 0);
+        }
+
+        for item in items.iter() {
+            let size = item.size();
+            if target_offset + size > offset {
+                target = Some(item);
+                break;
+            }
+            target_offset += size;
+        }
+
+        if let Some(target) = target {
+            (Some(target.clone()), offset - target_offset)
+        } else {
+            (None, target_offset)
         }
     }
 

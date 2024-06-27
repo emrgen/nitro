@@ -22,6 +22,7 @@ mod nproxy;
 mod nstring;
 mod ntext;
 mod persist;
+mod richtext;
 mod state;
 mod store;
 mod sync;

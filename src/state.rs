@@ -233,6 +233,9 @@ impl Decode for ClientIdState {
 mod tests {
     use std::default::Default;
 
+    use miniz_oxide::deflate::compress_to_vec;
+    use uuid::Uuid;
+
     use crate::codec_v1::EncoderV1;
 
     use super::*;
@@ -262,5 +265,22 @@ mod tests {
         let decoded = ClientIdState::decode(&mut d, &DecodeContext::default()).unwrap();
 
         assert_eq!(state, decoded);
+    }
+
+    #[test]
+    fn test_client_state_size() {
+        let mut state = ClientState::new();
+
+        for _ in 0..10000 {
+            let id = Uuid::new_v4().to_string();
+            state.clients.get_or_insert(&id);
+        }
+
+        let mut encoder = EncoderV1::default();
+        state.encode(&mut encoder, &EncodeContext::default());
+
+        let buf = encoder.buffer();
+        let comp = compress_to_vec(&buf, 1);
+        println!("ClientState size: {}", buf.len());
     }
 }

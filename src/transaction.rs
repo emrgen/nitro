@@ -1,15 +1,18 @@
 use std::cell::Ref;
 use std::collections::{BTreeMap, HashMap};
+use std::default::Default;
+use std::time::Duration;
 
 use crate::bimapid::ClientId;
 use crate::crdt::integrate;
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
-use crate::item::{ItemData, StartEnd};
+use crate::item::{ItemData, ItemRef, StartEnd};
 use crate::store::{
     ClientStore, DocStore, ItemDataStore, ItemStore, PendingStore, ReadyStore, WeakStoreRef,
 };
+use crate::types::Type;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Transaction {
@@ -19,6 +22,8 @@ pub(crate) struct Transaction {
 
     diff: Diff,
     ops: Vec<TxOp>,
+
+    elapsed: Duration,
 }
 
 impl Transaction {
@@ -32,6 +37,7 @@ impl Transaction {
             ready: ReadyStore::default(),
             pending: PendingStore::default(),
             ops: Vec::default(),
+            elapsed: Duration::default(),
         }
     }
 
@@ -177,10 +183,15 @@ impl Transaction {
 
         self.ready.queue.reverse();
 
+        let now = std::time::Instant::now();
+        let mut times: Vec<Duration> = Vec::new();
+        let mut counters: Vec<i32> = Vec::new();
+        let client_map = self.store.upgrade().unwrap().borrow().state.clients.clone();
+        let store = self.store.upgrade().unwrap();
+        let mut store = store.borrow_mut();
+
         while let Some(data) = self.ready.queue.pop() {
             let parent = {
-                let store = self.store.upgrade().unwrap();
-                let store = store.borrow();
                 if let Some(parent_id) = &data.parent_id {
                     store.find(*parent_id)
                 } else if let Some(left_id) = &data.left_id {
@@ -192,12 +203,20 @@ impl Transaction {
                 }
             };
 
+            let now = std::time::Instant::now();
             if let Some(parent) = parent {
-                integrate(
-                    data,
-                    &self.store.clone(),
+                let mut left = data.left_id.map(|id| store.find(id)).flatten();
+                let right = data.right_id.map(|id| store.find(id)).flatten();
+
+                let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
+
+                let count = integrate(
+                    item.clone(),
+                    &client_map,
                     parent.clone(),
                     parent.start(),
+                    &mut left,
+                    right,
                     |start| {
                         parent.set_start(start);
                         Ok(())
@@ -207,8 +226,28 @@ impl Transaction {
                         Ok(())
                     },
                 )?;
+
+                store.insert(item);
+
+                counters.push(count);
             }
+
+            times.push(now.elapsed());
         }
+
+        println!("Time taken to integrate: {:?}", now.elapsed());
+        if times.is_empty() {
+            return Ok(());
+        }
+
+        println!(
+            "Average time taken to integrate: {:?}",
+            times.iter().sum::<Duration>() / times.len() as u32
+        );
+        println!(
+            "Average count of items integrated: {}",
+            counters.iter().sum::<i32>() / counters.len() as i32
+        );
 
         Ok(())
     }

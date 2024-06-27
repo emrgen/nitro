@@ -98,12 +98,16 @@ impl DocStore {
         self.items.remove(id);
     }
 
-    pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
+    pub(crate) fn insert_delete(&mut self, item: DeleteItem) -> &mut DocStore {
         self.deleted_items.insert(item);
+
+        self
     }
 
-    pub(crate) fn replace(&mut self, item: &Type, items: (Type, Type)) {
+    pub(crate) fn replace(&mut self, item: &Type, items: (Type, Type)) -> &mut DocStore {
         self.items.replace(item, items);
+
+        self
     }
 
     pub(crate) fn client(&mut self, client_id: &Client) -> ClientId {
@@ -119,7 +123,7 @@ impl DocStore {
 
         let mut clients = self.state.clients.clone();
 
-        for (_, client_id) in clients.clone().iter() {
+        for (_, client_id) in clients.iter() {
             if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
                 // clients.remove(client_id);
             }
@@ -584,6 +588,13 @@ impl<T: IdStoreEntry> IdStore<T> {
 
     pub(crate) fn size(&self) -> usize {
         self.map.len()
+    }
+
+    pub(crate) fn take_first(&mut self) -> Option<T> {
+        let (_, item) = self.map.iter().next()?;
+        let item = item.clone();
+        self.map.remove(&item.id());
+        Some(item)
     }
 }
 

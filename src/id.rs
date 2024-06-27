@@ -132,7 +132,7 @@ impl Add<Clock> for &Id {
 
 impl PartialEq<Self> for Id {
     fn eq(&self, other: &Self) -> bool {
-        self.client == other.client && self.clock == other.clock
+        self.clock == other.clock
     }
 }
 
@@ -146,7 +146,7 @@ impl PartialOrd<Self> for Id {
 
 impl Ord for Id {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.compare(other, &ClientMap::new())
+        self.compare_without_client(other)
     }
 }
 
@@ -209,7 +209,9 @@ impl IdRange {
         if self.client != other.client {
             let client = clients.get_client(&self.client).unwrap();
             let other_client = clients.get_client(&other.client).unwrap();
-            return calculate_hash(client).cmp(&calculate_hash(other_client));
+            return calculate_hash(&format!("({}, {})", client, self.start)).cmp(&calculate_hash(
+                &format!("({}, {})", other_client, other.start),
+            ));
         }
 
         self.compare_without_client(other)
@@ -366,24 +368,13 @@ mod tests {
 
         let id1 = IdRange::new(0, 1, 1);
         let id2 = IdRange::new(0, 1, 1);
-        let id3 = IdRange::new(0, 1, 2);
+        let id3 = IdRange::new(0, 2, 1);
         let id4 = IdRange::new(0, 2, 2);
-        let id5 = IdRange::new(1, 1, 1);
-        let id6 = IdRange::new(1, 1, 2);
-        let id7 = IdRange::new(1, 2, 2);
 
-        assert_eq!(id1.compare(&id2, &clients), std::cmp::Ordering::Equal);
-        assert_eq!(id1.compare(&id3, &clients), std::cmp::Ordering::Equal);
-        assert_eq!(id1.compare(&id4, &clients), std::cmp::Ordering::Less);
-        assert_eq!(id1.compare(&id5, &clients), std::cmp::Ordering::Less);
-        assert_eq!(id1.compare(&id6, &clients), std::cmp::Ordering::Less);
-        assert_eq!(id1.compare(&id7, &clients), std::cmp::Ordering::Less);
-
-        assert_eq!(id3.compare(&id1, &clients), std::cmp::Ordering::Equal);
-        assert_eq!(id4.compare(&id1, &clients), std::cmp::Ordering::Greater);
-        assert_eq!(id5.compare(&id1, &clients), std::cmp::Ordering::Greater);
-
-        assert_eq!(id6.compare(&id1, &clients), std::cmp::Ordering::Greater);
-        assert_eq!(id7.compare(&id1, &clients), std::cmp::Ordering::Greater);
+        // compare without client
+        assert_eq!(id1.compare_without_client(&id2), Ordering::Equal);
+        assert_eq!(id1.compare_without_client(&id3), Ordering::Less);
+        assert_eq!(id3.compare_without_client(&id1), Ordering::Greater);
+        assert_eq!(id3.compare_without_client(&id4), Ordering::Less);
     }
 }

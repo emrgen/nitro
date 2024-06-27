@@ -49,7 +49,7 @@ impl DocStoreData {
 
         let mut clients = self.state.clients.clone();
 
-        for (_, client_id) in clients.clone().iter() {
+        for (_, client_id) in clients.iter() {
             if (items.client_size(client_id) + deletes.client_size(client_id)) == 0 {
                 // clients.remove(client_id);
             }
@@ -66,7 +66,7 @@ impl From<DocStore> for DocStoreData {
         let fields = store.fields.clone();
         let id_map = store.id_map.clone();
         let state = store.state.clone();
-        let items = store.items.clone().into();
+        let items = store.items.into();
         let deleted_items = store.deleted_items.clone();
 
         let pending = store.pending.clone();

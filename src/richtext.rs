@@ -104,41 +104,43 @@ mod tests {
         let mut size = 2;
 
         let mut s1: Option<Type> = None;
-        for _ in 0..2000 {
+        for _ in 0..5000 {
             for c in &chars {
                 let item = t1.doc.string(c.to_string());
-                t1.text.insert(0, item.clone());
-                // if let Some(s) = &s1 {
-                //     s.insert_after(&item)
-                // } else {
-                //     t1.text.insert(0, item.clone());
-                // }
-                //
-                // s1 = Some(item.into());
+                // t1.text.insert(0, item.clone());
+                if let Some(s) = &s1 {
+                    s.insert_after(&item)
+                } else {
+                    t1.text.insert(0, item.clone());
+                }
+
+                s1 = Some(item.into());
             }
         }
 
         chars.reverse();
 
         s1 = None;
-        for _ in 0..2000 {
+        for _ in 0..5000 {
             for c in &chars {
                 let item = t2.doc.string(c.to_string());
-                t2.text.insert(0, item.clone());
-                // if let Some(s) = &s1 {
-                //     s.insert_after(&item)
-                // } else {
-                //     t2.text.insert(0, &item);
-                // }
-                //
-                // s1 = Some(item.into());
+                // t2.text.insert(0, item.clone());
+                if let Some(s) = &s1 {
+                    s.insert_after(&item)
+                } else {
+                    t2.text.insert(0, &item);
+                }
+
+                s1 = Some(item.into());
             }
         }
 
         // t1.sync(&t2);
+        // sync_docs(&t1.doc, &t2.doc, SyncDirection::LeftToRight);
+        // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
         sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
 
-        // assert_eq!(t1, t2);
+        assert_eq!(t1, t2);
 
         // print_yaml(&t1);
         // print_yaml(&t2);

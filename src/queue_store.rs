@@ -27,16 +27,16 @@ impl<T: QueryStoreEntry> ClientQueryStore<T> {
     }
 
     pub(crate) fn take_first(&mut self, client_id: ClientId) -> Option<T> {
-        self.get_store(client_id).pop().cloned()
+        self.get_store(client_id).pop_front().cloned()
     }
 
     pub(crate) fn insert(&mut self, entry: T) {
         let client_id = entry.id().client;
-        self.get_store(client_id).push(entry);
+        self.get_store(client_id).append(entry);
     }
 
     pub(crate) fn pop(&mut self, client_id: ClientId) -> Option<&T> {
-        self.get_store(client_id).pop()
+        self.get_store(client_id).pop_front()
     }
 
     fn get_store(&mut self, client_id: ClientId) -> &mut QueueStore<T> {
@@ -95,11 +95,11 @@ impl<T: QueryStoreEntry> QueueStore<T> {
         }
     }
 
-    pub(crate) fn push(&mut self, entry: T) {
+    pub(crate) fn append(&mut self, entry: T) {
         self.vec.push(entry);
     }
 
-    pub(crate) fn pop(&mut self) -> Option<&T> {
+    pub(crate) fn pop_front(&mut self) -> Option<&T> {
         if self.pos < self.vec.len() {
             let entry = &self.vec[self.pos];
             self.pos += 1;
@@ -155,7 +155,11 @@ mod test {
         let now = std::time::Instant::now();
         let mut queue = QueueStore::default();
         for i in 0..50000 {
-            queue.push(Id::new(0, i as u32));
+            queue.append(Id::new(0, i as u32));
+        }
+
+        for _ in 0..5000 {
+            queue.pop_front();
         }
 
         println!("queue time: {:?}", now.elapsed());
@@ -165,6 +169,11 @@ mod test {
         for i in 0..50000 {
             store.insert(Id::new(0, i as u32));
         }
+
+        for _ in 0..5000 {
+            store.take_first();
+        }
+
         println!("store time: {:?}", now.elapsed());
     }
 }

@@ -22,12 +22,12 @@ impl NText {
         let store = self.store.upgrade().unwrap();
         if let Some(item) = &end.0 {
             let items = item.split(end.1);
-            item.replace(items.clone());
+            item.replace(items);
         }
 
         if let Some(item) = &start.0 {
             let items = item.split(start.1);
-            item.replace(items.clone());
+            item.replace(items);
         }
 
         Vec::new()
@@ -83,12 +83,6 @@ impl NText {
                     target.insert_after(item);
                 } else {
                     let items = target.split(offset);
-                    self.store
-                        .upgrade()
-                        .unwrap()
-                        .borrow_mut()
-                        .replace(&target, items.clone());
-
                     items.0.insert_after(item);
                 }
             }

@@ -135,34 +135,43 @@ impl Type {
     pub(crate) fn store(&self) -> WeakStoreRef {
         self.item_ref().store.clone()
     }
+
+    #[inline]
     pub(crate) fn right_origin(&self) -> Option<Type> {
         self.item_ref().borrow().right_origin(self.store())
     }
 
+    #[inline]
     pub(crate) fn left_origin(&self) -> Option<Type> {
         self.item_ref().borrow().left_origin(self.store())
     }
 
+    #[inline]
     pub(crate) fn parent(&self) -> Option<Type> {
         self.item_ref().borrow().parent.clone()
     }
 
+    #[inline]
     pub(crate) fn parent_id(&self) -> Option<Id> {
         self.item_ref().borrow().data.parent_id
     }
 
+    #[inline]
     pub(crate) fn left_id(&self) -> Option<Id> {
         self.item_ref().borrow().data.left_id
     }
 
+    #[inline]
     pub(crate) fn right_id(&self) -> Option<Id> {
         self.item_ref().borrow().data.right_id
     }
 
+    #[inline]
     pub(crate) fn start_id(&self) -> Id {
         self.item_ref().id().range(1).start_id()
     }
 
+    #[inline]
     pub(crate) fn end_id(&self) -> Id {
         if let ItemKind::String = self.kind() {
             self.item_ref().id().range(self.size()).end_id()
@@ -171,6 +180,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn set_parent(&self, parent: impl Into<Option<Type>>) {
         self.item_ref()
             .borrow_mut()
@@ -178,6 +188,7 @@ impl Type {
             .clone_from(&parent.into());
     }
 
+    #[inline]
     pub(crate) fn set_parent_id(&self, parent_id: impl Into<Option<Id>>) {
         self.item_ref()
             .borrow_mut()
@@ -185,10 +196,12 @@ impl Type {
             .clone_from(&parent_id.into());
     }
 
+    #[inline]
     pub(crate) fn set_left(&self, left: impl Into<Option<Type>>) {
         self.item_ref().borrow_mut().left.clone_from(&left.into());
     }
 
+    #[inline]
     pub(crate) fn set_left_id(&self, left_id: impl Into<Option<Id>>) {
         self.item_ref()
             .borrow_mut()
@@ -196,10 +209,12 @@ impl Type {
             .clone_from(&left_id.into());
     }
 
+    #[inline]
     pub(crate) fn set_right(&self, right: impl Into<Option<Type>>) {
         self.item_ref().borrow_mut().right.clone_from(&right.into());
     }
 
+    #[inline]
     pub(crate) fn set_right_id(&self, right_id: impl Into<Option<Id>>) {
         self.item_ref()
             .borrow_mut()
@@ -208,10 +223,12 @@ impl Type {
             .clone_from(&right_id.into());
     }
 
+    #[inline]
     pub(crate) fn set_start(&self, start: impl Into<Option<Type>>) {
         self.item_ref().borrow_mut().start.clone_from(&start.into());
     }
 
+    #[inline]
     pub(crate) fn set_end(&self, end: impl Into<Option<Type>>) {
         self.item_ref().borrow_mut().end.clone_from(&end.into());
     }
@@ -222,9 +239,9 @@ impl Type {
         let parent = self.parent();
         let next = self.right();
 
-        item.set_parent_id(parent.clone().map(|p| p.id()));
+        item.set_parent_id(parent.as_ref().map(|p| p.id()));
         item.set_left_id(Some(self.id()));
-        item.set_right_id(next.clone().map(|n| n.id()));
+        item.set_right_id(next.as_ref().map(|n| n.id()));
 
         item.set_parent(parent.clone());
         item.set_left(self.clone());
@@ -243,8 +260,8 @@ impl Type {
         let parent = self.parent();
         let prev = self.left();
 
-        item.set_parent_id(parent.clone().map(|p| p.id()));
-        item.set_left_id(prev.clone().map(|p| p.id()));
+        item.set_parent_id(parent.as_ref().map(|p| p.id()));
+        item.set_left_id(prev.as_ref().map(|p| p.id()));
         item.set_right_id(Some(self.id()));
 
         item.set_parent(parent.clone());
@@ -275,14 +292,17 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn is_moved(&self) -> bool {
         self.item_ref().borrow().is_moved()
     }
 
+    #[inline]
     pub(crate) fn is_deleted(&self) -> bool {
         self.item_ref().borrow().is_deleted()
     }
 
+    #[inline]
     pub(crate) fn is_visible(&self) -> bool {
         !self.is_moved() && !self.is_deleted()
     }
@@ -314,6 +334,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn remove_mark(&self, mark: Mark) {
         let id = self.store().upgrade().unwrap().borrow_mut().next_id();
         let marks = self.item_ref().borrow().get_marks();
@@ -347,6 +368,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn append(&self, item: Type) {
         match self {
             Type::List(n) => n.append(item),
@@ -354,6 +376,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn prepend(&self, item: Type) {
         match self {
             Type::List(n) => n.prepend(item),
@@ -361,6 +384,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         match self {
             Type::List(n) => n.insert(offset, item),
@@ -369,6 +393,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         match self {
             Type::Map(n) => n.set(key.into(), item.into()),
@@ -376,6 +401,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn get(&self, key: String) -> Option<Type> {
         match self {
             Type::Map(n) => n.get(key),
@@ -383,6 +409,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn remove(&self, key: ItemKey) {
         match self {
             Type::Map(n) => n.remove(key),
@@ -390,10 +417,12 @@ impl Type {
         }
     }
 
+    #[inline]
     pub fn delete(&self) {
         self.item_ref().delete(1);
     }
 
+    #[inline]
     pub(crate) fn clear(&self) {
         match self {
             Type::List(n) => n.clear(),
@@ -403,6 +432,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
         match self {
             Type::String(n) => n.split(offset).unwrap(),
@@ -411,6 +441,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn to_json(&self) -> Value {
         match self {
             Type::List(n) => n.to_json(),
@@ -482,23 +513,27 @@ impl Encode for Type {
 }
 
 impl Decode for Type {
+    #[inline]
     fn decode<T: Decoder>(_d: &mut T, _ctx: &DecodeContext) -> Result<Self, String> {
         Err("Type::decode: not implemented".to_string())
     }
 }
 
 impl WithId for Type {
+    #[inline]
     fn id(&self) -> Id {
         self.item_ref().id()
     }
 }
 
 impl From<Type> for Option<Id> {
+    #[inline]
     fn from(value: Type) -> Self {
         Some(value.id())
     }
 }
 impl From<&Type> for Option<Id> {
+    #[inline]
     fn from(value: &Type) -> Self {
         Some(value.id())
     }

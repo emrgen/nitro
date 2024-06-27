@@ -85,7 +85,7 @@ impl NMap {
     }
 
     pub(crate) fn set(&self, field: impl Into<String>, item: Type) {
-        let item_ref = item.clone().item_ref();
+        let item_ref = item.item_ref();
         let store = item_ref.store.upgrade().unwrap();
         let field_id = store.borrow_mut().get_field_id(&field.into());
         item_ref.borrow_mut().data.field = Some(field_id);

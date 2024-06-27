@@ -32,8 +32,8 @@ pub(crate) fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
     } else if direction == SyncDirection::RightToLeft {
         d1.apply(diff2);
     } else {
-        d2.apply(diff1);
         d1.apply(diff2);
+        d2.apply(diff1);
     }
 }
 

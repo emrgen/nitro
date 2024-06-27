@@ -91,7 +91,7 @@ impl ItemRef {
             self.borrow_mut().end = Some(item.clone());
         }
 
-        item.item_ref().borrow_mut().parent = Some(self.clone().into());
+        item.item_ref().borrow_mut().parent = Some(self.into());
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
     }
 
@@ -193,12 +193,12 @@ where
 impl StartEnd for ItemRef {
     #[inline]
     fn start(&self) -> Option<Self> {
-        self.borrow().start.as_ref().map(|s| s.clone().item_ref())
+        self.borrow().start.as_ref().map(|s| s.item_ref())
     }
 
     #[inline]
     fn end(&self) -> Option<Self> {
-        self.borrow().end.as_ref().map(|e| e.clone().item_ref())
+        self.borrow().end.as_ref().map(|e| e.item_ref())
     }
 }
 

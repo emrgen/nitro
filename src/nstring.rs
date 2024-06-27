@@ -77,6 +77,8 @@ impl NString {
 
 impl Split for NString {
     type Target = Type;
+
+    // split and replace the current string with the left and right parts
     fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String> {
         let data = self.item_ref().borrow().data.clone();
         let (ld, rd) = data.split(offset).unwrap();
@@ -117,10 +119,11 @@ impl Split for NString {
             right_item.set_right(right);
         }
 
-        self.store.upgrade().unwrap().borrow_mut().replace(
-            &self.clone().into(),
-            (left_item.clone(), right_item.clone()),
-        );
+        self.store
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .replace(&self.into(), (left_item.clone(), right_item.clone()));
 
         Ok((left_item, right_item))
     }

@@ -56,6 +56,8 @@ impl NMark {
 
 impl Split for NMark {
     type Target = Type;
+
+    // split the mark at the given offset and return the two new marks
     fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String> {
         let (ld, rd) = self.item_ref().borrow().data.split(offset).unwrap();
         let left = NMark::from_data(ld, self.store.clone());

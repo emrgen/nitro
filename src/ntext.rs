@@ -5,7 +5,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemIterator, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -61,11 +61,11 @@ impl NText {
     }
 
     pub(crate) fn size(&self) -> u32 {
-        self.borrow().as_list().iter().map(|item| item.size()).sum()
+        self.visible_item_iter()
+            .fold(0, |acc, item| acc + item.size())
     }
 
     pub(crate) fn insert(&self, offset: u32, item: impl Into<Type>) {
-        let items = self.borrow().as_list();
         let item = item.into();
 
         if offset == 0 {
@@ -104,7 +104,7 @@ impl NText {
             return (items.first().cloned(), 0);
         }
 
-        for item in items.iter() {
+        for item in self.item.visible_item_iter() {
             let size = item.size();
             if target_offset + size > offset {
                 target = Some(item);
@@ -113,8 +113,8 @@ impl NText {
             target_offset += size;
         }
 
-        if let Some(target) = target {
-            (Some(target.clone()), offset - target_offset)
+        if let Some(target) = &target {
+            (Some(target.into()), offset - target_offset)
         } else {
             (None, target_offset)
         }
@@ -140,11 +140,11 @@ impl Serialize for NText {
         let mut s = serializer.serialize_struct("Text", self.borrow().serialize_size() + 1)?;
         self.borrow().serialize_with(&mut s)?;
 
-        let items = self.borrow().as_list();
-        let content = items
-            .iter()
+        let content = self
+            .visible_item_iter()
             .map(|item| serde_json::to_value(item).unwrap_or_default())
-            .collect();
+            .collect::<Vec<_>>();
+
         s.serialize_field("content", &serde_json::Value::Array(content))?;
 
         s.end()

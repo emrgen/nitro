@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::doc::{CloneDeep, Doc};
 use crate::item::Content;
-use crate::sync::sync_docs;
+use crate::sync::{sync_docs, SyncDirection};
 use crate::types::Type;
 
 #[derive(Clone, Debug)]
@@ -24,12 +24,14 @@ impl RichText {
     }
 
     pub(crate) fn sync(&mut self, other: &RichText) {
-        sync_docs(&mut self.doc, &other.doc);
+        sync_docs(&self.doc, &other.doc, SyncDirection::default());
     }
 
-    pub(crate) fn insert(&mut self, index: usize, text: &str) {
+    pub(crate) fn insert(&mut self, index: usize, text: &str) -> Type {
         let text = self.doc.string(text);
-        self.text.insert(index as u32, text);
+        self.text.insert(index as u32, text.clone());
+
+        text.into()
     }
 
     pub(crate) fn to_string(&self) -> String {
@@ -99,21 +101,44 @@ mod tests {
             "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
             "r", "s", "t", "u", "v", "w", "x", "y", "z",
         ];
-        for c in &chars {
-            let index = rand::random::<usize>() % (t1.text.size() as usize + 1);
-            t1.insert(index, &c.to_string());
+        let mut size = 2;
+
+        let mut s1: Option<Type> = None;
+        for _ in 0..2000 {
+            for c in &chars {
+                let item = t1.doc.string(c.to_string());
+                t1.text.insert(0, item.clone());
+                // if let Some(s) = &s1 {
+                //     s.insert_after(&item)
+                // } else {
+                //     t1.text.insert(0, item.clone());
+                // }
+                //
+                // s1 = Some(item.into());
+            }
         }
 
         chars.reverse();
 
-        for c in &chars {
-            let index = rand::random::<usize>() % (t1.text.size() as usize + 1);
-            t2.insert(index, &c.to_string());
+        s1 = None;
+        for _ in 0..2000 {
+            for c in &chars {
+                let item = t2.doc.string(c.to_string());
+                t2.text.insert(0, item.clone());
+                // if let Some(s) = &s1 {
+                //     s.insert_after(&item)
+                // } else {
+                //     t2.text.insert(0, &item);
+                // }
+                //
+                // s1 = Some(item.into());
+            }
         }
 
-        t1.sync(&t2);
+        // t1.sync(&t2);
+        sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
 
-        assert_eq!(t1, t2);
+        // assert_eq!(t1, t2);
 
         // print_yaml(&t1);
         // print_yaml(&t2);

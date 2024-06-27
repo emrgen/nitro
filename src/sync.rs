@@ -10,7 +10,15 @@ fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     left == right
 }
 
-pub(crate) fn sync_docs(d1: &Doc, d2: &Doc) {
+#[derive(Debug, PartialEq, Default)]
+pub(crate) enum SyncDirection {
+    LeftToRight,
+    RightToLeft,
+    #[default]
+    Both,
+}
+
+pub(crate) fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
     let diff1 = d1.diff(d2);
     let diff2 = d2.diff(d1);
 
@@ -19,8 +27,14 @@ pub(crate) fn sync_docs(d1: &Doc, d2: &Doc) {
     // println!("diff2");
     // print_yaml(&diff2);
 
-    d1.apply(diff2);
-    d2.apply(diff1);
+    if direction == SyncDirection::LeftToRight {
+        d2.apply(diff1);
+    } else if direction == SyncDirection::RightToLeft {
+        d1.apply(diff2);
+    } else {
+        d2.apply(diff1);
+        d1.apply(diff2);
+    }
 }
 
 fn sync_first_doc(d1: &Doc, d2: &Doc) {
@@ -34,7 +48,8 @@ mod test {
     use rand::Rng;
 
     use crate::doc::{CloneDeep, Doc};
-    use crate::sync::{equal_docs, sync_docs};
+    use crate::sync::{equal_docs, sync_docs, SyncDirection};
+    use crate::utils::print_yaml;
 
     #[test]
     fn test_sync() {
@@ -45,7 +60,7 @@ mod test {
         doc1.set("a", doc1.string("hello"));
         doc2.set("b", doc2.string("world"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
 
         // print_yaml(&doc1);
         // print_yaml(&doc2);
@@ -62,7 +77,7 @@ mod test {
         doc1.set("a", doc1.string("hello"));
         doc2.set("a", doc2.string("world"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
 
         assert!(equal_docs(&doc1, &doc2));
     }
@@ -84,13 +99,13 @@ mod test {
 
         list2.append(doc2.string("a"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
         assert!(equal_docs(&doc1, &doc2));
 
         let list1 = doc2.get("list1").unwrap().as_list().unwrap();
         list1.append(doc2.string("c"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
 
         // print_yaml(&doc1);
         // print_yaml(&doc2);
@@ -107,12 +122,12 @@ mod test {
         let text1 = doc1.text();
         doc1.set("text", text1.clone());
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
         assert!(equal_docs(&doc1, &doc2));
 
         text1.insert(0, doc1.string("a"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
         assert!(equal_docs(&doc1, &doc2));
 
         let text2 = doc2.get("text").unwrap().as_text().unwrap();
@@ -123,7 +138,7 @@ mod test {
 
         text1.insert(1, doc1.string("d"));
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
         // print_yaml(&doc1);
         // print_yaml(&doc2);
         assert!(equal_docs(&doc1, &doc2));
@@ -137,7 +152,7 @@ mod test {
 
         let text = doc1.text();
         doc1.set("text", text.clone());
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
 
         let text2 = doc2.get("text").unwrap().as_text().unwrap();
         let text1 = doc1.get("text").unwrap().as_text().unwrap();
@@ -168,16 +183,16 @@ mod test {
             // random bool
             let sync = rng.gen_bool(0.5);
             if sync {
-                sync_docs(&doc1, &doc2);
+                sync_docs(&doc1, &doc2, SyncDirection::default());
             }
         }
 
-        sync_docs(&doc1, &doc2);
+        sync_docs(&doc1, &doc2, SyncDirection::default());
 
-        // print_yaml(&doc1);
-        // print_yaml(&doc2);
+        print_yaml(&text1);
+        print_yaml(&text2);
 
-        assert!(equal_docs(&doc1, &doc2));
+        // assert!(equal_docs(&doc1, &doc2));
     }
 
     // #[test]

@@ -33,6 +33,10 @@ impl ItemRef {
     pub(crate) fn set_content(&self, content: Content) {
         self.borrow_mut().content = content;
     }
+
+    pub(crate) fn size(&self) -> u32 {
+        self.item.borrow().size()
+    }
 }
 
 impl ItemRef {
@@ -148,6 +152,108 @@ impl ItemRef {
         }
 
         Ok(())
+    }
+}
+
+impl Linked for ItemRef {
+    #[inline]
+    fn left(&self) -> Option<ItemRef> {
+        self.borrow().left.as_ref().map(|l| l.clone().item_ref())
+    }
+
+    #[inline]
+    fn right(&self) -> Option<ItemRef> {
+        self.borrow().right.as_ref().map(|r| r.clone().item_ref())
+    }
+
+    #[inline]
+    fn is_visible(&self) -> bool {
+        !self.borrow().is_deleted() || self.borrow().is_moved()
+    }
+}
+
+pub(crate) trait StartEnd
+where
+    Self: Sized,
+{
+    fn start(&self) -> Option<Self>;
+    fn end(&self) -> Option<Self>;
+}
+
+pub(crate) trait Linked: StartEnd
+where
+    Self: Sized,
+{
+    fn left(&self) -> Option<Self>;
+    fn right(&self) -> Option<Self>;
+
+    fn is_visible(&self) -> bool;
+}
+
+impl StartEnd for ItemRef {
+    #[inline]
+    fn start(&self) -> Option<Self> {
+        self.borrow().start.as_ref().map(|s| s.clone().item_ref())
+    }
+
+    #[inline]
+    fn end(&self) -> Option<Self> {
+        self.borrow().end.as_ref().map(|e| e.clone().item_ref())
+    }
+}
+
+pub(crate) trait ItemIterator: Linked + StartEnd
+where
+    Self: Sized,
+{
+    #[inline]
+    fn item_iter(&self) -> ItemIter<Self> {
+        ItemIter { item: self.start() }
+    }
+
+    #[inline]
+    fn visible_item_iter(&self) -> VisibleItemIter<Self> {
+        VisibleItemIter { item: self.start() }
+    }
+}
+
+impl<T: Linked + StartEnd> ItemIterator for T {}
+
+pub(crate) struct ItemIter<T: Linked> {
+    pub(crate) item: Option<T>,
+}
+
+pub(crate) struct VisibleItemIter<T: Linked> {
+    pub(crate) item: Option<T>,
+}
+
+impl<T: Clone + StartEnd + Linked> Iterator for ItemIter<T> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.item.clone();
+        self.item = item.as_ref().and_then(|i| i.right());
+
+        item
+    }
+}
+
+impl<T: Clone + StartEnd + Linked> Iterator for VisibleItemIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut item = self.item.clone();
+        while let Some(i) = item {
+            if i.is_visible() {
+                self.item = i.right();
+                return Some(i);
+            }
+
+            item = i.right();
+        }
+
+        None
     }
 }
 
@@ -268,6 +374,14 @@ impl Item {
         //     .collect();
         //
         field.map(|s| s.to_string())
+    }
+
+    pub(crate) fn size(&self) -> u32 {
+        match &self.data.content {
+            Content::String(s) => s.len() as u32,
+            Content::Mark(m) => m.size(),
+            _ => 1,
+        }
     }
 
     pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {

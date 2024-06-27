@@ -6,7 +6,7 @@ use crate::crdt::integrate;
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
-use crate::item::ItemData;
+use crate::item::{ItemData, StartEnd};
 use crate::store::{
     ClientStore, DocStore, ItemDataStore, ItemStore, PendingStore, ReadyStore, WeakStoreRef,
 };
@@ -36,9 +36,24 @@ impl Transaction {
     }
 
     pub(crate) fn commit(&mut self) {
+        println!("-----------------------------------------------------");
+        println!("items to integrate: {}", self.diff.items.size());
+
+        let now = std::time::Instant::now();
         self.prepare()
-            .and_then(|_| self.merge())
-            .and_then(|_| self.apply())
+            .and_then(|_| {
+                println!("Time taken to prepare: {:?}", now.elapsed());
+                let now = std::time::Instant::now();
+                self.merge()?;
+                println!("Time taken to merge: {:?}", now.elapsed());
+                Ok(())
+            })
+            .and_then(|_| {
+                let now = std::time::Instant::now();
+                self.apply()?;
+                println!("Time taken to apply: {:?}", now.elapsed());
+                Ok(())
+            })
             .unwrap_or_else(|err| {
                 log::error!("Tx commit error: {}", err);
                 self.rollback();
@@ -79,6 +94,8 @@ impl Transaction {
 
         let mut progress = false;
         let mut count = 0;
+
+        // let now = std::time::Instant::now();
         loop {
             if stage.is_empty() {
                 break;
@@ -103,6 +120,7 @@ impl Transaction {
 
                     if progress {
                         if let Some(data) = self.pending.take_first(&client_id) {
+                            // println!("count: {}", count);
                             stage.insert(client_id, data);
                         } else {
                             stage.remove(&client_id);
@@ -110,7 +128,7 @@ impl Transaction {
                     }
 
                     count += 1;
-                    if count > 1000 {
+                    if count > 1000000 {
                         println!("Item: {:?}", id);
                         panic!("Infinite loop while collecting client ready items");
                     }
@@ -122,12 +140,15 @@ impl Transaction {
                 break;
             }
 
-            if count > 1000 {
+            if count > 1000000 {
                 panic!("Infinite loop while collecting ready items");
             }
 
             progress = false;
         }
+
+        // println!("Time taken: {:?}", now.elapsed());
+
         //
         // // remaining items has unmet dependencies and are put in pending store
         for (_, data) in stage.iter() {
@@ -146,8 +167,9 @@ impl Transaction {
 
         Ok(())
     }
+
     pub(crate) fn apply(&mut self) -> Result<(), String> {
-        // println!("[items ready to integrate: {}]", self.ready.queue.len());
+        println!("[items ready to integrate: {}]", self.ready.queue.len());
 
         let fields = self.store.upgrade().unwrap().borrow().fields.clone();
 

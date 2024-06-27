@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::ops::Deref;
 
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
 use crate::mark::{Mark, MarkContent};
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
@@ -147,8 +148,21 @@ impl Serialize for NMap {
         let mut s = serializer.serialize_struct("Doc", self.borrow().serialize_size() + 1)?;
         self.serialize_with(&mut s)?;
 
-        let map = self.borrow().as_map(self.store.clone());
+        // let map = self.borrow().as_map(self.store.clone());
+        // let content = serde_json::to_value(map).unwrap_or_default();
+
+        let mut map = HashMap::new();
+        self.item_iter().for_each(|item| {
+            let field = item.field().unwrap_or_default();
+            if (item.is_visible()) {
+                let value = serde_json::to_value(item).unwrap_or_default();
+                map.insert(field, value);
+            } else {
+                map.remove(&field);
+            }
+        });
         let content = serde_json::to_value(map).unwrap_or_default();
+
         s.serialize_field("content", &content)?;
 
         s.end()

@@ -8,7 +8,7 @@ use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
-use crate::item::{Content, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemKey, ItemKind, ItemRef, Linked, StartEnd};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -151,28 +151,12 @@ impl Type {
         self.item_ref().borrow().data.parent_id
     }
 
-    pub(crate) fn left(&self) -> Option<Type> {
-        self.item_ref().borrow().left.clone()
-    }
-
-    pub(crate) fn right(&self) -> Option<Type> {
-        self.item_ref().borrow().right.clone()
-    }
-
     pub(crate) fn left_id(&self) -> Option<Id> {
         self.item_ref().borrow().data.left_id
     }
 
     pub(crate) fn right_id(&self) -> Option<Id> {
         self.item_ref().borrow().data.right_id
-    }
-
-    pub(crate) fn start(&self) -> Option<Type> {
-        self.item_ref().borrow().start.clone()
-    }
-
-    pub(crate) fn end(&self) -> Option<Type> {
-        self.item_ref().borrow().end.clone()
     }
 
     pub(crate) fn start_id(&self) -> Id {
@@ -232,7 +216,9 @@ impl Type {
         self.item_ref().borrow_mut().end.clone_from(&end.into());
     }
 
-    pub(crate) fn insert_after(&self, item: Type) {
+    pub(crate) fn insert_after(&self, item: impl Into<Type>) {
+        let item = item.into();
+
         let parent = self.parent();
         let next = self.right();
 
@@ -302,13 +288,13 @@ impl Type {
     }
 }
 
-impl Type {}
-
 impl Type {
+    #[inline]
     pub fn kind(&self) -> ItemKind {
         self.item_ref().kind()
     }
 
+    #[inline]
     pub fn field(&self) -> Option<String> {
         self.item_ref().field()
     }
@@ -334,6 +320,7 @@ impl Type {
         let item = DeleteItem::new(id, self.range());
     }
 
+    #[inline]
     pub fn size(&self) -> u32 {
         match self {
             Type::List(n) => n.size(),
@@ -437,6 +424,35 @@ impl Type {
             Type::Doc(n) => n.to_json(),
             Type::Identity => panic!("to_json: not implemented for identity"),
         }
+    }
+}
+
+impl Linked for Type {
+    #[inline]
+    fn left(&self) -> Option<Type> {
+        self.item_ref().borrow().left.clone()
+    }
+
+    #[inline]
+    fn right(&self) -> Option<Type> {
+        self.item_ref().borrow().right.clone()
+    }
+
+    #[inline]
+    fn is_visible(&self) -> bool {
+        !self.is_deleted() || !self.is_moved()
+    }
+}
+
+impl StartEnd for Type {
+    #[inline]
+    fn start(&self) -> Option<Type> {
+        self.item_ref().borrow().start.clone()
+    }
+
+    #[inline]
+    fn end(&self) -> Option<Type> {
+        self.item_ref().borrow().end.clone()
     }
 }
 
@@ -588,6 +604,12 @@ impl From<Type> for ItemRef {
             Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
+    }
+}
+
+impl<T: Into<Type> + Clone> From<&T> for Type {
+    fn from(value: &T) -> Self {
+        value.clone().into()
     }
 }
 

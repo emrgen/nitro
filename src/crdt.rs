@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::id::{Id, WithId};
-use crate::item::{ItemData, ItemRef};
+use crate::item::{ItemData, ItemRef, Linked, StartEnd};
 use crate::store::{ClientStore, WeakStoreRef};
 use crate::types::Type;
 
@@ -55,8 +55,30 @@ where
 
     let item_id = item.id();
 
-    while conflict.is_some() && conflict != right {
+    let mut counter = 0;
+    while conflict.is_some() && right != conflict {
+        println!(
+            "current conflict: {}",
+            &conflict.as_ref().map(|c| c.id()).unwrap()
+        );
+        if right.is_some() {
+            println!("right: {}", &right.as_ref().map(|c| c.id()).unwrap());
+        }
+
+        counter += 1;
         let curr_conflict = conflict.clone().unwrap();
+
+        if counter > 100000 {
+            println!(
+                "infinite loop: conflict: {}, right: {}",
+                conflict.clone().unwrap().id(),
+                right.clone().unwrap().id()
+            );
+
+            println!("right: {:?}", &curr_conflict.right_id());
+
+            return Err("infinite loop".to_string());
+        }
 
         items_before_origin.insert(conflict.clone().unwrap().id());
         conflict_items.insert(conflict.clone().unwrap().id());

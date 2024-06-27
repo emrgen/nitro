@@ -433,6 +433,12 @@ pub struct ClientStore<T: ClientStoreEntry> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    pub(crate) fn size(&self) -> u32 {
+        self.iter().map(|(_, store)| store.size() as u32).sum()
+    }
+}
+
+impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn contains(&self, id: &Id) -> bool {
         self.items
             .get(&id.client)
@@ -518,9 +524,7 @@ impl<T: ClientStoreEntry> Encode for ClientStore<T> {
     }
 }
 
-impl<T: WithId + Clone + Default + Encode + Decode + Eq + PartialEq + Serialize> Decode
-    for ClientStore<T>
-{
+impl<T: ClientStoreEntry> Decode for ClientStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientStore<T>, String> {
         let len = d.u32()? as usize;
         let mut items = BTreeMap::new();

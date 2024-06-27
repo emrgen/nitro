@@ -4,7 +4,7 @@ use std::ops::Deref;
 use serde::ser::{Serialize, SerializeStruct};
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -117,11 +117,11 @@ impl Serialize for NList {
         let mut s = serializer.serialize_struct("List", self.borrow().serialize_size() + 1)?;
         self.serialize_with(&mut s)?;
 
-        let items = self.borrow().as_list();
-        let content = items
-            .iter()
+        let content = self
+            .visible_item_iter()
             .map(|item| serde_json::to_value(item).unwrap_or_default())
-            .collect();
+            .collect::<Vec<_>>();
+
         s.serialize_field("content", &serde_json::Value::Array(content))?;
 
         s.end()

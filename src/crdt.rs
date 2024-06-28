@@ -57,14 +57,6 @@ where
 
     let mut counter = 0;
     while conflict.is_some() && right != conflict {
-        println!(
-            "current conflict: {}",
-            &conflict.as_ref().map(|c| c.id()).unwrap()
-        );
-        if right.is_some() {
-            println!("right: {}", &right.as_ref().map(|c| c.id()).unwrap());
-        }
-
         counter += 1;
         let curr_conflict = conflict.clone().unwrap();
 

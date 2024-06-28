@@ -347,16 +347,18 @@ impl Type {
         }
     }
 
-    pub fn append(&self, item: Type) {
+    pub fn append(&self, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.append(item),
+            Type::List(n) => n.append(item.into()),
+            Type::Text(n) => n.append(item.into()),
             _ => panic!("append: not implemented"),
         }
     }
 
-    pub fn prepend(&self, item: Type) {
+    pub fn prepend(&self, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.prepend(item),
+            Type::List(n) => n.prepend(item.into()),
+            Type::Text(n) => n.prepend(item.into()),
             _ => panic!("prepend: not implemented"),
         }
     }

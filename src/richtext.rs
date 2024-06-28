@@ -85,8 +85,7 @@ impl CloneDeep for RichText {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_rich_text() {
+    fn create_text_pairs() -> (RichText, RichText) {
         let mut t1 = RichText::new();
         let mut t2 = t1.clone_deep();
 
@@ -96,6 +95,49 @@ mod tests {
         t1.sync(&t2);
         assert_eq!(t1, t2);
 
+        let mut chars = vec![
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ];
+
+        (t1, t2)
+    }
+
+    #[test]
+    fn test_rich_text_sync_at_start() {
+        let (mut t1, mut t2) = create_text_pairs();
+
+        // 26 letters
+        let mut chars = vec![
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ];
+
+        let mut s1: Option<Type> = None;
+        for _ in 0..10 {
+            for c in &chars {
+                let item = t1.doc.string(c.to_string());
+                t1.text.prepend(item);
+            }
+        }
+
+        chars.reverse();
+
+        s1 = None;
+        for _ in 0..10 {
+            for c in &chars {
+                let item = t2.doc.string(c.to_string());
+                t2.text.prepend(item);
+            }
+        }
+
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_rich_text_sync_at_end() {
+        let (mut t1, mut t2) = create_text_pairs();
         // 26 letters
         let mut chars = vec![
             "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
@@ -104,43 +146,88 @@ mod tests {
         let mut size = 2;
 
         let mut s1: Option<Type> = None;
-        for _ in 0..2000 {
+        for _ in 0..10 {
             for c in &chars {
                 let item = t1.doc.string(c.to_string());
-                t1.text.insert(0, item.clone());
-                // if let Some(s) = &s1 {
-                //     s.insert_after(&item)
-                // } else {
-                //     t1.text.insert(0, item.clone());
-                // }
-                //
-                // s1 = Some(item.into());
+                t1.text.append(item);
             }
         }
 
         chars.reverse();
 
         s1 = None;
-        for _ in 0..2000 {
+        for _ in 0..10 {
             for c in &chars {
                 let item = t2.doc.string(c.to_string());
-                t2.text.insert(0, item.clone());
-                // if let Some(s) = &s1 {
-                //     s.insert_after(&item)
-                // } else {
-                //     t2.text.insert(0, &item);
-                // }
-                //
-                // s1 = Some(item.into());
+                t2.text.append(item);
             }
         }
 
-        // t1.sync(&t2);
-        sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
+    }
 
-        // assert_eq!(t1, t2);
+    #[test]
+    fn test_rich_text_sync_at_start_end() {
+        let (mut t1, mut t2) = create_text_pairs();
+        // 26 letters
+        let mut chars = vec![
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t", "u", "v", "w", "x", "y", "z",
+        ];
+        let mut size = 2;
 
-        // print_yaml(&t1);
-        // print_yaml(&t2);
+        let mut s1: Option<Type> = None;
+        for _ in 0..10 {
+            for c in &chars {
+                let item = t1.doc.string(c.to_string());
+                t1.text.append(item);
+            }
+        }
+
+        chars.reverse();
+
+        s1 = None;
+        for _ in 0..10 {
+            for c in &chars {
+                let item = t2.doc.string(c.to_string());
+                t2.text.prepend(item);
+            }
+        }
+
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_rich_text_sync_at_end_start() {
+        let (mut t1, mut t2) = create_text_pairs();
+        // 26 letters
+        let mut chars = vec![
+            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
+            "r", "s", "t",
+        ];
+        let mut size = 2;
+
+        let mut s1: Option<Type> = None;
+        for _ in 0..5000 {
+            for c in &chars {
+                let item = t1.doc.string(c.to_string());
+                t1.text.prepend(item);
+            }
+        }
+
+        chars.reverse();
+
+        s1 = None;
+        for _ in 0..5000 {
+            for c in &chars {
+                let item = t2.doc.string(c.to_string());
+                t2.text.append(item);
+            }
+        }
+
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
     }
 }

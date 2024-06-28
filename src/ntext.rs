@@ -10,7 +10,7 @@ use crate::store::WeakStoreRef;
 use crate::types::Type;
 
 #[derive(Clone, Debug)]
-pub(crate) struct NText {
+pub struct NText {
     pub(crate) item: ItemRef,
 }
 

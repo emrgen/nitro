@@ -21,7 +21,7 @@ use crate::ntext::NText;
 use crate::store::WeakStoreRef;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) enum Type {
+pub enum Type {
     List(NList),
     Map(NMap),
     Text(NText),
@@ -182,55 +182,138 @@ impl Type {
 
     #[inline]
     pub(crate) fn set_parent(&self, parent: impl Into<Option<Type>>) {
-        self.item_ref()
-            .borrow_mut()
-            .parent
-            .clone_from(&parent.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().parent.clone_from(&parent.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self
+                .item_ref()
+                .borrow_mut()
+                .parent
+                .clone_from(&parent.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_parent_id(&self, parent_id: impl Into<Option<Id>>) {
-        self.item_ref()
-            .borrow_mut()
-            .parent_id
-            .clone_from(&parent_id.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().parent_id.clone_from(&parent_id.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self
+                .item_ref()
+                .borrow_mut()
+                .parent_id
+                .clone_from(&parent_id.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_left(&self, left: impl Into<Option<Type>>) {
-        self.item_ref().borrow_mut().left.clone_from(&left.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().left.clone_from(&left.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self.item_ref().borrow_mut().left.clone_from(&left.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_left_id(&self, left_id: impl Into<Option<Id>>) {
-        self.item_ref()
-            .borrow_mut()
-            .left_id
-            .clone_from(&left_id.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().left_id.clone_from(&left_id.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self
+                .item_ref()
+                .borrow_mut()
+                .left_id
+                .clone_from(&left_id.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_right(&self, right: impl Into<Option<Type>>) {
-        self.item_ref().borrow_mut().right.clone_from(&right.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().right.clone_from(&right.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self.item_ref().borrow_mut().right.clone_from(&right.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_right_id(&self, right_id: impl Into<Option<Id>>) {
-        self.item_ref()
-            .borrow_mut()
-            .data
-            .right_id
-            .clone_from(&right_id.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.set_left(left),
+            // Type::String(n) => n.item.borrow_mut().right_id.clone_from(&right_id.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self
+                .item_ref()
+                .borrow_mut()
+                .right_id
+                .clone_from(&right_id.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_start(&self, start: impl Into<Option<Type>>) {
-        self.item_ref().borrow_mut().start.clone_from(&start.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.item.borrow_mut().start.clone_from(&start.into()),
+            // Type::String(n) => n.item.borrow_mut().start.clone_from(&start.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self.item_ref().borrow_mut().start.clone_from(&start.into()),
+        }
     }
 
     #[inline]
     pub(crate) fn set_end(&self, end: impl Into<Option<Type>>) {
-        self.item_ref().borrow_mut().end.clone_from(&end.into());
+        match self {
+            // Type::List(n) => n.set_left(left),
+            // Type::Map(n) => n.set_left(left),
+            // Type::Text(n) => n.item.borrow_mut().end.clone_from(&end.into()),
+            // Type::String(n) => n.item.borrow_mut().end.clone_from(&end.into()),
+            // Type::Atom(n) => n.set_left(left),
+            // Type::Proxy(n) => n.set_left(left),
+            // Type::Move(n) => n.set_left(left),
+            // Type::Mark(n) => n.set_left(left),
+            _ => self.item_ref().borrow_mut().end.clone_from(&end.into()),
+        }
     }
 
     pub(crate) fn insert_after(&self, item: impl Into<Type>) {

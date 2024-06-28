@@ -21,7 +21,7 @@ impl NProxy {
             ..ItemData::default()
         };
 
-        let target = store.upgrade().unwrap().borrow().find(target_id);
+        let target = store.upgrade().unwrap().borrow().find(&target_id);
 
         Self {
             item: ItemRef::new(data.into(), store),

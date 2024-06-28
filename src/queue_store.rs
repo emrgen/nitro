@@ -35,8 +35,14 @@ impl<T: QueryStoreEntry> ClientQueueStore<T> {
             .map_or(0, |store| store.vec.len())
     }
 
+    pub(crate) fn reverse(&mut self) {
+        for (_, store) in self.items.iter_mut() {
+            store.vec.reverse();
+        }
+    }
+
     pub(crate) fn take_first(&mut self, client_id: &ClientId) -> Option<T> {
-        self.get_store(client_id).pop_front().cloned()
+        self.get_store(client_id).pop()
     }
 
     pub(crate) fn insert(&mut self, entry: T) {
@@ -122,6 +128,10 @@ impl<T: QueryStoreEntry> QueueStore<T> {
         } else {
             None
         }
+    }
+
+    pub(crate) fn pop(&mut self) -> Option<T> {
+        self.vec.pop()
     }
 
     pub(crate) fn reset(&mut self) {

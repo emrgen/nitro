@@ -1,6 +1,14 @@
 // allow warnings for now
 #![allow(warnings)]
 
+pub use crate::doc::*;
+pub use crate::id::*;
+pub use crate::nstring::*;
+pub use crate::ntext::*;
+pub use crate::richtext::*;
+pub use crate::sync::*;
+pub use crate::types::*;
+
 mod bimapid;
 pub mod codec_v1;
 mod crdt;
@@ -11,6 +19,7 @@ mod doc;
 pub mod encoder;
 mod hash;
 mod id;
+mod id_store;
 mod item;
 mod mark;
 mod natom;

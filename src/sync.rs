@@ -11,14 +11,14 @@ fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
 }
 
 #[derive(Debug, PartialEq, Default)]
-pub(crate) enum SyncDirection {
+pub enum SyncDirection {
     LeftToRight,
     RightToLeft,
     #[default]
     Both,
 }
 
-pub(crate) fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
+pub fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
     let diff1 = d1.diff(d2);
     let diff2 = d2.diff(d1);
 
@@ -37,7 +37,7 @@ pub(crate) fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
     }
 }
 
-fn sync_first_doc(d1: &Doc, d2: &Doc) {
+pub fn sync_first_doc(d1: &Doc, d2: &Doc) {
     let diff1 = d2.diff(d1);
     d1.apply(diff1);
 }

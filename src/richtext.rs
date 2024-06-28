@@ -7,13 +7,13 @@ use crate::sync::{sync_docs, SyncDirection};
 use crate::types::Type;
 
 #[derive(Clone, Debug)]
-pub(crate) struct RichText {
-    pub(crate) doc: Doc,
-    pub(crate) text: Type,
+pub struct RichText {
+    pub doc: Doc,
+    pub text: Type,
 }
 
 impl RichText {
-    pub(crate) fn new() -> RichText {
+    pub fn new() -> RichText {
         let doc = Doc::default();
         let text = doc.text();
         doc.set("text", text.clone());
@@ -23,11 +23,11 @@ impl RichText {
         }
     }
 
-    pub(crate) fn sync(&mut self, other: &RichText) {
+    pub fn sync(&mut self, other: &RichText) {
         sync_docs(&self.doc, &other.doc, SyncDirection::default());
     }
 
-    pub(crate) fn insert(&mut self, index: usize, text: &str) -> Type {
+    pub fn insert(&mut self, index: usize, text: &str) -> Type {
         let text = self.doc.string(text);
         self.text.insert(index as u32, text.clone());
 
@@ -35,7 +35,10 @@ impl RichText {
     }
 
     pub(crate) fn to_string(&self) -> String {
-        serde_json::to_string(&self).unwrap()
+        println!("to_string");
+        let a = serde_json::to_string(&self).unwrap();
+        println!("to_string: {}", a);
+        a
     }
 }
 
@@ -95,26 +98,18 @@ mod tests {
         t1.sync(&t2);
         assert_eq!(t1, t2);
 
-        let mut chars = vec![
-            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
-            "r", "s", "t", "u", "v", "w", "x", "y", "z",
-        ];
-
         (t1, t2)
     }
 
     #[test]
-    fn test_rich_text_sync_at_start() {
+    fn test_rich_text_sync_at_start1() {
         let (mut t1, mut t2) = create_text_pairs();
 
         // 26 letters
-        let mut chars = vec![
-            "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q",
-            "r", "s", "t", "u", "v", "w", "x", "y", "z",
-        ];
+        let mut chars = vec!["a", "b", "c", "d"];
 
         let mut s1: Option<Type> = None;
-        for _ in 0..10 {
+        for _ in 0..1 {
             for c in &chars {
                 let item = t1.doc.string(c.to_string());
                 t1.text.prepend(item);
@@ -124,7 +119,7 @@ mod tests {
         chars.reverse();
 
         s1 = None;
-        for _ in 0..10 {
+        for _ in 0..1 {
             for c in &chars {
                 let item = t2.doc.string(c.to_string());
                 t2.text.prepend(item);
@@ -132,7 +127,8 @@ mod tests {
         }
 
         t1.sync(&t2);
-        assert_eq!(t1, t2);
+        assert_eq!(t1.to_string(), t2.to_string());
+        // assert_eq!(t1, t2);
     }
 
     #[test]

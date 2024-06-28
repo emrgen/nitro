@@ -39,7 +39,7 @@ impl Default for DocOpts {
 }
 
 #[derive(Debug, Clone, Eq)]
-pub(crate) struct Doc {
+pub struct Doc {
     pub(crate) opts: DocOpts,
     pub(crate) root: NMap,
     pub(crate) store: StoreRef,
@@ -119,7 +119,7 @@ impl Doc {
         tx.commit();
     }
 
-    pub fn find_by_id(&self, id: Id) -> Option<Type> {
+    pub fn find_by_id(&self, id: &Id) -> Option<Type> {
         self.store.borrow().find(id)
     }
 
@@ -277,7 +277,7 @@ impl Encode for Doc {
     }
 }
 
-pub(crate) trait CloneDeep {
+pub trait CloneDeep {
     fn clone_deep(&self) -> Self;
 }
 

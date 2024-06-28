@@ -24,7 +24,7 @@ where
     // let item: Type = ItemRef::new(data.into(), store.clone()).into();
     // print_yaml(&item);
 
-    let left_conflict = {
+    let left_conflict = || {
         let next = item.right();
         let next_id = next.map(|n| n.id());
         let right_id = right.as_ref().map(|r| r.id());
@@ -32,7 +32,7 @@ where
         !Id::eq_opt(&next_id, &right_id)
     };
 
-    let right_conflict = {
+    let right_conflict = || {
         let prev = item.left();
         let prev_id = prev.map(|p| p.id());
         let left_id = left.as_ref().map(|l| l.id());
@@ -41,7 +41,7 @@ where
     };
 
     let mut conflict: Option<Type> = None;
-    if left.is_none() && right.is_none() || left_conflict || right_conflict {
+    if left.is_none() && right.is_none() || left_conflict() || right_conflict() {
         if let Some(left) = &left {
             conflict.clone_from(&left.right());
         } else {

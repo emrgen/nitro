@@ -12,7 +12,7 @@ use crate::store::WeakStoreRef;
 use crate::types::Type;
 
 #[derive(Clone, Debug)]
-pub(crate) struct NString {
+pub struct NString {
     pub(crate) item: ItemRef,
 }
 
@@ -190,7 +190,7 @@ mod test {
         string.add_mark(Mark::Bold);
         string.split(5).unwrap();
 
-        let ls = doc.find_by_id(Id::new(1, 2)).unwrap();
+        let ls = doc.find_by_id(&Id::new(1, 2)).unwrap();
         // println!("{}", serde_json::to_string(&ls).unwrap());
         let (l, r) = ls.split(2);
         r.add_mark(Mark::Code);

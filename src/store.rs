@@ -14,6 +14,7 @@ use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Clock, Id, IdRange, Split, WithId};
+use crate::id_store::ClientIdStore;
 use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
 use crate::types::Type;
@@ -77,8 +78,8 @@ impl DocStore {
     }
 
     #[inline]
-    pub(crate) fn find(&self, id: Id) -> Option<Type> {
-        let key = self.id_map.find(&id);
+    pub(crate) fn find(&self, id: &Id) -> Option<Type> {
+        let key = self.id_map.find(id);
         self.items.find(&key)
     }
 
@@ -138,16 +139,19 @@ pub(crate) struct ReadyStore {
     pub(crate) id_range_map: IdRangeMap,
     pub(crate) queue: Vec<ItemData>,
     pub(crate) items: ItemDataStore,
+    pub(crate) items_exists: ClientIdStore,
     pub(crate) delete_items: DeleteItemStore,
 }
 
 impl ReadyStore {
     pub(crate) fn insert(&mut self, item: ItemData) {
+        self.items_exists.insert(item.id());
         self.queue.push(item.clone());
         self.items.insert(item);
     }
 
     pub(crate) fn contains(&self, id: &Id) -> bool {
+        // self.items_exists.contains(id)
         self.find_item(id).is_some()
     }
 

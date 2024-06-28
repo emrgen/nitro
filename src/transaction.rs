@@ -9,6 +9,7 @@ use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
 use crate::item::{ItemData, ItemRef, StartEnd};
+use crate::queue_store::ClientQueueStore;
 use crate::store::{
     ClientStore, DocStore, ItemDataStore, ItemStore, PendingStore, ReadyStore, WeakStoreRef,
 };
@@ -19,6 +20,7 @@ pub(crate) struct Transaction {
     store: WeakStoreRef,
     ready: ReadyStore,
     pending: PendingStore,
+    pending_queue: ClientQueueStore<ItemData>,
 
     diff: Diff,
     ops: Vec<TxOp>,
@@ -37,6 +39,7 @@ impl Transaction {
             ready: ReadyStore::default(),
             pending: PendingStore::default(),
             ops: Vec::default(),
+            pending_queue: ClientQueueStore::default(),
             elapsed: Duration::default(),
         }
     }
@@ -73,6 +76,7 @@ impl Transaction {
         for (_, store) in self.diff.items.iter() {
             for (_, data) in store.iter() {
                 self.pending.insert(data.clone());
+                // self.pending_queue.insert(data.clone());
             }
         }
 
@@ -84,35 +88,30 @@ impl Transaction {
 
         // if all item dependencies are satisfied put the item in ready store
         let mut stage: BTreeMap<ClientId, ItemData> = BTreeMap::new();
-        for (client, store) in self.pending.iter_items() {
-            // take the first item from pending store
-            if store.is_empty() {
-                continue;
-            }
-
-            let (_, data) = store.iter().next().unwrap();
-            stage.insert(*client, data.clone());
-        }
-
-        for (_, data) in &stage {
-            self.pending.remove(&data.id);
-        }
 
         let mut progress = false;
         let mut count = 0;
 
+        // self.pending_queue.reverse();
+
+        let clients = self.pending.items.keys().cloned().collect::<Vec<_>>();
+        for client in &clients {
+            if let Some(data) = self.pending.take_first(&client) {
+                stage.insert(*client, data.clone());
+            }
+        }
+
+        let mut orphans: Vec<ItemData> = Vec::new();
         // let now = std::time::Instant::now();
         loop {
             if stage.is_empty() {
                 break;
             }
 
-            let clients = stage.keys().cloned().collect::<Vec<_>>();
-
-            for client_id in clients {
+            for client_id in &clients {
                 if let Some(item) = stage.get(&client_id) {
                     let id = item.id;
-                    let clone = item.clone();
+                    // let clone = item.clone();
 
                     if self.is_integrated(item, &store) {
                         progress = true;
@@ -120,16 +119,16 @@ impl Transaction {
                         progress = true;
                         self.ready.insert(item.clone());
                     } else if self.is_orphan(item) {
-                        self.pending.insert(item.clone());
+                        orphans.push(item.clone());
                         progress = true;
                     }
 
                     if progress {
                         if let Some(data) = self.pending.take_first(&client_id) {
                             // println!("count: {}", count);
-                            stage.insert(client_id, data);
+                            stage.insert(*client_id, data);
                         } else {
-                            stage.remove(&client_id);
+                            stage.remove(client_id);
                         }
                     }
 
@@ -158,7 +157,13 @@ impl Transaction {
         //
         // // remaining items has unmet dependencies and are put in pending store
         for (_, data) in stage.iter() {
+            // self.pending.insert(data.clone());
             self.pending.insert(data.clone());
+        }
+
+        for orphan in orphans {
+            // self.pending.insert(orphan.clone());
+            self.pending.insert(orphan.clone());
         }
 
         // now that all ready items are collected, collected the ready delete items
@@ -193,11 +198,11 @@ impl Transaction {
         while let Some(data) = self.ready.queue.pop() {
             let parent = {
                 if let Some(parent_id) = &data.parent_id {
-                    store.find(*parent_id)
+                    store.find(parent_id)
                 } else if let Some(left_id) = &data.left_id {
-                    store.find(*left_id).and_then(|item| item.parent())
+                    store.find(left_id).and_then(|item| item.parent())
                 } else if let Some(right_id) = &data.right_id {
-                    store.find(*right_id).and_then(|item| item.parent())
+                    store.find(right_id).and_then(|item| item.parent())
                 } else {
                     None
                 }
@@ -205,8 +210,10 @@ impl Transaction {
 
             let now = std::time::Instant::now();
             if let Some(parent) = parent {
-                let mut left = data.left_id.map(|id| store.find(id)).flatten();
-                let right = data.right_id.map(|id| store.find(id)).flatten();
+                let mut left = data.left_id.as_ref().map(|id| store.find(id)).flatten();
+                let right = data.right_id.as_ref().map(|id| store.find(id)).flatten();
+
+                println!("integrating: {:?}", data.id);
 
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 
@@ -259,6 +266,11 @@ impl Transaction {
             store.fields.extend(&self.diff.fields);
             store.state.clients.extend(&self.diff.state.clients);
             store.pending.extend(&self.pending);
+            // self.pending_queue.items.iter().for_each(|(client, queue)| {
+            //     for item in queue.iter() {
+            //         store.pending.insert(item.clone());
+            //     }
+            // });
         }
         Ok(())
     }
@@ -281,12 +293,14 @@ impl Transaction {
         }
 
         if let Some(left_id) = data.left_id {
+            // println!("left");
             if !(self.ready.contains(&left_id) || store.contains(&left_id)) {
                 return false;
             }
         }
 
         if let Some(right_id) = data.right_id {
+            // println!("right");
             if !(self.ready.contains(&right_id) || store.contains(&right_id)) {
                 return false;
             }

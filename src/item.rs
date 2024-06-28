@@ -24,7 +24,7 @@ use crate::types::Type;
 type ItemRefInner = Rc<RefCell<Item>>;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ItemRef {
+pub struct ItemRef {
     pub(crate) store: WeakStoreRef,
     pub(crate) item: ItemRefInner,
 }
@@ -158,12 +158,12 @@ impl ItemRef {
 impl Linked for ItemRef {
     #[inline]
     fn left(&self) -> Option<ItemRef> {
-        self.borrow().left.as_ref().map(|l| l.clone().item_ref())
+        self.borrow().left.as_ref().map(|l| l.item_ref().clone())
     }
 
     #[inline]
     fn right(&self) -> Option<ItemRef> {
-        self.borrow().right.as_ref().map(|r| r.clone().item_ref())
+        self.borrow().right.as_ref().map(|r| r.item_ref().clone())
     }
 
     #[inline]
@@ -193,12 +193,12 @@ where
 impl StartEnd for ItemRef {
     #[inline]
     fn start(&self) -> Option<Self> {
-        self.borrow().start.as_ref().map(|s| s.item_ref())
+        self.borrow().start.as_ref().map(|s| s.item_ref().clone())
     }
 
     #[inline]
     fn end(&self) -> Option<Self> {
-        self.borrow().end.as_ref().map(|e| e.item_ref())
+        self.borrow().end.as_ref().map(|e| e.item_ref().clone())
     }
 }
 
@@ -318,7 +318,7 @@ impl Ord for ItemRef {
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Item {
+pub struct Item {
     pub(crate) data: ItemData,       // data for the item
     pub(crate) parent: Option<Type>, // parent link
     pub(crate) left: Option<Type>,   // left link
@@ -388,19 +388,19 @@ impl Item {
     pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {
         self.data
             .parent_id
-            .and_then(|id| store.upgrade()?.borrow().find(id))
+            .and_then(|id| store.upgrade()?.borrow().find(&id))
     }
 
     pub(crate) fn left_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .left_id
-            .and_then(|id| store.upgrade()?.borrow().find(id))
+            .and_then(|id| store.upgrade()?.borrow().find(&id))
     }
 
     pub(crate) fn right_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .right_id
-            .and_then(|id| store.upgrade()?.borrow().find(id))
+            .and_then(|id| store.upgrade()?.borrow().find(&id))
     }
 
     #[inline]

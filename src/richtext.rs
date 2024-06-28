@@ -17,6 +17,9 @@ impl RichText {
         let doc = Doc::default();
         let text = doc.text();
         doc.set("text", text.clone());
+
+        println!("doc client: {}", doc.opts.crated_by);
+
         RichText {
             doc,
             text: text.into(),
@@ -35,10 +38,7 @@ impl RichText {
     }
 
     pub(crate) fn to_string(&self) -> String {
-        println!("to_string");
-        let a = serde_json::to_string(&self).unwrap();
-        println!("to_string: {}", a);
-        a
+        serde_json::to_string(&self).unwrap()
     }
 }
 
@@ -95,8 +95,14 @@ mod tests {
         t1.insert(0, "w");
         t2.insert(0, "h");
 
+        // print_yaml(&t1.doc.state());
+        // print_yaml(&t2.doc.state());
+
         t1.sync(&t2);
         assert_eq!(t1, t2);
+
+        // print_yaml(&t1.doc);
+        // print_yaml(&t2.doc);
 
         (t1, t2)
     }
@@ -105,8 +111,12 @@ mod tests {
     fn test_rich_text_sync_at_start1() {
         let (mut t1, mut t2) = create_text_pairs();
 
+        // print_yaml(&t1.doc.state());
+        // print_yaml(&t2.doc.state());
+
         // 26 letters
-        let mut chars = vec!["a", "b", "c", "d"];
+        let mut chars = vec!["a", "b", "c"];
+        let mut nums = vec!["1"];
 
         let mut s1: Option<Type> = None;
         for _ in 0..1 {
@@ -116,11 +126,9 @@ mod tests {
             }
         }
 
-        chars.reverse();
-
         s1 = None;
         for _ in 0..1 {
-            for c in &chars {
+            for c in &nums {
                 let item = t2.doc.string(c.to_string());
                 t2.text.prepend(item);
             }
@@ -128,7 +136,7 @@ mod tests {
 
         t1.sync(&t2);
         assert_eq!(t1.to_string(), t2.to_string());
-        // assert_eq!(t1, t2);
+        assert_eq!(t1, t2);
     }
 
     #[test]

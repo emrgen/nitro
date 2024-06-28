@@ -517,6 +517,12 @@ impl Type {
         }
     }
 
+    pub(crate) fn eq_opt(a: &Option<Type>, b: &Option<Type>) -> bool {
+        let a = a.as_ref().map(|a| a.id());
+        let b = b.as_ref().map(|b| b.id());
+        Id::eq_opt(&a, &b)
+    }
+
     #[inline]
     pub(crate) fn split(&self, offset: u32) -> (Type, Type) {
         match self {

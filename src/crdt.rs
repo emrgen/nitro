@@ -56,8 +56,10 @@ where
 
         let item_id = item.id();
 
+        // println!("right: {:?}", right.as_ref().map(|r| r.id()));
+        // println!("conflict: {:?}", conflict.as_ref().map(|r| r.id()));
         // resolve conflicts
-        while conflict.is_some() && right != conflict {
+        while conflict.is_some() && !Type::eq_opt(&conflict, &right) {
             // println!(
             //     "current conflict: {}",
             //     &conflict.as_ref().map(|c| c.id()).unwrap()
@@ -93,10 +95,12 @@ where
             // println!("conflict: {:?}", curr_conflict.id());
 
             if Id::eq_opt(&conflict_left_id, &item_left_id) {
-                if curr_conflict.id().compare(&item_id, client_map) == Ordering::Greater {
+                if item_id.compare(&curr_conflict.id(), client_map) == Ordering::Greater {
+                    // println!("->item id is greater than item conflict id");
                     left.clone_from(&conflict);
                     conflict_items.clear();
                 } else if Id::eq_opt(&curr_conflict.right_id(), &item.right_id()) {
+                    // println!("->item right id is equal to item conflict right id");
                     break;
                 }
             } else if conflict_left_id.is_some()
@@ -115,7 +119,7 @@ where
 
         if let Some(left) = &left {
             integrate_after(left, item);
-            // println!("integrated after left");
+            // println!("integrated after left, {}", left.id());
         } else {
             // println!("parent start: {:?}", parent.id());
             integrate_start(item, parent, start, set_start);

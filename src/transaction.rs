@@ -76,7 +76,6 @@ impl Transaction {
         for (_, store) in self.diff.items.iter() {
             for (_, data) in store.iter() {
                 self.pending.insert(data.clone());
-                // self.pending_queue.insert(data.clone());
             }
         }
 
@@ -213,7 +212,7 @@ impl Transaction {
                 let mut left = data.left_id.as_ref().map(|id| store.find(id)).flatten();
                 let right = data.right_id.as_ref().map(|id| store.find(id)).flatten();
 
-                println!("integrating: {:?}", data.id);
+                // println!("\nintegrating: {:?}", data.id);
 
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 

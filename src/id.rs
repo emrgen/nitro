@@ -61,7 +61,9 @@ impl Id {
 
             let client = clients.get_client(&self.client).unwrap();
             let other_client = clients.get_client(&other.client).unwrap();
-            return calculate_hash(client).cmp(&calculate_hash(other_client));
+            let left = calculate_hash(&format!("{}{}", client, self.clock));
+            let right = calculate_hash(&format!("{}{}", other_client, other.clock));
+            return left.cmp(&right);
         }
 
         self.compare_without_client(other)

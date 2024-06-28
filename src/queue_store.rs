@@ -6,14 +6,23 @@ use serde::Serialize;
 use crate::bimapid::ClientId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::WithId;
+use crate::id::{Id, WithId};
+use crate::item::ItemData;
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
-pub(crate) struct ClientQueryStore<T: QueryStoreEntry> {
+pub(crate) struct ClientQueueStore<T: QueryStoreEntry> {
     pub(crate) items: BTreeMap<ClientId, QueueStore<T>>,
 }
 
-impl<T: QueryStoreEntry> ClientQueryStore<T> {
+impl ClientQueueStore<ItemData> {
+    pub(crate) fn iter_items(
+        &self,
+    ) -> std::collections::btree_map::Iter<ClientId, QueueStore<ItemData>> {
+        self.items.iter()
+    }
+}
+
+impl<T: QueryStoreEntry> ClientQueueStore<T> {
     pub(crate) fn new() -> Self {
         Self {
             items: BTreeMap::new(),
@@ -26,25 +35,25 @@ impl<T: QueryStoreEntry> ClientQueryStore<T> {
             .map_or(0, |store| store.vec.len())
     }
 
-    pub(crate) fn take_first(&mut self, client_id: ClientId) -> Option<T> {
+    pub(crate) fn take_first(&mut self, client_id: &ClientId) -> Option<T> {
         self.get_store(client_id).pop_front().cloned()
     }
 
     pub(crate) fn insert(&mut self, entry: T) {
-        let client_id = entry.id().client;
+        let client_id = &entry.id().client;
         self.get_store(client_id).append(entry);
     }
 
-    pub(crate) fn pop(&mut self, client_id: ClientId) -> Option<&T> {
+    pub(crate) fn pop(&mut self, client_id: &ClientId) -> Option<&T> {
         self.get_store(client_id).pop_front()
     }
 
-    fn get_store(&mut self, client_id: ClientId) -> &mut QueueStore<T> {
-        self.items.entry(client_id).or_insert_with(QueueStore::new)
+    fn get_store(&mut self, client_id: &ClientId) -> &mut QueueStore<T> {
+        self.items.entry(*client_id).or_insert_with(QueueStore::new)
     }
 
-    pub(crate) fn remove(&mut self, client_id: ClientId) {
-        self.items.remove(&client_id);
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.items.remove(&id.client);
     }
 
     pub(crate) fn clear(&mut self) {
@@ -52,7 +61,7 @@ impl<T: QueryStoreEntry> ClientQueryStore<T> {
     }
 }
 
-impl<T: QueryStoreEntry> Encode for ClientQueryStore<T> {
+impl<T: QueryStoreEntry> Encode for ClientQueueStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
         e.u32(self.items.len() as u32);
         for (client_id, store) in &self.items {
@@ -62,7 +71,7 @@ impl<T: QueryStoreEntry> Encode for ClientQueryStore<T> {
     }
 }
 
-impl<T: QueryStoreEntry> Decode for ClientQueryStore<T> {
+impl<T: QueryStoreEntry> Decode for ClientQueueStore<T> {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Self, String> {
         let mut items = BTreeMap::new();
         let len = d.u32()? as usize;
@@ -85,6 +94,12 @@ impl<T: Debug + Default + Encode + Decode + Serialize + Clone + WithId> QuerySto
 pub(crate) struct QueueStore<T: QueryStoreEntry> {
     vec: Vec<T>,
     pub(crate) pos: usize,
+}
+
+impl<T: QueryStoreEntry> QueueStore<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
 }
 
 impl<T: QueryStoreEntry> QueueStore<T> {

@@ -32,20 +32,23 @@ impl Id {
 }
 
 impl Id {
+    #[inline]
     pub(crate) fn new(client: ClientId, clock: Clock) -> Id {
         Id { client, clock }
     }
 
+    #[inline]
     pub(crate) fn eq_opt(a: &Option<Id>, b: &Option<Id>) -> bool {
         match (a, b) {
             (Some(a), Some(b)) => {
-                a.client == b.client && a.compare_without_client(&b) == std::cmp::Ordering::Equal
+                a.client == b.client && a.compare_without_client(&b) == Ordering::Equal
             }
             (None, None) => true,
             _ => false,
         }
     }
 
+    #[inline]
     pub(crate) fn compare_without_client(&self, other: &Id) -> Ordering {
         self.clock.cmp(&other.clock)
     }
@@ -89,6 +92,7 @@ impl Display for Id {
 }
 
 impl WithId for Id {
+    #[inline]
     fn id(&self) -> Id {
         *self
     }
@@ -279,6 +283,7 @@ impl Decode for IdRange {
 }
 
 impl WithId for IdRange {
+    #[inline]
     fn id(&self) -> Id {
         self.clone().into()
     }

@@ -74,6 +74,7 @@ impl NMove {
 }
 
 impl WithId for NMove {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

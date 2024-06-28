@@ -109,6 +109,7 @@ impl NProxy {
 }
 
 impl WithId for NProxy {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

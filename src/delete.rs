@@ -60,6 +60,7 @@ impl Decode for DeleteItem {
 }
 
 impl WithId for DeleteItem {
+    #[inline]
     fn id(&self) -> Id {
         self.id
     }

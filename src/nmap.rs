@@ -170,6 +170,7 @@ impl Serialize for NMap {
 }
 
 impl WithId for NMap {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

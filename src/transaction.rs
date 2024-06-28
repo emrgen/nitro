@@ -211,9 +211,9 @@ impl Transaction {
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 
                 let count = integrate(
-                    item.clone(),
+                    &item,
                     &client_map,
-                    parent.clone(),
+                    &parent,
                     parent.start(),
                     &mut left,
                     right,

@@ -440,6 +440,10 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn size(&self) -> u32 {
         self.iter().map(|(_, store)| store.size() as u32).sum()
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.items.is_empty() || self.items.iter().all(|(_, store)| store.is_empty())
+    }
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
@@ -595,6 +599,10 @@ impl<T: IdStoreEntry> IdStore<T> {
         let item = item.clone();
         self.map.remove(&item.id());
         Some(item)
+    }
+
+    pub(crate) fn first(&self) -> Option<&T> {
+        self.map.iter().next().map(|(_, item)| item)
     }
 }
 

@@ -8,9 +8,9 @@ use crate::types::Type;
 
 // integrate an item into the list of items
 pub(crate) fn integrate<SF, EF>(
-    item: Type,
+    item: &Type,
     client_map: &ClientMap,
-    parent: Type,
+    parent: &Type,
     start: Option<Type>,
     left: &mut Option<Type>,
     right: Option<Type>,
@@ -114,11 +114,11 @@ where
         }
 
         if let Some(left) = &left {
-            integrate_after(left, &item);
+            integrate_after(left, item);
             // println!("integrated after left");
         } else {
             // println!("parent start: {:?}", parent.id());
-            integrate_start(&item, &parent, start, set_start);
+            integrate_start(item, parent, start, set_start);
             // println!("integrated at start, {:?}", item.id());
         }
 

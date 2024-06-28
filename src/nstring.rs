@@ -145,6 +145,7 @@ impl Serialize for NString {
 }
 
 impl WithId for NString {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

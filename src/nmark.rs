@@ -90,6 +90,7 @@ impl Deref for NMark {
 }
 
 impl WithId for NMark {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

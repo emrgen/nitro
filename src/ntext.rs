@@ -146,6 +146,7 @@ impl Serialize for NText {
 }
 
 impl WithId for NText {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

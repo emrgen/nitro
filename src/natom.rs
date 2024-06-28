@@ -65,6 +65,7 @@ impl Serialize for NAtom {
 }
 
 impl WithId for NAtom {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

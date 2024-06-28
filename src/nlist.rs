@@ -129,6 +129,7 @@ impl Serialize for NList {
 }
 
 impl WithId for NList {
+    #[inline]
     fn id(&self) -> Id {
         self.item.borrow().id()
     }

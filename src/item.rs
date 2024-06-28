@@ -287,6 +287,7 @@ impl Decode for ItemRef {
 }
 
 impl WithId for ItemRef {
+    #[inline]
     fn id(&self) -> Id {
         self.borrow().data.id
     }
@@ -941,6 +942,7 @@ impl Default for ItemKind {
 }
 
 impl WithId for ItemData {
+    #[inline]
     fn id(&self) -> Id {
         self.id
     }

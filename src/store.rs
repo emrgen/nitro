@@ -501,6 +501,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn replace(&mut self, item: &T, items: (T, T)) {
         let id = item.id();
         let store = self.items.get_mut(&id.client).unwrap();
+
         store.remove(&item.id());
 
         store.insert(items.0);

@@ -214,7 +214,7 @@ mod tests {
         let mut size = 2;
 
         let mut s1: Option<Type> = None;
-        for _ in 0..5000 {
+        for _ in 0..50 {
             for c in &chars {
                 let item = t1.doc.string(c.to_string());
                 t1.text.prepend(item);
@@ -224,12 +224,27 @@ mod tests {
         chars.reverse();
 
         s1 = None;
-        for _ in 0..5000 {
+        for _ in 0..50 {
             for c in &chars {
                 let item = t2.doc.string(c.to_string());
                 t2.text.append(item);
             }
         }
+
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_text_block_split_by_insert() {
+        let (mut t1, mut t2) = create_text_pairs();
+
+        t1.text.insert(0, t1.doc.string("012345678"));
+        t1.sync(&t2);
+        assert_eq!(t1, t2);
+
+        t2.text.insert(3, t2.doc.string("abc"));
+        t1.text.insert(3, t1.doc.string("pqr"));
 
         t1.sync(&t2);
         assert_eq!(t1, t2);

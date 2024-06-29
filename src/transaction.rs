@@ -45,22 +45,22 @@ impl Transaction {
     }
 
     pub(crate) fn commit(&mut self) {
-        println!("-----------------------------------------------------");
-        println!("items to integrate: {}", self.diff.items.size());
+        // println!("-----------------------------------------------------");
+        // println!("items to integrate: {}", self.diff.items.size());
 
         let now = std::time::Instant::now();
         self.prepare()
             .and_then(|_| {
-                println!("Time taken to prepare: {:?}", now.elapsed());
+                // println!("Time taken to prepare: {:?}", now.elapsed());
                 let now = std::time::Instant::now();
                 self.merge()?;
-                println!("Time taken to merge: {:?}", now.elapsed());
+                // println!("Time taken to merge: {:?}", now.elapsed());
                 Ok(())
             })
             .and_then(|_| {
                 let now = std::time::Instant::now();
                 self.apply()?;
-                println!("Time taken to apply: {:?}", now.elapsed());
+                // println!("Time taken to apply: {:?}", now.elapsed());
                 Ok(())
             })
             .unwrap_or_else(|err| {
@@ -179,7 +179,7 @@ impl Transaction {
     }
 
     pub(crate) fn apply(&mut self) -> Result<(), String> {
-        println!("[items ready to integrate: {}]", self.ready.queue.len());
+        // println!("[items ready to integrate: {}]", self.ready.queue.len());
 
         let fields = self.store.upgrade().unwrap().borrow().fields.clone();
 
@@ -235,25 +235,26 @@ impl Transaction {
 
                 store.insert(item);
 
+                // println!("integrated with count: {}", count);
                 counters.push(count);
             }
 
             times.push(now.elapsed());
         }
 
-        println!("Time taken to integrate: {:?}", now.elapsed());
+        // println!("Time taken to integrate: {:?}", now.elapsed());
         if times.is_empty() {
             return Ok(());
         }
 
-        println!(
-            "Average time taken to integrate: {:?}",
-            times.iter().sum::<Duration>() / times.len() as u32
-        );
-        println!(
-            "Average count of items integrated: {}",
-            counters.iter().sum::<i32>() / counters.len() as i32
-        );
+        // println!(
+        //     "Average time taken to integrate: {:?}",
+        //     times.iter().sum::<Duration>() / times.len() as u32
+        // );
+        // println!(
+        //     "Average count of items integrated: {}",
+        //     counters.iter().sum::<i32>() / counters.len() as i32
+        // );
 
         Ok(())
     }

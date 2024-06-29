@@ -8,7 +8,7 @@ use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
-use crate::item::{Content, ItemKey, ItemKind, ItemRef, Linked, StartEnd};
+use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef, Linked, StartEnd};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -33,6 +33,12 @@ pub enum Type {
     Doc(Doc),
     #[default]
     Identity,
+}
+
+impl Type {
+    pub(crate) fn data(&self) -> ItemData {
+        self.item_ref().borrow().data.clone()
+    }
 }
 
 impl Type {

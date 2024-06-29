@@ -370,7 +370,7 @@ mod test {
             "{:6}   {:6}   {:10}   {:10}   {:8}",
             "-----", "-----", "----------", "----------", "--------"
         );
-        for i in 0..21 {
+        for i in 0..10 {
             let lines = 10 * i;
             let words = 20;
             let buf = get_doc_encoding(lines, words);

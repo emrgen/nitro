@@ -18,28 +18,22 @@ fn main() {
     let mut size = 2;
 
     let mut s1: Option<Type> = None;
-    for _ in 0..1 {
+    for _ in 0..500 {
         for c in &chars {
             let item = t1.doc.string(c.to_string());
-            t1.text.insert(0, item.clone());
-            // t1.text.append(item);
+            // t1.text.insert(0, item.clone());
+            t1.text.prepend(item);
         }
     }
 
     chars.reverse();
 
     s1 = None;
-    for _ in 0..1 {
+    for _ in 0..500 {
         for c in &chars {
             let item = t2.doc.string(c.to_string());
-            t2.text.insert(0, item.clone());
-            // if let Some(s) = &s1 {
-            //     s.insert_after(&item)
-            // } else {
-            //     t2.text.insert(0, &item);
-            // }
-            //
-            // s1 = Some(item.into());
+            // t2.text.insert(0, item.clone());
+            t2.text.prepend(item);
         }
     }
 

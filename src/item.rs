@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use bitflags::bitflags;
+use fractional_index::FractionalIndex;
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
@@ -39,6 +40,16 @@ impl ItemRef {
     }
 }
 
+pub(crate) trait WithIndex {
+    fn index(&self) -> FractionalIndex;
+}
+
+impl WithIndex for ItemRef {
+    fn index(&self) -> FractionalIndex {
+        self.item.borrow().index.clone().unwrap()
+    }
+}
+
 impl ItemRef {
     pub(crate) fn new(item: ItemRefInner, store: WeakStoreRef) -> Self {
         Self { item, store }
@@ -59,7 +70,7 @@ impl ItemRef {
         self.borrow_mut().add_mark(mark);
     }
 
-    pub(crate) fn append(&self, value: impl Into<Type>) {
+    pub fn append(&self, value: impl Into<Type>) {
         let end = self.borrow().end.clone();
         let item = value.into();
 
@@ -78,7 +89,7 @@ impl ItemRef {
         item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
     }
 
-    pub(crate) fn prepend(&self, value: impl Into<Type>) {
+    pub fn prepend(&self, value: impl Into<Type>) {
         let item = value.into();
         let start = self.borrow().start.clone();
         if let Some(ref start) = start {
@@ -319,16 +330,17 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub struct Item {
-    pub(crate) data: ItemData,       // data for the item
-    pub(crate) parent: Option<Type>, // parent link
-    pub(crate) left: Option<Type>,   // left link
-    pub(crate) right: Option<Type>,  // right link
-    pub(crate) start: Option<Type>,  // linked children start
-    pub(crate) end: Option<Type>,    // linked children end
-    pub(crate) target: Option<Type>, // indirect item ref (proxy, mover)
-    pub(crate) mover: Option<Type>,  // mover ref (proxy)
-    pub(crate) marks: Option<Type>,  // linked movers
-    pub(crate) movers: Option<Type>, // linked movers
+    pub(crate) data: ItemData,                 // data for the item
+    pub(crate) parent: Option<Type>,           // parent link
+    pub(crate) left: Option<Type>,             // left link
+    pub(crate) right: Option<Type>,            // right link
+    pub(crate) start: Option<Type>,            // linked children start
+    pub(crate) end: Option<Type>,              // linked children end
+    pub(crate) target: Option<Type>,           // indirect item ref (proxy, mover)
+    pub(crate) mover: Option<Type>,            // mover ref (proxy)
+    pub(crate) marks: Option<Type>,            // linked movers
+    pub(crate) movers: Option<Type>,           // linked movers
+    pub(crate) index: Option<FractionalIndex>, // runtime index for quick index lookup
     pub(crate) flags: u8,
 }
 
@@ -351,6 +363,7 @@ impl Item {
             mover: None,
             marks: None,
             movers: None,
+            index: None,
             flags: 0,
         }
     }

@@ -189,7 +189,7 @@ impl Doc {
     }
 
     #[inline]
-    pub(crate) fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
+    pub fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
         let key = key.into();
 
         self.root.set(key, item.into());
@@ -370,7 +370,7 @@ mod test {
             "{:6}   {:6}   {:10}   {:10}   {:8}",
             "-----", "-----", "----------", "----------", "--------"
         );
-        for i in 0..10 {
+        for i in 0..20 {
             let lines = 10 * i;
             let words = 20;
             let buf = get_doc_encoding(lines, words);
@@ -381,7 +381,7 @@ mod test {
                 lines * words,
                 to_unit(buf.len()),
                 to_unit(comp.len()),
-                100f32 * (buf.len() as f32 / comp.len() as f32 - 1f32)
+                100f32 * ((buf.len() as f32 - comp.len() as f32) / buf.len() as f32)
             );
         }
     }

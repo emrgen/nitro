@@ -4,14 +4,20 @@ use std::ops::Deref;
 use serde::ser::{Serialize, SerializeStruct};
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
 use crate::store::WeakStoreRef;
+use crate::tree::IndexTree;
 use crate::types::Type;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct NList {
     item: ItemRef,
     cache: Option<Vec<Type>>,
+    list: IndexTree,
+}
+
+impl NList {
+    pub(crate) fn on_insert(&self, child: &Type) {}
 }
 
 impl NList {
@@ -25,6 +31,7 @@ impl NList {
         Self {
             item: ItemRef::new(data.into(), store),
             cache: None,
+            list: IndexTree::new(),
         }
     }
 

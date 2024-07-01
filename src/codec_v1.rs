@@ -22,7 +22,7 @@ impl Default for EncoderV1 {
 }
 
 impl EncoderV1 {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::with_capacity(INIT_SIZE)
     }
 

@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 
+use fractional_index::FractionalIndex;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -8,7 +9,7 @@ use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef, Linked, StartEnd};
+use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef, Linked, StartEnd, WithIndex};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -553,6 +554,50 @@ impl Type {
             Type::Identity => panic!("to_json: not implemented for identity"),
         }
     }
+}
+
+impl WithIndex for Type {
+    fn index(&self) -> FractionalIndex {
+        self.item_ref().index()
+    }
+}
+
+impl Type {
+    pub(crate) fn on_insert(&self, child: &Type) {
+        match self {
+            Type::List(n) => {
+                self.handle_insert(child);
+                n.on_insert(child)
+            }
+            Type::Text(n) => {
+                self.handle_insert(child);
+                // n.on_insert(child)
+            }
+            _ => panic!("on_insert: not implemented for {:?}", self.kind()),
+        }
+    }
+
+    fn handle_insert(&self, child: &Type) {
+        let left = self.left();
+        let right = self.right();
+
+        let index = match (left, right) {
+            (Some(left), Some(right)) => {
+                FractionalIndex::new_between(&left.index(), &right.index()).unwrap()
+            }
+            (Some(left), None) => FractionalIndex::new_after(&left.index()),
+            (None, Some(right)) => FractionalIndex::new_before(&right.index()),
+            (None, None) => FractionalIndex::default(),
+        };
+
+        child.item_ref().borrow_mut().index = Some(index);
+    }
+
+    pub(crate) fn on_delete(&self, child: &Type) {}
+
+    pub(crate) fn on_undelete(&self, child: &Type) {}
+
+    pub(crate) fn on_move(&self, child: &Type) {}
 }
 
 impl Linked for Type {

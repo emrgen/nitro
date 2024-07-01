@@ -65,7 +65,7 @@ impl NText {
             .fold(0, |acc, item| acc + item.size())
     }
 
-    pub(crate) fn insert(&self, offset: u32, item: impl Into<Type>) {
+    pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let item = item.into();
 
         if offset == 0 {

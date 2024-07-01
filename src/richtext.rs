@@ -18,8 +18,6 @@ impl RichText {
         let text = doc.text();
         doc.set("text", text.clone());
 
-        println!("doc client: {}", doc.opts.crated_by);
-
         RichText {
             doc,
             text: text.into(),
@@ -248,5 +246,14 @@ mod tests {
 
         t1.sync(&t2);
         assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_append_n_chars() {
+        let (mut t1, mut t2) = create_text_pairs();
+
+        for i in 0..100 {
+            t1.text.append(t1.doc.string(&i.to_string()));
+        }
     }
 }

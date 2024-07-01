@@ -20,6 +20,7 @@ fake = { version = "2.9.2", features = ["derive"] }
 byte-unit = "5.1.4"
 rand = "0.8.5"
 chrono = "0.4.38"
+fractional_index = "2.0.0"
 
 [dependencies.serde_json]
 version = "1.0"

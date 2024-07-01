@@ -1,5 +1,11 @@
-// allow warnings for now
+// allow warnings for now to make it easier to work on this
 #![allow(warnings)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(unused_mut)]
+#![allow(unused_assignments)]
+#![allow(unused_must_use)]
 
 pub use crate::doc::*;
 pub use crate::id::*;
@@ -17,6 +23,7 @@ mod delete;
 mod diff;
 mod doc;
 pub mod encoder;
+mod frac_index;
 mod hash;
 mod id;
 mod id_store;
@@ -37,5 +44,6 @@ mod state;
 mod store;
 mod sync;
 mod transaction;
+mod tree;
 mod types;
 mod utils;

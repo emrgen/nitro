@@ -15,6 +15,10 @@ pub struct NText {
 }
 
 impl NText {
+    pub(crate) fn on_insert(&self, p0: &Type) {}
+}
+
+impl NText {
     pub(crate) fn slice(&self, start: u32, end: u32) -> Vec<Type> {
         let start = self.find_at_offset(start);
         let end = self.find_at_offset(end);

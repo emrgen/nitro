@@ -46,7 +46,7 @@ pub(crate) trait WithIndex {
 
 impl WithIndex for ItemRef {
     fn index(&self) -> FractionalIndex {
-        self.item.borrow().index.clone().unwrap()
+        self.item.borrow().index.clone()
     }
 }
 
@@ -330,17 +330,17 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub struct Item {
-    pub(crate) data: ItemData,                 // data for the item
-    pub(crate) parent: Option<Type>,           // parent link
-    pub(crate) left: Option<Type>,             // left link
-    pub(crate) right: Option<Type>,            // right link
-    pub(crate) start: Option<Type>,            // linked children start
-    pub(crate) end: Option<Type>,              // linked children end
-    pub(crate) target: Option<Type>,           // indirect item ref (proxy, mover)
-    pub(crate) mover: Option<Type>,            // mover ref (proxy)
-    pub(crate) marks: Option<Type>,            // linked movers
-    pub(crate) movers: Option<Type>,           // linked movers
-    pub(crate) index: Option<FractionalIndex>, // runtime index for quick index lookup
+    pub(crate) data: ItemData,         // data for the item
+    pub(crate) parent: Option<Type>,   // parent link
+    pub(crate) left: Option<Type>,     // left link
+    pub(crate) right: Option<Type>,    // right link
+    pub(crate) start: Option<Type>,    // linked children start
+    pub(crate) end: Option<Type>,      // linked children end
+    pub(crate) target: Option<Type>,   // indirect item ref (proxy, mover)
+    pub(crate) mover: Option<Type>,    // mover ref (proxy)
+    pub(crate) marks: Option<Type>,    // linked movers
+    pub(crate) movers: Option<Type>,   // linked movers
+    pub(crate) index: FractionalIndex, // runtime index for quick index lookup
     pub(crate) flags: u8,
 }
 
@@ -363,7 +363,7 @@ impl Item {
             mover: None,
             marks: None,
             movers: None,
-            index: None,
+            index: FractionalIndex::default(),
             flags: 0,
         }
     }

@@ -365,6 +365,8 @@ impl Type {
         } else if let Some(ref parent) = parent {
             parent.set_start(item.clone());
         }
+
+        parent.unwrap().on_insert(&item);
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -566,18 +568,18 @@ impl Type {
     pub(crate) fn on_insert(&self, child: &Type) {
         match self {
             Type::List(n) => {
-                self.handle_insert(child);
+                Self::add_frac_index(child);
                 n.on_insert(child)
             }
             Type::Text(n) => {
-                self.handle_insert(child);
-                // n.on_insert(child)
+                // Self::add_frac_index(child);
+                n.on_insert(child)
             }
             _ => panic!("on_insert: not implemented for {:?}", self.kind()),
         }
     }
 
-    fn handle_insert(&self, child: &Type) {
+    pub(crate) fn add_frac_index(&self) {
         let left = self.left();
         let right = self.right();
 
@@ -590,7 +592,7 @@ impl Type {
             (None, None) => FractionalIndex::default(),
         };
 
-        child.item_ref().borrow_mut().index = Some(index);
+        self.item_ref().borrow_mut().index = (index);
     }
 
     pub(crate) fn on_delete(&self, child: &Type) {}

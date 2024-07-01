@@ -49,7 +49,6 @@ mod test {
 
     use crate::doc::{CloneDeep, Doc};
     use crate::sync::{equal_docs, sync_docs, SyncDirection};
-    use crate::utils::print_yaml;
 
     #[test]
     fn test_sync() {
@@ -189,8 +188,8 @@ mod test {
 
         sync_docs(&doc1, &doc2, SyncDirection::default());
 
-        print_yaml(&text1);
-        print_yaml(&text2);
+        // print_yaml(&text1);
+        // print_yaml(&text2);
 
         // assert!(equal_docs(&doc1, &doc2));
     }

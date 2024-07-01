@@ -14,8 +14,8 @@ fn main() {
 
     let now = std::time::Instant::now();
     let doc = Doc::default();
-    let text = doc.text();
-    doc.set("text", text.clone());
+    let list = doc.list();
+    doc.set("list", list.clone());
 
     let chars = [
         "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
@@ -27,7 +27,7 @@ fn main() {
     for i in 0..6000 {
         // random index
         let index = indexes[i];
-        text.insert(index as u32, doc.string(chars[i % 26]));
+        list.insert(index as u32, doc.string(chars[i % 26]));
     }
 
     let mut encoder = EncoderV1::new();
@@ -39,4 +39,6 @@ fn main() {
     println!("Compressed size: {}", comp.len());
 
     println!("elapsed: {:?}", now.elapsed());
+
+    // print_yaml(&doc);
 }

@@ -3,6 +3,17 @@ use fractional_index::FractionalIndex;
 use crate::item::WithIndex;
 use crate::Type;
 
+pub(crate) trait ItemListContainer {
+    fn size(&self) -> usize;
+    fn at_index(&self, index: usize) -> Option<&Type>;
+    fn index_of(&self, item: &Type) -> usize;
+    fn insert(&mut self, item: Type);
+    fn remove(&mut self, item: &Type);
+    fn delete(&mut self, item: &Type);
+    fn undelete(&mut self, item: &Type);
+    fn contains(&self, item: &Type) -> bool;
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct IndexTree {
     root: Option<Box<TreeNode>>,
@@ -465,11 +476,11 @@ mod test {
         let s3: Type = doc.string("c").into();
         let s4: Type = doc.string("d").into();
 
-        s1.item_ref().borrow_mut().index = Some(FractionalIndex::default());
-        s2.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&s1.index()));
-        s3.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&s2.index()));
+        s1.item_ref().borrow_mut().index = (FractionalIndex::default());
+        s2.item_ref().borrow_mut().index = (FractionalIndex::new_after(&s1.index()));
+        s3.item_ref().borrow_mut().index = FractionalIndex::new_after(&s2.index());
         s4.item_ref().borrow_mut().index =
-            Some(FractionalIndex::new_between(&s2.index(), &s3.index()).unwrap());
+            FractionalIndex::new_between(&s2.index(), &s3.index()).unwrap();
 
         tree.insert(s1.clone());
         tree.insert(s2.clone());
@@ -508,13 +519,13 @@ mod test {
         let s4: Type = doc.string("d").into();
         let s5: Type = doc.string("e").into();
 
-        s1.item_ref().borrow_mut().index = Some(FractionalIndex::default());
-        s2.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&s1.index()));
-        s3.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&s2.index()));
+        s1.item_ref().borrow_mut().index = (FractionalIndex::default());
+        s2.item_ref().borrow_mut().index = (FractionalIndex::new_after(&s1.index()));
+        s3.item_ref().borrow_mut().index = (FractionalIndex::new_after(&s2.index()));
         s4.item_ref().borrow_mut().index =
-            Some(FractionalIndex::new_between(&s2.index(), &s3.index()).unwrap());
+            FractionalIndex::new_between(&s2.index(), &s3.index()).unwrap();
 
-        s5.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&s3.index()));
+        s5.item_ref().borrow_mut().index = (FractionalIndex::new_after(&s3.index()));
 
         tree.insert(s1.clone());
         tree.insert(s2.clone());
@@ -553,9 +564,9 @@ mod test {
         for i in 0..10 {
             let s: Type = doc.string(i.to_string()).into();
             if let Some(p) = prev {
-                s.item_ref().borrow_mut().index = Some(FractionalIndex::new_after(&p.index()));
+                s.item_ref().borrow_mut().index = (FractionalIndex::new_after(&p.index()));
             } else {
-                s.item_ref().borrow_mut().index = Some(FractionalIndex::default());
+                s.item_ref().borrow_mut().index = (FractionalIndex::default());
             }
 
             nodes.push(s.clone());

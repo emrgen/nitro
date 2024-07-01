@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::default::Default;
 use std::ops::Deref;
+use std::rc::Rc;
 
 use serde::ser::{Serialize, SerializeStruct};
 
@@ -10,14 +12,16 @@ use crate::tree::IndexTree;
 use crate::types::Type;
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct NList {
+pub struct NList {
     item: ItemRef,
     cache: Option<Vec<Type>>,
-    list: IndexTree,
+    list: Rc<RefCell<IndexTree>>,
 }
 
 impl NList {
-    pub(crate) fn on_insert(&self, child: &Type) {}
+    pub(crate) fn on_insert(&self, child: &Type) {
+        self.list.borrow_mut().insert(child.clone());
+    }
 }
 
 impl NList {
@@ -31,12 +35,12 @@ impl NList {
         Self {
             item: ItemRef::new(data.into(), store),
             cache: None,
-            list: IndexTree::new(),
+            list: Rc::new(RefCell::new(IndexTree::new())),
         }
     }
 
     pub(crate) fn size(&self) -> u32 {
-        self.borrow().as_list().len() as u32
+        self.list.borrow().size() as u32
     }
 
     pub(crate) fn field(&self) -> Option<String> {
@@ -62,24 +66,34 @@ impl Deref for NList {
 }
 
 impl NList {
-    fn prepend(&self, item: Type) {
-        self.item.append(item)
+    fn prepend(&self, item: impl Into<Type>) {
+        let item = item.into();
+        self.item.append(item.clone());
+        Type::add_frac_index(&item);
+        self.on_insert(&item);
     }
 
     fn append(&self, item: impl Into<Type>) {
-        self.item.append(item.into())
+        let item = item.into();
+        self.item.append(item.clone());
+        Type::add_frac_index(&item);
+        self.on_insert(&item);
     }
 
-    pub(crate) fn insert(&self, offset: u32, item: impl Into<Type>) {
-        let items = self.borrow().as_list();
+    pub fn insert(&self, offset: u32, item: impl Into<Type>) {
+        let size = self.list.borrow().size();
         if offset == 0 {
             self.prepend(item.into());
-        } else if offset >= items.len() as u32 {
+        } else if offset >= size as u32 {
             self.append(item.into());
         } else {
-            let next = items[offset as usize].clone();
-
-            next.insert_before(item.into());
+            let list = self.list.borrow();
+            let next = list.at_index(offset);
+            if let Some(next) = next {
+                next.insert_before(item.into());
+            } else {
+                self.append(item.into());
+            }
         }
     }
 

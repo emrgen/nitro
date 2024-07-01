@@ -14,6 +14,7 @@ pub use crate::ntext::*;
 pub use crate::richtext::*;
 pub use crate::sync::*;
 pub use crate::types::*;
+pub use crate::utils::*;
 
 mod bimapid;
 pub mod codec_v1;

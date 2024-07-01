@@ -26,6 +26,7 @@ mod doc;
 pub mod encoder;
 mod frac_index;
 mod hash;
+mod ibtree;
 mod id;
 mod id_store;
 mod item;

@@ -4,9 +4,9 @@ use crate::item::WithIndex;
 use crate::Type;
 
 pub(crate) trait ItemListContainer {
-    fn size(&self) -> usize;
-    fn at_index(&self, index: usize) -> Option<&Type>;
-    fn index_of(&self, item: &Type) -> usize;
+    fn size(&self) -> u32;
+    fn at_index(&self, index: u32) -> Option<&Type>;
+    fn index_of(&self, item: &Type) -> u32;
     fn insert(&mut self, item: Type);
     fn remove(&mut self, item: &Type);
     fn delete(&mut self, item: &Type);

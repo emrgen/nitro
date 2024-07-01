@@ -5,9 +5,10 @@ use std::rc::Rc;
 
 use serde::ser::{Serialize, SerializeStruct};
 
+use crate::ibtree::IBTree;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
-use crate::rbtree::IndexTree;
+use crate::rbtree::ItemListContainer;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
@@ -15,7 +16,7 @@ use crate::types::Type;
 pub struct NList {
     item: ItemRef,
     cache: Option<Vec<Type>>,
-    list: Rc<RefCell<IndexTree>>,
+    list: Rc<RefCell<IBTree>>,
 }
 
 impl NList {
@@ -35,7 +36,7 @@ impl NList {
         Self {
             item: ItemRef::new(data.into(), store),
             cache: None,
-            list: Rc::new(RefCell::new(IndexTree::new())),
+            list: Rc::new(RefCell::new(IBTree::new())),
         }
     }
 
@@ -68,7 +69,7 @@ impl Deref for NList {
 impl NList {
     fn prepend(&self, item: impl Into<Type>) {
         let item = item.into();
-        self.item.append(item.clone());
+        self.item.prepend(item.clone());
         Type::add_frac_index(&item);
         self.on_insert(&item);
     }

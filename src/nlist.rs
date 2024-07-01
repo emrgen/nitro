@@ -7,8 +7,8 @@ use serde::ser::{Serialize, SerializeStruct};
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
+use crate::rbtree::IndexTree;
 use crate::store::WeakStoreRef;
-use crate::tree::IndexTree;
 use crate::types::Type;
 
 #[derive(Clone, Debug, Default)]

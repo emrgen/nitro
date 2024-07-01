@@ -464,7 +464,7 @@ mod test {
 
     use crate::{Doc, Type};
     use crate::item::WithIndex;
-    use crate::tree::IndexTree;
+    use crate::rbtree::IndexTree;
 
     #[test]
     fn test_insert_node() {

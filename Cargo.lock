@@ -411,6 +411,7 @@ dependencies = [
  "log",
  "miniz_oxide",
  "rand",
+ "rand_chacha",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -124,9 +124,8 @@ impl Doc {
     }
 
     pub fn update_client(&self) -> String {
-        let mut store = self.store.borrow_mut();
         let client_id = Uuid::new_v4().to_string();
-        store.update_client(&client_id, 1);
+        self.store.borrow_mut().update_client(&client_id, 1);
 
         client_id
     }
@@ -184,7 +183,7 @@ impl Doc {
     }
 
     #[inline]
-    pub(crate) fn get(&self, key: impl Into<String>) -> Option<Type> {
+    pub fn get(&self, key: impl Into<String>) -> Option<Type> {
         self.root.get(key.into())
     }
 

@@ -36,7 +36,7 @@ impl NList {
         Self {
             item: ItemRef::new(data.into(), store),
             cache: None,
-            list: Rc::new(RefCell::new(IBTree::new())),
+            list: Rc::new(RefCell::new(Default::default())),
         }
     }
 

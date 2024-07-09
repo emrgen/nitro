@@ -24,13 +24,33 @@ use crate::transaction::Transaction;
 use crate::types::Type;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct DocOpts {
-    pub(crate) id: DocId,
-    pub(crate) crated_by: Client,
+pub struct DocOpts {
+    pub id: DocId,
+    pub crated_by: Client,
 }
 
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct DocId(Uuid);
+
+impl DocId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        Uuid::parse_str(s)
+            .map(|uuid| Self(uuid))
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn as_bytes(&self) -> [u8; 16] {
+        self.0.as_bytes().to_owned().try_into().unwrap()
+    }
+}
 
 impl Encode for DocId {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {

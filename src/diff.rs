@@ -15,13 +15,13 @@ use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub(crate) struct Diff {
-    pub(crate) created_by: Client,
-    pub(crate) doc_id: DocId,
-    pub(crate) fields: FieldMap,
-    pub(crate) state: ClientState,
-    pub(crate) items: ItemDataStore,
-    pub(crate) deletes: DeleteItemStore,
+pub struct Diff {
+    pub created_by: Client,
+    pub doc_id: DocId,
+    pub fields: FieldMap,
+    pub state: ClientState,
+    pub items: ItemDataStore,
+    pub deletes: DeleteItemStore,
 }
 
 impl Diff {

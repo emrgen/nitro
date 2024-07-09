@@ -29,12 +29,17 @@ pub struct DocOpts {
     pub crated_by: Client,
 }
 
-#[derive(Default, Clone, Debug, Eq, PartialEq)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DocId(Uuid);
 
 impl DocId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+
+    pub fn from_bytes(bytes: &[u8; 16]) -> Self {
+        let uuid = Uuid::from_slice(bytes).unwrap();
+        Self(uuid)
     }
 
     pub fn from_str(s: &str) -> Result<Self, String> {

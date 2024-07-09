@@ -305,7 +305,7 @@ impl Add<PendingStore> for PendingStore {
     }
 }
 
-pub(crate) type ItemDataStore = ClientStore<ItemData>;
+pub type ItemDataStore = ClientStore<ItemData>;
 
 impl From<ItemStore> for ItemDataStore {
     fn from(value: ItemStore) -> Self {
@@ -320,8 +320,8 @@ impl From<ItemStore> for ItemDataStore {
     }
 }
 
-pub(crate) type DeleteItemStore = ClientStore<DeleteItem>;
-pub(crate) type ItemStore = ClientStore<Type>;
+pub type DeleteItemStore = ClientStore<DeleteItem>;
+pub type ItemStore = ClientStore<Type>;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IdRangeMap {

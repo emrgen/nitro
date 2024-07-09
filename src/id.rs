@@ -24,12 +24,6 @@ pub enum Client {
 
 impl Default for Client {
     fn default() -> Self {
-        Client::new()
-    }
-}
-
-impl Client {
-    pub(crate) fn new() -> Client {
         #[cfg(feature = "uuid-client")]
         return Client::UUID(Uuid::new_v4());
         #[cfg(feature = "string-client")]
@@ -37,15 +31,17 @@ impl Client {
         #[cfg(feature = "u64-client")]
         return Client::U64(0);
     }
+}
 
-    pub(crate) fn from_uuid(uuid: Uuid) -> Client {
+impl Client {
+    pub fn from_uuid(uuid: Uuid) -> Client {
         #[cfg(feature = "uuid-client")]
         return Client::UUID(uuid);
         #[cfg(not(feature = "uuid-client"))]
         panic!("UUID client is not enabled");
     }
 
-    pub(crate) fn from_string(string: String) -> Client {
+    pub fn from_string(string: String) -> Client {
         #[cfg(feature = "string-client")]
         return Client::String(string);
         #[cfg(not(feature = "string-client"))]
@@ -57,6 +53,29 @@ impl Client {
         return Client::U64(u64);
         #[cfg(not(feature = "u64-client"))]
         panic!("U64 client is not enabled");
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Client {
+        #[cfg(feature = "uuid-client")]
+        if bytes.len() == 16 {
+            let mut array = [0; 16];
+            array.copy_from_slice(bytes);
+            return Client::UUID(Uuid::from_bytes(array));
+        }
+
+        #[cfg(feature = "string-client")]
+        if let Ok(string) = String::from_utf8(bytes.to_vec()) {
+            return Client::String(string);
+        }
+
+        #[cfg(feature = "u64-client")]
+        if bytes.len() == 8 {
+            let mut array = [0; 8];
+            array.copy_from_slice(bytes);
+            return Client::U64(u64::from_be_bytes(array));
+        }
+
+        panic!("Invalid bytes for Client");
     }
 
     pub(crate) fn as_uuid(&self) -> Uuid {
@@ -81,6 +100,17 @@ impl Client {
             return *u64;
         }
         panic!("Client is not a U64");
+    }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        match self {
+            #[cfg(feature = "uuid-client")]
+            Client::UUID(uuid) => uuid.as_bytes().to_vec(),
+            #[cfg(feature = "string-client")]
+            Client::String(string) => string.as_bytes().to_vec(),
+            #[cfg(feature = "u64-client")]
+            Client::U64(u64) => u64.to_be_bytes().to_vec(),
+        }
     }
 }
 
@@ -533,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_client() {
-        let client = Client::new();
+        let client = Client::default();
         println!("{}", client);
     }
 }

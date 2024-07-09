@@ -337,7 +337,7 @@ pub(crate) type Field = String;
 pub(crate) type FieldId = u32;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub(crate) struct FieldMap {
+pub struct FieldMap {
     map: EncoderMap<String>,
 }
 

@@ -4,6 +4,7 @@ use fractional_index::FractionalIndex;
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
@@ -710,8 +711,8 @@ impl From<NMap> for Type {
     fn from(n: NMap) -> Self {
         if let Content::Doc(d) = n.content() {
             Type::Doc(Doc::new(DocOpts {
-                guid: d.guid,
-                crated_by: d.created_by,
+                id: d.id,
+                crated_by: Client::from(d.created_by),
             }))
         } else {
             Self::Map(n)

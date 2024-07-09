@@ -13,8 +13,10 @@ use serde::ser::SerializeStruct;
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
+use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, Split, WithId};
 use crate::mark::MarkContent;
@@ -1019,7 +1021,7 @@ impl Content {
             Self::String(s) => Value::String(s.clone()),
             Self::Types(t) => Value::Array(t.iter().map(|t| t.to_json()).collect()),
             Self::Embed(a) => a.to_json(),
-            Self::Doc(d) => Value::String(d.guid.clone()),
+            Self::Doc(d) => Value::String(serde_json::to_string(&d.id).unwrap()),
             Self::Null => Value::Null,
         }
     }
@@ -1034,7 +1036,7 @@ impl Serialize for Content {
             Self::Binary(b) => serializer.serialize_str(&serde_json::to_string(b).unwrap()),
             Self::String(s) => serializer.serialize_str(s),
             // Self::Embed(a) => a.serialize(serializer),
-            Self::Doc(d) => serializer.serialize_str(&d.guid),
+            Self::Doc(d) => serializer.serialize_str(&serde_json::to_string(&d.id).unwrap()),
             Self::Null => serializer.serialize_none(),
             _ => serializer.serialize_none(),
         }
@@ -1161,17 +1163,17 @@ impl From<Any> for Content {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocProps {
-    pub(crate) guid: String,
+    pub(crate) id: DocId,
     // user id of the creator
-    pub(crate) created_by: String,
+    pub(crate) created_by: Client,
     // custom create time props fot the document
     pub(crate) props: Any,
 }
 
 impl DocProps {
-    pub(crate) fn new(guid: String, created_by: String) -> Self {
+    pub(crate) fn new(guid: DocId, created_by: Client) -> Self {
         Self {
-            guid,
+            id: guid,
             created_by,
             props: Any::Null,
         }
@@ -1180,8 +1182,8 @@ impl DocProps {
 
 impl Encode for DocProps {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
-        e.string(&self.guid);
-        e.string(&self.created_by);
+        self.id.encode(e, ctx);
+        self.created_by.encode(e, ctx);
         self.props.encode(e, ctx);
     }
 }
@@ -1191,12 +1193,12 @@ impl Decode for DocProps {
     where
         Self: Sized,
     {
-        let guid = d.string()?;
-        let created_by = d.string()?;
+        let doc_id = DocId::decode(d, ctx)?;
+        let created_by = Client::decode(d, ctx)?;
         let props = Any::decode(d, ctx)?;
 
         Ok(Self {
-            guid,
+            id: doc_id,
             created_by,
             props,
         })

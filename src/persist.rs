@@ -3,8 +3,10 @@ use std::default::Default;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::FieldMap;
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
+use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::item::Content;
 use crate::state::ClientState;
@@ -19,8 +21,8 @@ pub(crate) type WeakStoreDataRef = Weak<RefCell<DocStoreData>>;
 // This is the data structure that will be serialized to disk
 #[derive(Debug, Clone, Default)]
 pub(crate) struct DocStoreData {
-    pub(crate) doc_id: String,
-    pub(crate) created_by: String,
+    pub(crate) doc_id: DocId,
+    pub(crate) created_by: Client,
 
     pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
@@ -40,7 +42,6 @@ impl DocStoreData {
     }
 
     pub(crate) fn diff(&self, state: &ClientState) -> Diff {
-        let guid = self.doc_id.clone();
         let state = state.as_per(&self.state);
 
         let items = self.items.diff(state.clone(), &self.id_map);
@@ -55,7 +56,14 @@ impl DocStoreData {
             }
         }
 
-        Diff::from(guid, self.fields.clone(), state.clone(), items, deletes)
+        Diff::from(
+            self.doc_id.clone(),
+            self.created_by.clone(),
+            self.fields.clone(),
+            state.clone(),
+            items,
+            deletes,
+        )
     }
 }
 
@@ -86,8 +94,8 @@ impl From<DocStore> for DocStoreData {
 
 impl Encode for DocStoreData {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
-        e.string(&self.doc_id);
-        e.string(&self.created_by);
+        self.doc_id.encode(e, ctx);
+        self.created_by.encode(e, ctx);
         self.fields.encode(e, ctx);
         self.state.encode(e, ctx);
         self.items.encode(e, ctx);
@@ -101,8 +109,8 @@ impl Decode for DocStoreData {
     where
         Self: Sized,
     {
-        let doc_id = d.string()?;
-        let created_by = d.string()?;
+        let doc_id = DocId::decode(d, ctx)?;
+        let created_by = Client::decode(d, ctx)?;
         let fields = FieldMap::decode(d, ctx)?;
         let state = ClientState::decode(d, ctx)?;
         let items = ItemDataStore::decode(d, ctx)?;

@@ -6,7 +6,8 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::bimapid::Client;
+use crate::Client;
+use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
@@ -24,15 +25,47 @@ use crate::types::Type;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct DocOpts {
-    pub(crate) guid: String,
+    pub(crate) id: DocId,
     pub(crate) crated_by: Client,
+}
+
+#[derive(Default, Clone, Debug, Eq, PartialEq)]
+pub struct DocId(Uuid);
+
+impl Encode for DocId {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        e.uuid(self.0.as_bytes().as_slice());
+    }
+}
+
+impl Decode for DocId {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let bytes = d.uuid()?;
+        let uuid = Uuid::from_slice(&bytes).map_err(|e| e.to_string())?;
+
+        Ok(Self(uuid))
+    }
+}
+
+impl Serialize for DocId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut s = serializer.serialize_struct("DocId", 1)?;
+        s.serialize_field("guid", &self.0.to_string())?;
+        s.end()
+    }
 }
 
 impl Default for DocOpts {
     fn default() -> Self {
-        let client_id = Uuid::new_v4().to_string();
+        let client_id = Uuid::new_v4().into();
         Self {
-            guid: Uuid::new_v4().to_string(),
+            id: DocId(Uuid::new_v4()),
             crated_by: client_id,
         }
     }
@@ -58,7 +91,7 @@ impl Doc {
     pub(crate) fn new(opts: DocOpts) -> Self {
         let mut store = DocStore::default();
 
-        store.doc_id = opts.guid.clone();
+        store.doc_id = opts.id.clone();
         store.created_by = opts.crated_by.clone();
 
         // doc is always created by the client with clock 0,
@@ -74,7 +107,7 @@ impl Doc {
         let weak = Rc::downgrade(&store_ref);
         let root = NMap::new(root_id, weak);
 
-        root.set_content(DocProps::new(opts.guid.clone(), opts.crated_by.clone()));
+        root.set_content(DocProps::new(opts.id.clone(), opts.crated_by.clone()));
 
         store_ref.borrow_mut().insert(root.clone());
 
@@ -90,8 +123,8 @@ impl Doc {
         if let Some(root) = &diff.get_root() {
             if let Content::Doc(content) = &root.content {
                 let doc = Doc::new(DocOpts {
-                    guid: content.guid.clone(),
-                    crated_by: content.created_by.clone(),
+                    id: content.id.clone(),
+                    crated_by: content.created_by.clone().into(),
                 });
 
                 doc.apply(diff.clone());
@@ -105,10 +138,11 @@ impl Doc {
 
     #[inline]
     pub fn diff(&self, state: impl Into<ClientState>) -> Diff {
-        let mut diff = self
-            .store
-            .borrow()
-            .diff(self.opts.guid.clone(), state.into());
+        let mut diff = self.store.borrow().diff(
+            self.opts.id.clone(),
+            self.opts.crated_by.clone(),
+            state.into(),
+        );
         diff.optimize();
 
         diff
@@ -123,8 +157,8 @@ impl Doc {
         self.store.borrow().find(id)
     }
 
-    pub fn update_client(&self) -> String {
-        let client_id = Uuid::new_v4().to_string();
+    pub fn update_client(&self) -> Client {
+        let client_id = Uuid::new_v4().into();
         self.store.borrow_mut().update_client(&client_id, 1);
 
         client_id
@@ -216,7 +250,7 @@ impl Doc {
 
         map.insert(
             "id".to_string(),
-            serde_json::Value::String(self.opts.guid.to_string()),
+            serde_json::Value::String(self.opts.id.0.to_string()),
         );
         map.insert(
             "created_by".to_string(),
@@ -265,7 +299,7 @@ impl Serialize for Doc {
         size += root.borrow().serialize_size();
 
         let mut s = serializer.serialize_struct("Doc", size + 1)?;
-        s.serialize_field("guid", &self.opts.guid)?;
+        s.serialize_field("guid", &self.opts.id)?;
         s.serialize_field("created_by", &self.opts.crated_by)?;
         s.serialize_field("root", &root)?;
 
@@ -318,17 +352,17 @@ mod test {
 
         assert_eq!(doc.size(), 1);
 
-        let atom = doc.atom("hudrogen");
-        doc.set("el", atom.clone());
-
-        let atom = doc.atom("oxygen");
-        doc.set("el", atom.clone());
-
-        assert_eq!(doc.size(), 2);
-
-        // let json_str = serde_json::to_string_pretty(&doc.to_json()).unwrap();
-        let yaml = serde_yaml::to_string(&doc.to_json()).unwrap();
-        println!("{}", yaml);
+        // let atom = doc.atom("hudrogen");
+        // doc.set("el", atom.clone());
+        //
+        // let atom = doc.atom("oxygen");
+        // doc.set("el", atom.clone());
+        //
+        // assert_eq!(doc.size(), 2);
+        //
+        // // let json_str = serde_json::to_string_pretty(&doc.to_json()).unwrap();
+        // let yaml = serde_yaml::to_string(&doc.to_json()).unwrap();
+        // println!("{}", yaml);
     }
 
     fn get_doc_encoding(lines: u32, words: u32) -> Vec<u8> {

@@ -5,7 +5,9 @@ use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
 use crate::bimapid::FieldMap;
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
 use crate::item::{ItemData, Optimize};
@@ -14,7 +16,8 @@ use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Diff {
-    pub(crate) guid: String,
+    pub(crate) created_by: Client,
+    pub(crate) doc_id: DocId,
     pub(crate) fields: FieldMap,
     pub(crate) state: ClientState,
     pub(crate) items: ItemDataStore,
@@ -27,28 +30,31 @@ impl Diff {
     }
 
     pub(crate) fn get_root(&self) -> Option<ItemData> {
-        let client = self.state.clients.get_client_id(&self.guid)?;
+        let client = self.state.clients.get_client_id(&self.created_by)?;
         self.items.find(&Id::new(*client, 1))
     }
 }
 
 impl Diff {
-    pub(crate) fn new(guid: String) -> Diff {
+    pub(crate) fn new(doc_id: DocId, created_by: Client) -> Diff {
         Self {
-            guid,
+            doc_id,
+            created_by,
             ..Default::default()
         }
     }
 
     pub(crate) fn from(
-        guid: String,
+        doc_id: DocId,
+        created_by: Client,
         fields: FieldMap,
         state: ClientState,
         items: ItemDataStore,
         deletes: DeleteItemStore,
     ) -> Diff {
         Diff {
-            guid,
+            created_by,
+            doc_id,
             fields,
             state,
             items,
@@ -100,9 +106,14 @@ impl Diff {
             }
         }
 
-        let guid = self.guid.clone();
-
-        Diff::from(guid, fields.clone(), state.clone(), items, deletes)
+        Diff::from(
+            self.doc_id.clone(),
+            self.created_by.clone(),
+            fields.clone(),
+            state.clone(),
+            items,
+            deletes,
+        )
     }
 
     pub(crate) fn optimize(&mut self) {
@@ -120,18 +131,20 @@ impl Serialize for Diff {
         S: Serializer,
     {
         let mut s = serializer.serialize_struct("Diff", 6)?;
-        s.serialize_field("guid", &self.guid)?;
-        s.serialize_field("fields", &serde_json::to_value(&self.fields).unwrap())?;
-        s.serialize_field("state", &serde_json::to_value(&self.state).unwrap())?;
-        s.serialize_field("deletes", &serde_json::to_value(&self.deletes).unwrap())?;
-        s.serialize_field("items", &serde_json::to_value(&self.items).unwrap())?;
+        s.serialize_field("doc_id", &self.doc_id)?;
+        s.serialize_field("created_by", &self.created_by)?;
+        s.serialize_field("fields", &self.fields)?;
+        s.serialize_field("state", &self.state)?;
+        s.serialize_field("deletes", &self.deletes)?;
+        s.serialize_field("items", &self.items)?;
         s.end()
     }
 }
 
 impl Encode for Diff {
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
-        e.string(&self.guid);
+        self.doc_id.encode(e, ctx);
+        self.created_by.encode(e, ctx);
         self.fields.encode(e, ctx);
         self.state.encode(e, ctx);
         self.deletes.encode(e, ctx);
@@ -141,15 +154,16 @@ impl Encode for Diff {
 
 impl Decode for Diff {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Diff, String> {
-        let guid = d.string()?;
-
+        let doc_id = DocId::decode(d, ctx)?;
+        let created_by = Client::decode(d, ctx)?;
         let fields = FieldMap::decode(d, ctx)?;
         let state = ClientState::decode(d, ctx)?;
         let deletes = DeleteItemStore::decode(d, ctx)?;
         let items = ItemDataStore::decode(d, ctx)?;
 
         Ok(Diff {
-            guid,
+            doc_id,
+            created_by,
             fields,
             state,
             deletes,

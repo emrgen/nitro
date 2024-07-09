@@ -22,6 +22,12 @@ pub enum Client {
     U64(u64),
 }
 
+impl Default for Client {
+    fn default() -> Self {
+        Client::new()
+    }
+}
+
 impl Client {
     pub(crate) fn new() -> Client {
         #[cfg(feature = "uuid-client")]
@@ -75,6 +81,15 @@ impl Client {
             return *u64;
         }
         panic!("Client is not a U64");
+    }
+}
+
+impl Serialize for Client {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        format!("{}", self).serialize(serializer)
     }
 }
 
@@ -501,8 +516,8 @@ mod tests {
     #[test]
     fn test_compare() {
         let mut clients = ClientMap::new();
-        clients.get_or_insert(&"client1".to_string());
-        clients.get_or_insert(&"client2".to_string());
+        clients.get_or_insert(&Client::default());
+        clients.get_or_insert(&Client::default());
 
         let id1 = IdRange::new(0, 1, 1);
         let id2 = IdRange::new(0, 1, 1);

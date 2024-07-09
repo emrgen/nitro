@@ -6,11 +6,11 @@ use std::ops::Add;
 use bimap::BiMap;
 use serde::{Serialize, Serializer};
 
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
 
-pub type Client = String;
 pub type ClientId = u32;
 
 pub(crate) trait BiMapEntry:
@@ -135,6 +135,16 @@ impl<T: EncoderMapEntry> Add<&EncoderMap<T>> for &EncoderMap<T> {
 //     }
 // }
 
+impl Encode for EncoderMap<Client> {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
+        e.u32(self.size() as u32);
+        for (client, client_id) in self.map.iter() {
+            client.encode(e, _ctx);
+            e.u32(*client_id);
+        }
+    }
+}
+
 impl Encode for EncoderMap<String> {
     fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
         e.u32(self.size() as u32);
@@ -220,7 +230,7 @@ impl Decode for EncoderMap<Mark> {
 // #[derive(Debug, Clone, Default)]
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ClientMap {
-    map: EncoderMap<String>,
+    map: EncoderMap<Client>,
 }
 
 impl ClientMap {
@@ -232,7 +242,7 @@ impl ClientMap {
 }
 
 impl ClientMap {
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &u32)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Client, &u32)> {
         self.map.map.iter()
     }
 }
@@ -253,12 +263,12 @@ impl ClientMap {
     pub(crate) fn size(&self) -> u32 {
         self.map.size() as u32
     }
-    pub(crate) fn insert(&mut self, client_id: Client, client: ClientId) {
-        self.map.map.insert(client_id, client);
+    pub(crate) fn insert(&mut self, client: Client, client_id: ClientId) {
+        self.map.map.insert(client, client_id);
     }
 
-    pub(crate) fn get_or_insert(&mut self, client_id: &Client) -> ClientId {
-        self.map.get_or_insert(client_id)
+    pub(crate) fn get_or_insert(&mut self, client: &Client) -> ClientId {
+        self.map.get_or_insert(client)
     }
 
     pub(crate) fn contains_client(&self, client: &Client) -> bool {
@@ -287,7 +297,7 @@ impl ClientMap {
         ClientMap { map }
     }
 
-    pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &u32)> {
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&Client, &u32)> {
         self.map.map.iter()
     }
 }
@@ -313,11 +323,9 @@ impl Decode for ClientMap {
         let len = decoder.u32()? as usize;
         let mut map = BiMap::new();
         for _ in 0..len {
-            let size = decoder.u8()? as usize;
-            let slice = decoder.slice(size)?;
-            let client_id = String::from_utf8(slice.into()).map_err(|e| e.to_string())?;
-            let client = decoder.u32()?;
-            map.insert(client_id, client);
+            let client = Client::decode(decoder, _ctx)?;
+            let client_id = decoder.u32()?;
+            map.insert(client, client_id);
         }
         Ok(Self {
             map: EncoderMap { map },
@@ -348,8 +356,8 @@ impl FieldMap {
         }
     }
 
-    fn insert(&mut self, client_id: Client, client: ClientId) {
-        self.map.map.insert(client_id, client);
+    fn insert(&mut self, field: String, field_id: FieldId) {
+        self.map.map.insert(field, field_id);
     }
 
     pub(crate) fn get_or_insert(&mut self, client_id: &Field) -> FieldId {
@@ -360,8 +368,8 @@ impl FieldMap {
         self.map.get(field_id)
     }
 
-    pub(crate) fn get_field(&self, client: &FieldId) -> Option<&Field> {
-        self.map.get_key(client)
+    pub(crate) fn get_field(&self, field_id: &FieldId) -> Option<&Field> {
+        self.map.get_key(field_id)
     }
 
     pub(crate) fn adjust(&self, other: &FieldMap) -> FieldMap {
@@ -405,6 +413,7 @@ impl Decode for FieldMap {
 #[cfg(test)]
 mod test {
     use crate::bimapid::ClientMap;
+    use crate::Client;
     use crate::codec_v1::EncoderV1;
     use crate::decoder::{Decode, DecodeContext};
     use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -413,9 +422,9 @@ mod test {
     fn test_encode_decode_client_map() {
         let mut map = ClientMap::default();
 
-        map.insert("client1".to_string(), 1);
-        map.insert("client2".to_string(), 2);
-        map.insert("client3".to_string(), 3);
+        map.insert(Client::default(), 1);
+        map.insert(Client::default(), 2);
+        map.insert(Client::default(), 3);
 
         let mut e = EncoderV1::new();
         map.encode(&mut e, &EncodeContext::default());

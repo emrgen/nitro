@@ -5,7 +5,8 @@ use std::ops::Add;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
-use crate::bimapid::{Client, ClientId, ClientMap};
+use crate::bimapid::{ClientId, ClientMap};
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Clock;
@@ -24,7 +25,7 @@ impl ClientState {
         }
     }
 
-    pub fn clients(&self) -> Vec<(&String, u32)> {
+    pub fn clients(&self) -> Vec<(&Client, u32)> {
         self.clients.iter().map(|(k, v)| (k, *v)).collect()
     }
 
@@ -280,7 +281,7 @@ mod tests {
         let mut state = ClientState::new();
 
         for _ in 0..10000 {
-            let id = Uuid::new_v4().to_string();
+            let id = Uuid::new_v4().into();
             state.clients.get_or_insert(&id);
         }
 

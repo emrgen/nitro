@@ -1,6 +1,4 @@
-use std::str::FromStr;
-
-use uuid::{Error, Uuid};
+use uuid::Error;
 
 use nitro::Doc;
 use nitro::encoder::{Encode, Encoder};
@@ -18,14 +16,14 @@ fn main() -> Result<(), Error> {
     doc.set("text", text.clone());
 
     let mut counter = 0;
-    // for i in 0..1 {
-    //     insert_text(&doc, "a");
-    //     if i / 100 != counter {
-    //         // println!("Counter: {}", counter);
-    //     }
-    //
-    //     counter = i / 100;
-    // }
+    for i in 0..50 {
+        insert_text(&doc, "a");
+        if i / 100 != counter {
+            // println!("Counter: {}", counter);
+        }
+
+        counter = i / 100;
+    }
 
     let mut encoder = nitro::codec_v1::EncoderV1::new();
 
@@ -43,14 +41,12 @@ fn main() -> Result<(), Error> {
     let v = doc.version();
     let clients = v.clients();
 
+    println!("Clients: {:?}", clients.len());
+    let ctx = Default::default();
+
     encoder.u32(clients.len() as u32);
     for (client, id) in clients {
-        println!("Client: {}", client);
-
-        let uuid: Uuid = Uuid::from_str(client)?;
-        let uuid = uuid.as_bytes().as_slice();
-        encoder.uuid(uuid);
-        println!("Client size: {}", uuid.len());
+        client.encode(&mut encoder, &ctx);
         encoder.u32(id);
     }
 

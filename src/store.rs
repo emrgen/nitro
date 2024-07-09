@@ -8,10 +8,12 @@ use std::rc::{Rc, Weak};
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
 
-use crate::bimapid::{Client, ClientId, Field, FieldId, FieldMap};
+use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
+use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Clock, Id, IdRange, Split, WithId};
 use crate::id_store::ClientIdStore;
@@ -24,7 +26,7 @@ pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocStore {
-    pub(crate) doc_id: String,
+    pub(crate) doc_id: DocId,
     pub(crate) created_by: Client,
 
     pub(crate) client: ClientId,
@@ -115,7 +117,7 @@ impl DocStore {
         self.state.get_or_insert(client_id)
     }
 
-    pub(crate) fn diff(&self, guid: String, state: ClientState) -> Diff {
+    pub(crate) fn diff(&self, id: DocId, created_by: Client, state: ClientState) -> Diff {
         let state = state.as_per(&self.state);
 
         let items = self.items.diff(state.clone(), &self.id_map);
@@ -130,7 +132,14 @@ impl DocStore {
             }
         }
 
-        Diff::from(guid, self.fields.clone(), state.clone(), items, deletes)
+        Diff::from(
+            id,
+            created_by,
+            self.fields.clone(),
+            state.clone(),
+            items,
+            deletes,
+        )
     }
 }
 
@@ -869,10 +878,10 @@ mod tests {
     fn test_adjust_client_state() {
         let mut s1 = ClientState::default();
         let mut s2 = ClientState::default();
-        let u1 = Uuid::new_v4().to_string();
-        let u2 = Uuid::new_v4().to_string();
-        let u3 = Uuid::new_v4().to_string();
-        let u4 = Uuid::new_v4().to_string();
+        let u1 = Uuid::new_v4().into();
+        let u2 = Uuid::new_v4().into();
+        let u3 = Uuid::new_v4().into();
+        let u4 = Uuid::new_v4().into();
 
         let uid1 = s1.clients.get_or_insert(&u1);
         let uid2 = s1.clients.get_or_insert(&u2);

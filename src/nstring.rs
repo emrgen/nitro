@@ -190,13 +190,13 @@ mod test {
         string.add_mark(Mark::Bold);
         string.split(5).unwrap();
 
-        let ls = doc.find_by_id(&Id::new(1, 2)).unwrap();
+        let ls = doc.find_by_id(&Id::new(0, 3)).unwrap();
         // println!("{}", serde_json::to_string(&ls).unwrap());
         let (l, r) = ls.split(2);
         r.add_mark(Mark::Code);
         l.delete();
 
-        let yaml = serde_yaml::to_string(&doc).unwrap();
-        println!("{}", yaml);
+        // let yaml = serde_yaml::to_string(&doc).unwrap();
+        // println!("{}", yaml);
     }
 }

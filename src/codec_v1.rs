@@ -73,6 +73,15 @@ impl Encoder for EncoderV1 {
         self.pos += 8;
     }
 
+    fn uuid(&mut self, value: &[u8]) {
+        let mut array = [0; 16];
+        array.copy_from_slice(value);
+
+        self.ensure_capacity(16);
+        self.buf.extend_from_slice(&array);
+        self.pos += 16;
+    }
+
     fn string(&mut self, value: &str) {
         self.u32(value.len() as u32);
         self.ensure_capacity(value.len());
@@ -188,6 +197,14 @@ impl Decoder for DecoderV1 {
             self.buf[self.pos + 7],
         ]);
         self.pos += 8;
+        Ok(value)
+    }
+
+    fn uuid(&mut self) -> Result<[u8; 16], String> {
+        self.ensure_capacity(16);
+        let mut value = [0; 16];
+        value.copy_from_slice(&self.buf[self.pos..self.pos + 16]);
+        self.pos += 16;
         Ok(value)
     }
 

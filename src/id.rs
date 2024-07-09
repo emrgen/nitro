@@ -3,13 +3,144 @@ use std::fmt::Display;
 use std::ops::{Add, Sub};
 
 use serde::{Serialize, Serializer};
+use uuid::Uuid;
 
 use crate::bimapid::{ClientId, ClientMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 
-pub(crate) type Clock = u32;
+pub type Clock = u32;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Client {
+    #[cfg(feature = "uuid-client")]
+    UUID(Uuid),
+    #[cfg(feature = "string-client")]
+    String(String),
+    #[cfg(feature = "u64-client")]
+    U64(u64),
+}
+
+impl Client {
+    pub(crate) fn new() -> Client {
+        #[cfg(feature = "uuid-client")]
+        return Client::UUID(Uuid::new_v4());
+        #[cfg(feature = "string-client")]
+        return Client::String("".to_string());
+        #[cfg(feature = "u64-client")]
+        return Client::U64(0);
+    }
+
+    pub(crate) fn from_uuid(uuid: Uuid) -> Client {
+        #[cfg(feature = "uuid-client")]
+        return Client::UUID(uuid);
+        #[cfg(not(feature = "uuid-client"))]
+        panic!("UUID client is not enabled");
+    }
+
+    pub(crate) fn from_string(string: String) -> Client {
+        #[cfg(feature = "string-client")]
+        return Client::String(string);
+        #[cfg(not(feature = "string-client"))]
+        panic!("String client is not enabled");
+    }
+
+    pub(crate) fn from_u64(u64: u64) -> Client {
+        #[cfg(feature = "u64-client")]
+        return Client::U64(u64);
+        #[cfg(not(feature = "u64-client"))]
+        panic!("U64 client is not enabled");
+    }
+
+    pub(crate) fn as_uuid(&self) -> Uuid {
+        #[cfg(feature = "uuid-client")]
+        if let Client::UUID(uuid) = self {
+            return *uuid;
+        }
+        panic!("Client is not a UUID");
+    }
+
+    pub(crate) fn as_string(&self) -> String {
+        #[cfg(feature = "string-client")]
+        if let Client::String(string) = self {
+            return string.clone();
+        }
+        panic!("Client is not a String");
+    }
+
+    pub(crate) fn as_u64(&self) -> u64 {
+        #[cfg(feature = "u64-client")]
+        if let Client::U64(u64) = self {
+            return *u64;
+        }
+        panic!("Client is not a U64");
+    }
+}
+
+impl Encode for Client {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+        match self {
+            #[cfg(feature = "uuid-client")]
+            Client::UUID(client) => e.uuid(client.as_bytes().as_slice()),
+            #[cfg(feature = "string-client")]
+            Client::String(client) => e.string(client),
+            #[cfg(feature = "u64-client")]
+            Client::U64(client) => e.u64(client),
+        }
+    }
+}
+
+impl Decode for Client {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        #[cfg(feature = "uuid-client")]
+        let uuid = d.uuid()?;
+        let uuid = Uuid::from_slice(&uuid).expect("Invalid UUID");
+        return Ok(Client::UUID(uuid));
+
+        #[cfg(feature = "string-client")]
+        return Ok(Client::String(d.string()?));
+
+        #[cfg(feature = "u64-client")]
+        return Ok(Client::U64(d.u64()?));
+
+        Err("Invalid version for Client".to_string())
+    }
+}
+
+impl From<String> for Client {
+    fn from(value: String) -> Self {
+        Client::from_string(value)
+    }
+}
+
+impl From<Uuid> for Client {
+    fn from(value: Uuid) -> Self {
+        Client::from_uuid(value)
+    }
+}
+
+impl From<u64> for Client {
+    fn from(value: u64) -> Self {
+        Client::from_u64(value)
+    }
+}
+
+impl Display for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            #[cfg(feature = "uuid-client")]
+            Client::UUID(uuid) => write!(f, "{}", uuid),
+            #[cfg(feature = "string-client")]
+            Client::String(string) => write!(f, "{}", string),
+            #[cfg(feature = "u64-client")]
+            Client::U64(u64) => write!(f, "{}", u64),
+        }
+    }
+}
 
 pub(crate) trait Split {
     type Target;
@@ -383,5 +514,11 @@ mod tests {
         assert_eq!(id1.compare_without_client(&id3), Ordering::Less);
         assert_eq!(id3.compare_without_client(&id1), Ordering::Greater);
         assert_eq!(id3.compare_without_client(&id4), Ordering::Less);
+    }
+
+    #[test]
+    fn test_client() {
+        let client = Client::new();
+        println!("{}", client);
     }
 }

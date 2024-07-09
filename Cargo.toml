@@ -3,6 +3,10 @@ name = "nitro"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["uuid-client"]
+uuid-client = []
+
 [profile.release]
 # or "z"
 opt-level = 3

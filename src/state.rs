@@ -11,7 +11,7 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Clock;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub(crate) struct ClientState {
+pub struct ClientState {
     pub(crate) state: ClientIdState,
     pub(crate) clients: ClientMap,
 }
@@ -22,6 +22,14 @@ impl ClientState {
             state: ClientIdState::new(),
             clients: ClientMap::new(),
         }
+    }
+
+    pub fn clients(&self) -> Vec<(&String, u32)> {
+        self.clients.iter().map(|(k, v)| (k, *v)).collect()
+    }
+
+    pub fn state(&self) -> Vec<(u32, u32)> {
+        self.state.clients.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
     pub(crate) fn get(&self, client: &ClientId) -> Option<&Clock> {

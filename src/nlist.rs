@@ -195,24 +195,24 @@ mod test {
 
         println!("{}", yaml);
 
-        let expect = r#"id: (1, 1)
+        let expect = r#"id: (0, 2)
 kind: list
 parent_id: (0, 1)
 content:
 - content: a
-  id: (1, 2)
+  id: (0, 3)
   kind: atom
-  parent_id: (1, 1)
+  parent_id: (0, 2)
 - content: b
-  id: (1, 3)
+  id: (0, 4)
   kind: atom
-  left_id: (1, 2)
-  parent_id: (1, 1)
+  left_id: (0, 3)
+  parent_id: (0, 2)
 - content: c
-  id: (1, 4)
+  id: (0, 5)
   kind: atom
-  left_id: (1, 3)
-  parent_id: (1, 1)
+  left_id: (0, 4)
+  parent_id: (0, 2)
 "#;
 
         assert_eq!(yaml, expect);
@@ -252,18 +252,18 @@ content:
     content:
     - content:
       - content: a
-        id: (1, 3)
+        id: (0, 4)
         kind: atom
-        parent_id: (1, 2)
-      id: (1, 2)
+        parent_id: (0, 3)
+      id: (0, 3)
       kind: list
-      parent_id: (1, 1)
+      parent_id: (0, 2)
     - content: b
-      id: (1, 4)
+      id: (0, 5)
       kind: atom
-      left_id: (1, 2)
-      parent_id: (1, 1)
-    id: (1, 1)
+      left_id: (0, 3)
+      parent_id: (0, 2)
+    id: (0, 2)
     kind: list
     parent_id: (0, 1)
 "#;

@@ -62,13 +62,13 @@ impl Doc {
         store.created_by = opts.crated_by.clone();
 
         // doc is always created by the client with clock 0,
-        // each doc is created by a new client
+        store.update_client(&opts.crated_by, 1);
 
-        let client = store.get_client(&opts.guid);
-        let root_id = Id::new(client, 1);
+        let client = store.get_client(&opts.crated_by);
+        let root_id = store.next_id();
 
-        let client = Uuid::new_v4().to_string();
-        store.update_client(&client, 1);
+        // let client = Uuid::new_v4().to_string();
+        // store.update_client(&client, 1);
 
         let store_ref = Rc::new(RefCell::new(store));
         let weak = Rc::downgrade(&store_ref);
@@ -205,6 +205,10 @@ impl Doc {
 
     fn values(&self) -> Vec<Type> {
         self.root.values()
+    }
+
+    pub fn version(&self) -> ClientState {
+        self.store.borrow().state.clone()
     }
 
     pub(crate) fn to_json(&self) -> Value {
@@ -363,11 +367,11 @@ mod test {
     fn test_encode_doc_size() {
         println!(
             "{:6}   {:6}   {:10}   {:10}   {:8}",
-            "lines", "words", "size", "comp", "ratio"
+            "lines", "words", "size", "comp", "comp ratio"
         );
         println!(
-            "{:6}   {:6}   {:10}   {:10}   {:8}",
-            "-----", "-----", "----------", "----------", "--------"
+            "{:6}   {:6}   {:10}   {:8}   {:8}",
+            "------", "------", "----------", "----------", "----------"
         );
         for i in 0..20 {
             let lines = 10 * i;

@@ -5,6 +5,7 @@ pub trait Decoder {
     fn u16(&mut self) -> Result<u16, String>;
     fn u32(&mut self) -> Result<u32, String>;
     fn u64(&mut self) -> Result<u64, String>;
+    fn uuid(&mut self) -> Result<[u8; 16], String>;
     fn string(&mut self) -> Result<String, String>;
     fn bytes(&mut self) -> Result<Vec<u8>, String>;
     fn slice(&mut self, len: usize) -> Result<&[u8], String>;
@@ -26,6 +27,10 @@ impl Decoder for Box<dyn Decoder> {
 
     fn u64(&mut self) -> Result<u64, String> {
         self.as_mut().u64()
+    }
+
+    fn uuid(&mut self) -> Result<[u8; 16], String> {
+        self.as_mut().uuid()
     }
 
     fn string(&mut self) -> Result<String, String> {

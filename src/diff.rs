@@ -78,7 +78,7 @@ impl Diff {
 
     // adjust the diff to the current state of the store
     // this is used when applying a diff to a store
-    pub(crate) fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
+    pub fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
         let state = self.state.adjust_min(&store.state);
 
         // let next_state = &self.state + &state;
@@ -114,6 +114,65 @@ impl Diff {
             items,
             deletes,
         )
+    }
+
+    // adjust the diff to the current state of the store
+    pub fn adjust_diff(&self, other: &Diff) -> Diff {
+        // print_yaml(&self.state);
+        // print_yaml(&other.state);
+
+        // merge client states
+        let state = self.state.adjust_max(&other.state);
+
+        // print_yaml(&state);
+
+        // merge fields
+        let fields = self.fields.adjust(&other.fields);
+
+        let mut items = ItemDataStore::default();
+
+        // adjust items
+        for (_, store) in other.items.iter() {
+            for (_, item) in store.iter() {
+                let adjust =
+                    item.adjust(&other.state.clients, &other.fields, &state.clients, &fields);
+                items.insert(adjust);
+            }
+        }
+
+        // adjust deletes
+        let mut deletes = DeleteItemStore::default();
+
+        for (_, store) in other.deletes.clone().into_iter() {
+            for (_, item) in store.into_iter() {
+                let adjust = item.adjust(&other.state.clients, &state.clients);
+                deletes.insert(adjust);
+            }
+        }
+
+        Diff::from(
+            self.doc_id.clone(),
+            self.created_by.clone(),
+            fields,
+            state,
+            items,
+            deletes,
+        )
+    }
+
+    // merge two diffs together into self
+    pub fn merge(&mut self, other: &Diff) {
+        if self.doc_id != other.doc_id {
+            panic!("cannot merge diffs with different doc ids");
+        }
+        if self.created_by != other.created_by {
+            panic!("cannot merge diffs with different created_by");
+        }
+
+        self.fields = self.fields.merge(&other.fields);
+        self.state = self.state.merge(&other.state);
+        self.items = self.items.merge(&other.items);
+        self.deletes = self.deletes.merge(&other.deletes);
     }
 
     pub(crate) fn optimize(&mut self) {

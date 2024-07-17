@@ -110,6 +110,7 @@ impl Transaction {
             for client_id in &clients {
                 if let Some(item) = stage.get(&client_id) {
                     let id = item.id;
+
                     // let clone = item.clone();
 
                     if self.is_integrated(item, &store) {
@@ -129,6 +130,7 @@ impl Transaction {
                         } else {
                             stage.remove(client_id);
                         }
+                        break;
                     }
 
                     count += 1;
@@ -153,8 +155,7 @@ impl Transaction {
 
         // println!("Time taken: {:?}", now.elapsed());
 
-        //
-        // // remaining items has unmet dependencies and are put in pending store
+        // remaining items has unmet dependencies and are put in pending store
         for (_, data) in stage.iter() {
             // self.pending.insert(data.clone());
             self.pending.insert(data.clone());
@@ -314,7 +315,7 @@ impl Transaction {
             return false;
         }
 
-        data.parent_id.is_none() || data.left_id.is_none() || data.right_id.is_none()
+        data.parent_id.is_none() && data.left_id.is_none() && data.right_id.is_none()
     }
 
     pub(crate) fn is_integrated(&self, data: &ItemData, store: &Ref<DocStore>) -> bool {

@@ -449,6 +449,8 @@ pub struct ClientStore<T: ClientStoreEntry> {
     pub(crate) items: BTreeMap<ClientId, IdStore<T>>,
 }
 
+impl<T: ClientStoreEntry> ClientStore<T> {}
+
 impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn size(&self) -> u32 {
         self.iter().map(|(_, store)| store.size() as u32).sum()
@@ -515,6 +517,18 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 
         store.insert(items.0);
         store.insert(items.1);
+    }
+
+    pub(crate) fn merge(&self, other: &ClientStore<T>) -> ClientStore<T> {
+        let mut store = self.clone();
+        for (client, items) in other.items.iter() {
+            let store = store.items.entry(*client).or_default();
+            for (_, item) in items.iter() {
+                store.insert(item.clone());
+            }
+        }
+
+        store
     }
 }
 

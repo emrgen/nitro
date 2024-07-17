@@ -66,6 +66,7 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         self.map.get_by_right(id)
     }
 
+    //
     pub fn adjust(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
         let mut clone = self.clone();
         let mut entries = other.map.iter().collect::<Vec<_>>();

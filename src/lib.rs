@@ -24,6 +24,7 @@ mod crdt;
 pub mod decoder;
 mod delete;
 mod diff;
+mod diffstore;
 mod doc;
 pub mod encoder;
 mod frac_index;

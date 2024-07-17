@@ -6,7 +6,6 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -22,6 +21,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
+use crate::Client;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocOpts {
@@ -29,7 +29,7 @@ pub struct DocOpts {
     pub crated_by: Client,
 }
 
-#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DocId(Uuid);
 
 impl DocId {
@@ -357,8 +357,8 @@ impl CloneDeep for Doc {
 #[cfg(test)]
 mod test {
     use byte_unit::{AdjustedByte, Byte, Unit};
-    use fake::Fake;
     use fake::faker::lorem::en::Words;
+    use fake::Fake;
     use miniz_oxide::deflate::compress_to_vec;
     use rand::random;
 

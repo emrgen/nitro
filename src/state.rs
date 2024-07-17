@@ -106,11 +106,33 @@ impl ClientState {
                 (None, Some(other_clock)) => {
                     state.update(*client_id, 0);
                 }
+                (Some(self_clock), None) => {
+                    state.update(*client_id, *self_clock);
+                }
                 _ => {}
             }
         }
 
         ClientState { clients, state }
+    }
+
+    pub(crate) fn merge(&self, other: &ClientState) -> ClientState {
+        let clients = self.clients.merge(&other.clients);
+        let state = self
+            .state
+            .iter()
+            .fold(other.state.clone(), |mut state, (client_id, clock)| {
+                state.update_max(*client_id, *clock);
+                state
+            });
+
+        ClientState { state, clients }
+    }
+}
+
+impl From<&ClientState> for ClientState {
+    fn from(state: &ClientState) -> Self {
+        state.clone()
     }
 }
 

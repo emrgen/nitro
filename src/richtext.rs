@@ -84,6 +84,8 @@ impl CloneDeep for RichText {
 
 #[cfg(test)]
 mod tests {
+    use crate::print_yaml;
+
     use super::*;
 
     fn create_text_pairs() -> (RichText, RichText) {
@@ -255,5 +257,28 @@ mod tests {
         for i in 0..100 {
             t1.text.append(t1.doc.string(&i.to_string()));
         }
+    }
+
+    #[test]
+    fn test_sync_three_docs() {
+        let mut t1 = RichText::new();
+        let mut t2 = t1.clone_deep();
+        let mut t3 = t1.clone_deep();
+
+        t1.insert(0, "a");
+        t2.insert(0, "b");
+        t3.insert(0, "c");
+
+        t1.sync(&t2);
+        t1.sync(&t3);
+        t2.sync(&t3);
+
+        assert_eq!(t1, t2);
+        assert_eq!(t1, t3);
+        assert_eq!(t2, t3);
+
+        // print_yaml(&t1.doc);
+        // print_yaml(&t2.doc);
+        // print_yaml(&t3.doc);
     }
 }

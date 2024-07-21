@@ -114,7 +114,7 @@ impl DocStore {
     }
 
     pub(crate) fn client(&mut self, client_id: &Client) -> ClientId {
-        self.state.get_or_insert(client_id)
+        self.state.get_or_insert(client_id).0
     }
 
     pub(crate) fn diff(&self, id: DocId, created_by: Client, state: ClientState) -> Diff {
@@ -132,11 +132,13 @@ impl DocStore {
             }
         }
 
+        let state = state.merge(&self.state);
+
         Diff::from(
             id,
             created_by,
             self.fields.clone(),
-            state.clone(),
+            state,
             items,
             deletes,
         )

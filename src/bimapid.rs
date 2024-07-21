@@ -67,9 +67,9 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
     }
 
     //
-    pub fn adjust(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
-        let mut clone = self.clone();
-        let mut entries = other.map.iter().collect::<Vec<_>>();
+    pub fn as_per(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
+        let mut clone = other.clone();
+        let mut entries = self.map.iter().collect::<Vec<_>>();
         entries.sort_by(|a, b| a.1.cmp(b.1));
 
         for (l, _) in entries {
@@ -288,8 +288,8 @@ impl ClientMap {
         self.map.get_key(client)
     }
 
-    pub(crate) fn adjust(&self, other: &ClientMap) -> ClientMap {
-        let map = self.map.adjust(&other.map);
+    pub(crate) fn as_per(&self, other: &ClientMap) -> ClientMap {
+        let map = self.map.as_per(&other.map);
         ClientMap { map }
     }
 
@@ -374,7 +374,7 @@ impl FieldMap {
     }
 
     pub(crate) fn adjust(&self, other: &FieldMap) -> FieldMap {
-        let map = self.map.adjust(&other.map);
+        let map = self.map.as_per(&other.map);
         FieldMap { map }
     }
 

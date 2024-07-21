@@ -39,24 +39,30 @@ impl ClientState {
 
     pub(crate) fn remove(&mut self, client: &ClientId) {
         self.state.remove(client);
+        self.state.remove(client);
+        self.state.remove(client);
     }
 
     pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
         self.state.update_max(client, clock);
     }
 
-    pub(crate) fn get_client_id(&self, client: &ClientId) -> Option<&Client> {
+    pub(crate) fn get_client(&self, client: &ClientId) -> Option<&Client> {
         self.clients.get_client(client)
     }
 
-    pub(crate) fn get_or_insert(&mut self, client: &Client) -> Clock {
+    pub(crate) fn get_client_id(&self, client: &Client) -> Option<&ClientId> {
+        self.clients.get_client_id(client)
+    }
+
+    pub(crate) fn get_or_insert(&mut self, client: &Client) -> (ClientId, Clock) {
         let client_id = self.clients.get_or_insert(client);
         let clock = self.state.get(&client_id).unwrap_or(&0);
-        *clock
+        (client_id, *clock)
     }
 
     pub(crate) fn adjust_max(&self, other: &ClientState) -> ClientState {
-        let clients = self.clients.adjust(&other.clients);
+        let clients = self.clients.as_per(&other.clients);
         let state = other
             .state
             .iter()
@@ -71,39 +77,48 @@ impl ClientState {
     }
 
     pub(crate) fn adjust_min(&self, other: &ClientState) -> ClientState {
-        let clients = self.clients.adjust(&other.clients);
-        let state = other
-            .state
-            .iter()
-            .fold(self.state.clone(), |mut state, (client_id, clock)| {
-                let client = other.clients.get_client(client_id).unwrap();
-                let client_id = clients.get_client_id(client).unwrap();
-                if let Some(current) = state.get(client_id) {
-                    if *clock < *current {
-                        state.update_max(*client_id, *clock);
-                    }
-                } else {
-                    state.update_max(*client_id, *clock);
-                }
+        let clients = self.clients.as_per(&other.clients);
+        let mut state = ClientIdState::default();
 
-                state
-            });
+        clients.iter().for_each(|(client, client_id)| {
+            let self_clock = self.clients.get_client_id(client).and_then(|id| self.get(id));
+            let other_clock = other.clients.get_client_id(client).and_then(|id| self.get(id));
+
+            match (self_clock, other_clock) {
+                (Some(self_clock), Some(other_clock)) => {
+                    if *self_clock < *other_clock {
+                        state.update(*client_id, *self_clock);
+                    } else {
+                        state.update(*client_id, *other_clock);
+                    }
+                }
+                (None, Some(other_clock)) => {
+                    state.update(*client_id, *other_clock);
+                }
+                (Some(self_clock), None) => {
+                    state.update(*client_id, *self_clock);
+                }
+                _ => {}
+            }
+        });
 
         ClientState { state, clients }
     }
 
+    // get modified view of self as per other state. the final client ids should match with other state.
     pub(crate) fn as_per(&self, other: &ClientState) -> ClientState {
-        let clients = self.clients.adjust(&other.clients);
+        let clients = self.clients.as_per(&other.clients);
 
         let mut state = ClientIdState::default();
-        for (_, client_id) in clients.iter() {
-            let self_clock = self.state.get(client_id);
-            let other_clock = other.state.get(client_id);
+        for (client, client_id) in clients.iter() {
+            let self_clock = self.clients.get_client_id(client).and_then(|id| self.state.get(id));
+            let other_clock = other.clients.get_client_id(client).and_then(|id| other.state.get(id));
+
             match (self_clock, other_clock) {
                 (Some(self_clock), Some(other_clock)) => {
                     state.update(*client_id, *self_clock);
                 }
-                (None, Some(other_clock)) => {
+                (None, Some(other_clock)) => { // client id does not exists in self
                     state.update(*client_id, 0);
                 }
                 (Some(self_clock), None) => {
@@ -267,7 +282,7 @@ mod tests {
     use miniz_oxide::deflate::compress_to_vec;
     use uuid::Uuid;
 
-    use crate::codec_v1::EncoderV1;
+    use crate::{codec_v1::EncoderV1, print_yaml};
 
     use super::*;
 
@@ -313,5 +328,34 @@ mod tests {
         let buf = encoder.buffer();
         let comp = compress_to_vec(&buf, 1);
         println!("ClientState size: {}", buf.len());
+    }
+
+    #[test]
+    fn test_client_state_as_per() {
+        let mut s1 = ClientState::default();
+        let mut s2 = ClientState::default();
+
+        let c1 = s1.get_or_insert(&Client::default());
+        let c2 = s1.get_or_insert(&Client::default());
+        // println!("c1: {}, c2: {}", c1.0, c2.0);
+        s1.update(c1.0, 5);
+        s1.update(c2.0, 5);
+
+        let c3 = s2.get_or_insert(&Client::default());
+        let c4 = s2.get_or_insert(&Client::default());
+        // println!("c3: {}, c4: {}", c3.0, c4.0);
+        s2.update(c3.0, 10);
+        s2.update(c4.0, 10);
+
+        // print_yaml(&s1);
+        // print_yaml(&s2);
+
+        let s3 = s1.as_per(&s2);
+        // print_yaml(&s3);
+
+        assert!(s3.get(&0).unwrap() == &0);
+        assert!(s3.get(&1).unwrap() == &0);
+        assert!(s3.get(&2).unwrap() == &5);
+        assert!(s3.get(&3).unwrap() == &5);
     }
 }

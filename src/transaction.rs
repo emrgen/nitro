@@ -9,6 +9,7 @@ use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
 use crate::item::{ItemData, ItemRef, StartEnd};
+use crate::print_yaml;
 use crate::queue_store::ClientQueueStore;
 use crate::store::{
     ClientStore, DocStore, ItemDataStore, ItemStore, PendingStore, ReadyStore, WeakStoreRef,
@@ -32,7 +33,9 @@ impl Transaction {
     pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Transaction {
         let mut_store = store.upgrade().unwrap();
         let store_ref = mut_store.borrow_mut();
+
         let diff = diff.adjust(&store_ref);
+
         Transaction {
             store,
             diff,

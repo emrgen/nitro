@@ -191,7 +191,6 @@ impl From<ItemRef> for NMap {
 #[cfg(test)]
 mod tests {
     use crate::doc::Doc;
-    use crate::utils::print_yaml;
 
     #[test]
     fn test_map() {
@@ -199,7 +198,6 @@ mod tests {
         let map = doc.map();
         doc.set("map", map.clone());
 
-        print_yaml(&doc);
         let map = doc.get("map").unwrap();
         assert_eq!(map.size(), 0);
 

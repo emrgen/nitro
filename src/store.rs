@@ -772,7 +772,6 @@ mod tests {
     use uuid::Uuid;
 
     use crate::codec_v1::EncoderV1;
-    use crate::print_yaml;
 
     use super::*;
 
@@ -913,8 +912,8 @@ mod tests {
         // print_yaml(&s1);
         // print_yaml(&s2);
 
-        print_yaml(&s12);
-        print_yaml(&d1);
+        // print_yaml(&s12);
+        // print_yaml(&d1);
 
         assert_eq!(s12, d1);
     }

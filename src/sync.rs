@@ -51,20 +51,16 @@ mod test {
     use crate::sync::{equal_docs, sync_docs, SyncDirection};
 
     #[test]
-    fn test_sync() {
-        let doc1 = Doc::default();
-        let doc2 = doc1.clone_deep();
-        doc2.update_client();
+    fn test_sync1() {
+        let d1 = Doc::default();
+        let d2 = d1.clone_deep();
+        d2.update_client();
 
-        doc1.set("a", doc1.string("hello"));
-        doc2.set("b", doc2.string("world"));
+        d1.set("a", d1.string("hello"));
+        d2.set("b", d2.string("world"));
 
-        sync_docs(&doc1, &doc2, SyncDirection::default());
-
-        // print_yaml(&doc1);
-        // print_yaml(&doc2);
-
-        assert!(equal_docs(&doc1, &doc2));
+        sync_docs(&d1, &d2, SyncDirection::default());
+        assert!(equal_docs(&d1, &d2));
     }
 
     #[test]

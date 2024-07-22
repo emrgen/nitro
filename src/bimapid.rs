@@ -66,7 +66,7 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         self.map.get_by_right(id)
     }
 
-    //
+    // insert self clients into other clients
     pub fn as_per(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
         let mut clone = other.clone();
         let mut entries = self.map.iter().collect::<Vec<_>>();
@@ -373,7 +373,8 @@ impl FieldMap {
         self.map.get_key(field_id)
     }
 
-    pub(crate) fn adjust(&self, other: &FieldMap) -> FieldMap {
+    // append self clients into other clients and return new clients
+    pub(crate) fn as_per(&self, other: &FieldMap) -> FieldMap {
         let map = self.map.as_per(&other.map);
         FieldMap { map }
     }

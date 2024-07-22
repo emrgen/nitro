@@ -63,15 +63,31 @@ impl ClientState {
 
     pub(crate) fn adjust_max(&self, other: &ClientState) -> ClientState {
         let clients = self.clients.as_per(&other.clients);
-        let state = other
-            .state
-            .iter()
-            .fold(self.state.clone(), |mut state, (client_id, clock)| {
-                let client = other.clients.get_client(client_id).unwrap();
-                let client_id = clients.get_client_id(client).unwrap();
-                state.update_max(*client_id, *clock);
-                state
-            });
+        let mut state = ClientIdState::default();
+
+        clients.iter().for_each(|(client, client_id)| {
+            let self_clock = self
+                .clients
+                .get_client_id(client)
+                .and_then(|id| self.get(id));
+            let other_clock = other
+                .clients
+                .get_client_id(client)
+                .and_then(|id| other.get(id));
+
+            match (self_clock, other_clock) {
+                (Some(self_clock), Some(other_clock)) => {
+                    state.update(*client_id, *other_clock.max(self_clock));
+                }
+                (None, Some(other_clock)) => {
+                    state.update(*client_id, *other_clock);
+                }
+                (Some(self_clock), None) => {
+                    state.update(*client_id, *self_clock);
+                }
+                _ => {}
+            }
+        });
 
         ClientState { state, clients }
     }
@@ -81,8 +97,14 @@ impl ClientState {
         let mut state = ClientIdState::default();
 
         clients.iter().for_each(|(client, client_id)| {
-            let self_clock = self.clients.get_client_id(client).and_then(|id| self.get(id));
-            let other_clock = other.clients.get_client_id(client).and_then(|id| self.get(id));
+            let self_clock = self
+                .clients
+                .get_client_id(client)
+                .and_then(|id| self.get(id));
+            let other_clock = other
+                .clients
+                .get_client_id(client)
+                .and_then(|id| other.get(id));
 
             match (self_clock, other_clock) {
                 (Some(self_clock), Some(other_clock)) => {
@@ -111,14 +133,21 @@ impl ClientState {
 
         let mut state = ClientIdState::default();
         for (client, client_id) in clients.iter() {
-            let self_clock = self.clients.get_client_id(client).and_then(|id| self.state.get(id));
-            let other_clock = other.clients.get_client_id(client).and_then(|id| other.state.get(id));
+            let self_clock = self
+                .clients
+                .get_client_id(client)
+                .and_then(|id| self.state.get(id));
+            let other_clock = other
+                .clients
+                .get_client_id(client)
+                .and_then(|id| other.state.get(id));
 
             match (self_clock, other_clock) {
                 (Some(self_clock), Some(other_clock)) => {
                     state.update(*client_id, *self_clock);
                 }
-                (None, Some(other_clock)) => { // client id does not exists in self
+                (None, Some(other_clock)) => {
+                    // client id does not exists in self
                     state.update(*client_id, 0);
                 }
                 (Some(self_clock), None) => {
@@ -163,17 +192,7 @@ impl Add<&ClientState> for &ClientState {
     type Output = ClientState;
 
     fn add(self, rhs: &ClientState) -> Self::Output {
-        let mut clone = self.clone();
-
-        for (client, clock) in rhs.state.iter() {
-            clone.update(*client, *clock);
-        }
-
-        for (client, clock) in rhs.clients.iter() {
-            clone.clients.insert(client.clone(), *clock);
-        }
-
-        clone
+        self.adjust_max(rhs)
     }
 }
 
@@ -282,7 +301,7 @@ mod tests {
     use miniz_oxide::deflate::compress_to_vec;
     use uuid::Uuid;
 
-    use crate::{codec_v1::EncoderV1, print_yaml};
+    use crate::codec_v1::EncoderV1;
 
     use super::*;
 
@@ -353,9 +372,9 @@ mod tests {
         let s3 = s1.as_per(&s2);
         // print_yaml(&s3);
 
-        assert!(s3.get(&0).unwrap() == &0);
-        assert!(s3.get(&1).unwrap() == &0);
-        assert!(s3.get(&2).unwrap() == &5);
-        assert!(s3.get(&3).unwrap() == &5);
+        assert_eq!(s3.get(&0).unwrap(), &0);
+        assert_eq!(s3.get(&1).unwrap(), &0);
+        assert_eq!(s3.get(&2).unwrap(), &5);
+        assert_eq!(s3.get(&3).unwrap(), &5);
     }
 }

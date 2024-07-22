@@ -51,6 +51,8 @@ impl Transaction {
         // println!("-----------------------------------------------------");
         // println!("items to integrate: {}", self.diff.items.size());
 
+        print_yaml(&self.diff);
+
         let now = std::time::Instant::now();
         self.prepare()
             .and_then(|_| {
@@ -187,7 +189,7 @@ impl Transaction {
 
         let fields = self.store.upgrade().unwrap().borrow().fields.clone();
 
-        self.store.upgrade().unwrap().borrow_mut().fields = fields.adjust(&self.diff.fields);
+        self.store.upgrade().unwrap().borrow_mut().fields = fields.as_per(&self.diff.fields);
 
         self.ready.queue.reverse();
 
@@ -216,7 +218,8 @@ impl Transaction {
                 let mut left = data.left_id.as_ref().map(|id| store.find(id)).flatten();
                 let right = data.right_id.as_ref().map(|id| store.find(id)).flatten();
 
-                // println!("\nintegrating: {:?}", data.id);
+                println!("\nintegrating: {:?}", data.id);
+                print_yaml(&data);
 
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 

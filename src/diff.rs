@@ -83,7 +83,7 @@ impl Diff {
 
         // let next_state = &self.state + &state;
 
-        let fields = store.fields.adjust(&self.fields);
+        let fields = self.fields.as_per(&store.fields);
         let mut items = ItemDataStore::default();
 
         // println!("before clients: {:?}", self.state.clients);
@@ -127,7 +127,7 @@ impl Diff {
         // print_yaml(&state);
 
         // merge fields
-        let fields = self.fields.adjust(&other.fields);
+        let fields = self.fields.as_per(&other.fields);
 
         let mut items = ItemDataStore::default();
 

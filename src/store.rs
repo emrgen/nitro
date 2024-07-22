@@ -134,14 +134,7 @@ impl DocStore {
 
         let state = state.merge(&self.state);
 
-        Diff::from(
-            id,
-            created_by,
-            self.fields.clone(),
-            state,
-            items,
-            deletes,
-        )
+        Diff::from(id, created_by, self.fields.clone(), state, items, deletes)
     }
 }
 
@@ -779,6 +772,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::codec_v1::EncoderV1;
+    use crate::print_yaml;
 
     use super::*;
 
@@ -913,20 +907,15 @@ mod tests {
         s2.state.update_max(uid3, 2);
         s2.state.update_max(uid4, 1);
 
-        let s12 = &s1 + &s2;
-
         let d1 = s1.adjust_max(&s2);
-        let sd1 = &(&d1 - &s1) + &s1;
+        let s12 = &s1 + &s2;
 
         // print_yaml(&s1);
         // print_yaml(&s2);
-        //
-        // print_yaml(&sd1);
-        // print_yaml(&d1);
-        //
-        // print_yaml(&s12);
 
-        assert_eq!(sd1, d1);
-        assert_ne!(s12, d1);
+        print_yaml(&s12);
+        print_yaml(&d1);
+
+        assert_eq!(s12, d1);
     }
 }

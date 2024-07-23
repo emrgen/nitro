@@ -1,6 +1,6 @@
 use crate::doc::Doc;
 
-fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
+pub fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     let left = serde_json::to_string(d1).unwrap();
     let right = serde_json::to_string(d2).unwrap();
 

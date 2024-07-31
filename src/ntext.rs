@@ -128,6 +128,12 @@ impl NText {
 
         items.into()
     }
+
+    pub(crate) fn text_content(&self) -> String {
+        self.visible_item_iter()
+            .map(|item| item.text_content())
+            .collect()
+    }
 }
 
 impl Serialize for NText {

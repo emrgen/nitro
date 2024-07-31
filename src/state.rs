@@ -92,7 +92,7 @@ impl ClientState {
         ClientState { state, clients }
     }
 
-    pub(crate) fn adjust_min(&self, other: &ClientState) -> ClientState {
+    pub(crate) fn _adjust_min(&self, other: &ClientState) -> ClientState {
         let clients = self.clients.as_per(&other.clients);
         let mut state = ClientIdState::default();
 
@@ -219,6 +219,7 @@ impl Decode for ClientState {
     fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<ClientState, String> {
         let state = ClientIdState::decode(d, ctx)?;
         let clients = ClientMap::decode(d, ctx)?;
+        println!("state: {:?}, clients: {:?}", state, clients);
         Ok(ClientState { state, clients })
     }
 }

@@ -8,6 +8,7 @@
 #![allow(unused_must_use)]
 
 pub use crate::diff::*;
+pub use crate::diffstore::*;
 pub use crate::doc::*;
 pub use crate::id::*;
 pub use crate::nstring::*;
@@ -24,7 +25,7 @@ mod crdt;
 pub mod decoder;
 mod delete;
 mod diff;
-mod diffstore;
+pub mod diffstore;
 mod doc;
 pub mod encoder;
 mod frac_index;

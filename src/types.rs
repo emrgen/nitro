@@ -527,6 +527,13 @@ impl Type {
         }
     }
 
+    pub(crate) fn text_content(&self) -> String {
+        match self {
+            Type::Text(n) => n.text_content(),
+            _ => panic!("text_content: not implemented"),
+        }
+    }
+
     pub(crate) fn eq_opt(a: &Option<Type>, b: &Option<Type>) -> bool {
         let a = a.as_ref().map(|a| a.id());
         let b = b.as_ref().map(|b| b.id());
@@ -677,6 +684,7 @@ impl From<Type> for Option<Id> {
         Some(value.id())
     }
 }
+
 impl From<&Type> for Option<Id> {
     #[inline]
     fn from(value: &Type) -> Self {

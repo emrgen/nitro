@@ -176,6 +176,7 @@ mod test {
     use crate::doc::Doc;
     use crate::id::{Id, Split};
     use crate::mark::Mark;
+    use crate::print_yaml;
 
     #[test]
     fn test_split_string() {
@@ -198,5 +199,26 @@ mod test {
 
         // let yaml = serde_yaml::to_string(&doc).unwrap();
         // println!("{}", yaml);
+    }
+
+    #[test]
+    fn test_merge_string() {
+        let doc = Doc::default();
+        let text = doc.text();
+        doc.set("text", text.clone());
+
+        let string = doc.string("he");
+        text.append(string.clone());
+
+        let string = doc.string("llo");
+        text.append(string.clone());
+
+        let string = doc.string(" world");
+        text.append(string.clone());
+
+        let string = doc.string("!");
+        text.append(string.clone());
+
+        print_yaml(&text);
     }
 }

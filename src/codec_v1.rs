@@ -105,12 +105,12 @@ impl Encoder for EncoderV1 {
         encode_item(self, ctx, value);
     }
 
-    fn trim(&mut self) {
+    fn finish(&mut self) {
         self.buf.shrink_to_fit();
     }
 
     fn decoder(&mut self) -> Box<dyn Decoder> {
-        self.trim();
+        self.finish();
         Box::new(DecoderV1::new(self.buf.clone()))
     }
 
@@ -137,7 +137,7 @@ pub struct DecoderV1 {
 }
 
 impl DecoderV1 {
-    pub(crate) fn new(buf: Vec<u8>) -> Self {
+    pub fn new(buf: Vec<u8>) -> Self {
         let mut d = Self { buf, pos: 0 };
 
         if d.u8().unwrap() != VERSION {

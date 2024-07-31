@@ -12,7 +12,7 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
 use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
-use crate::store::{DeleteItemStore, DocStore, ItemDataStore};
+use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore};
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct Diff {
@@ -62,6 +62,18 @@ impl Diff {
         }
     }
 
+    // create a diff from a diff
+    pub fn diff(&self, state: &ClientState) -> Diff {
+        Diff {
+            doc_id: self.doc_id.clone(),
+            created_by: self.created_by.clone(),
+            fields: self.fields.clone(),
+            items: self.items.diff(state),
+            deletes: self.deletes.diff(state),
+            state: self.state.clone(),
+        }
+    }
+
     pub(crate) fn from_deleted_items(deleted_items: DeleteItemStore) -> Diff {
         Diff {
             deletes: deleted_items,
@@ -79,7 +91,7 @@ impl Diff {
     // adjust the diff to the current state of the store
     // this is used when applying a diff to a store
     pub fn adjust(&self, store: &RefMut<DocStore>) -> Diff {
-        let state = self.state.adjust_min(&store.state);
+        let state = self.state.adjust_max(&store.state);
 
         // let next_state = &self.state + &state;
 
@@ -132,10 +144,10 @@ impl Diff {
         let mut items = ItemDataStore::default();
 
         // adjust items
-        for (_, store) in other.items.iter() {
+        for (_, store) in self.items.iter() {
             for (_, item) in store.iter() {
                 let adjust =
-                    item.adjust(&other.state.clients, &other.fields, &state.clients, &fields);
+                    item.adjust(&self.state.clients, &self.fields, &state.clients, &fields);
                 items.insert(adjust);
             }
         }
@@ -143,9 +155,9 @@ impl Diff {
         // adjust deletes
         let mut deletes = DeleteItemStore::default();
 
-        for (_, store) in other.deletes.clone().into_iter() {
+        for (_, store) in self.deletes.clone().into_iter() {
             for (_, item) in store.into_iter() {
-                let adjust = item.adjust(&other.state.clients, &state.clients);
+                let adjust = item.adjust(&self.state.clients, &state.clients);
                 deletes.insert(adjust);
             }
         }

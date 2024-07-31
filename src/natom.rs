@@ -8,7 +8,7 @@ use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 
 #[derive(Clone, Debug)]
-pub(crate) struct NAtom {
+pub struct NAtom {
     pub(crate) item: ItemRef,
 }
 

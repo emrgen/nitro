@@ -84,6 +84,8 @@ impl CloneDeep for RichText {
 
 #[cfg(test)]
 mod tests {
+    use rand::seq::SliceRandom;
+
     use super::*;
 
     fn create_text_pairs() -> (RichText, RichText) {
@@ -309,5 +311,95 @@ mod tests {
         // print_yaml(&t1.doc);
         // print_yaml(&t2.doc);
         // print_yaml(&t3.doc);
+    }
+
+    fn sync_all_docs(docs: &Vec<RichText>) {
+        for i in 0..docs.len() {
+            for j in 0..docs.len() {
+                if i != j {
+                    sync_docs(&docs[i].doc, &docs[j].doc, SyncDirection::default());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn sync_n_docs() {
+        let doc = RichText::new();
+        let mut docs = vec![];
+        for _ in 0..10 {
+            docs.push(doc.clone_deep());
+        }
+
+        docs[0].insert(0, "a");
+        docs[1].insert(0, "b");
+        docs[2].insert(0, "c");
+        docs[3].insert(0, "d");
+        docs[4].insert(0, "e");
+        docs[5].insert(0, "f");
+        docs[6].insert(0, "g");
+        docs[7].insert(0, "h");
+        docs[8].insert(0, "i");
+        docs[9].insert(0, "j");
+        sync_all_docs(&docs);
+        for i in 0..docs.len() {
+            for j in 0..docs.len() {
+                assert_eq!(docs[i], docs[j]);
+            }
+        }
+
+        docs[0].insert(0, "k");
+        docs[1].insert(0, "l");
+        docs[2].insert(0, "m");
+        docs[3].insert(0, "n");
+        docs[4].insert(0, "o");
+        docs[5].insert(0, "p");
+        docs[6].insert(0, "q");
+        docs[7].insert(0, "r");
+        docs[8].insert(0, "s");
+        docs[9].insert(0, "t");
+
+        sync_all_docs(&docs);
+        for i in 0..docs.len() {
+            for j in 0..docs.len() {
+                assert_eq!(docs[i], docs[j]);
+            }
+        }
+
+        // print_yaml(&docs[0].doc);
+    }
+
+    #[test]
+    fn test_sync_n_docs_with_insert() {
+        let doc = RichText::new();
+        let mut docs = vec![];
+        for _ in 0..10 {
+            docs.push(doc.clone_deep());
+        }
+
+        let mut chars = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+
+        insert_random_chars(&mut docs[0], &mut chars, 10);
+        insert_random_chars(&mut docs[1], &mut chars, 10);
+        insert_random_chars(&mut docs[2], &mut chars, 10);
+        insert_random_chars(&mut docs[3], &mut chars, 10);
+        insert_random_chars(&mut docs[4], &mut chars, 10);
+
+        sync_all_docs(&docs);
+
+        for i in 0..docs.len() {
+            for j in 0..docs.len() {
+                assert_eq!(docs[i], docs[j]);
+            }
+        }
+    }
+
+    fn insert_random_chars(doc: &mut RichText, chars: &mut Vec<&str>, size: usize) {
+        chars.shuffle(&mut rand::thread_rng());
+        for _ in 0..size {
+            for c in chars.iter() {
+                doc.insert(0, c);
+            }
+        }
     }
 }

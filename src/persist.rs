@@ -44,9 +44,9 @@ impl DocStoreData {
     pub(crate) fn diff(&self, state: &ClientState) -> Diff {
         let state = state.as_per(&self.state);
 
-        let items = self.items.diff(state.clone(), &self.id_map);
+        let items = self.items.diff(&state);
 
-        let deletes = self.deleted_items.diff(state.clone(), &self.id_map);
+        let deletes = self.deleted_items.diff(&state);
 
         let mut clients = self.state.clients.clone();
 

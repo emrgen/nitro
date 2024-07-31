@@ -40,6 +40,13 @@ impl ItemRef {
     pub(crate) fn size(&self) -> u32 {
         self.item.borrow().size()
     }
+
+    pub(crate) fn text_content(&self) -> String {
+        match self.borrow().content {
+            Content::String(ref s) => s.clone(),
+            _ => panic!("NString has invalid content"),
+        }
+    }
 }
 
 pub(crate) trait WithIndex {
@@ -89,6 +96,8 @@ impl ItemRef {
 
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
         item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
+
+        // TODO: if item and prev are adjacent string items, merge them
     }
 
     pub fn prepend(&self, value: impl Into<Type>) {
@@ -688,6 +697,14 @@ impl ItemData {
         }
 
         data
+    }
+
+    pub(crate) fn ticks(&self) -> u32 {
+        match &self.content {
+            Content::String(s) => s.len() as u32,
+            Content::Mark(m) => m.size(),
+            _ => 1,
+        }
     }
 
     pub(crate) fn is_root(&self) -> bool {

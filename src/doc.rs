@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
+use crate::{Client, Clock};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -21,7 +22,6 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
-use crate::Client;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocOpts {
@@ -32,9 +32,19 @@ pub struct DocOpts {
 #[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DocId(Uuid);
 
+impl From<&DocId> for DocId {
+    fn from(value: &DocId) -> Self {
+        value.clone()
+    }
+}
+
 impl DocId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
     }
 
     pub fn from_bytes(bytes: &[u8; 16]) -> Self {
@@ -54,6 +64,10 @@ impl DocId {
 
     pub fn as_bytes(&self) -> [u8; 16] {
         self.0.as_bytes().to_owned().try_into().unwrap()
+    }
+
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
     }
 }
 
@@ -143,6 +157,10 @@ impl Doc {
         }
     }
 
+    pub fn id(&self) -> DocId {
+        self.opts.id.clone()
+    }
+
     // create a new doc from a diff
     pub(crate) fn from_diff(diff: &Diff) -> Option<Doc> {
         if let Some(root) = &diff.get_root() {
@@ -222,8 +240,13 @@ impl Doc {
     }
 
     pub fn string(&self, value: impl Into<String>) -> NString {
-        let id = self.store.borrow_mut().next_id();
-        let string = NString::new(id, value.into(), Rc::downgrade(&self.store));
+        let content = value.into();
+        let id = self
+            .store
+            .borrow_mut()
+            .next_id_range(content.len() as Clock)
+            .start_id();
+        let string = NString::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(string.clone());
 
         string
@@ -357,8 +380,8 @@ impl CloneDeep for Doc {
 #[cfg(test)]
 mod test {
     use byte_unit::{AdjustedByte, Byte, Unit};
-    use fake::faker::lorem::en::Words;
     use fake::Fake;
+    use fake::faker::lorem::en::Words;
     use miniz_oxide::deflate::compress_to_vec;
     use rand::random;
 

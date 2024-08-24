@@ -39,8 +39,6 @@ impl ClientState {
 
     pub(crate) fn remove(&mut self, client: &ClientId) {
         self.state.remove(client);
-        self.state.remove(client);
-        self.state.remove(client);
     }
 
     pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {

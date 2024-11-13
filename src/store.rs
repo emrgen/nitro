@@ -163,6 +163,7 @@ impl ReadyStore {
         let id = self.id_range_map.find(id);
         self.items.find(&id)
     }
+    
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
         self.delete_items.insert(item);
     }

@@ -9,6 +9,7 @@ A high performance CRDT library.
 - [x] string
 - [x] atom
 - [ ] proxy
+- [ ] move
 - [x] mark
 - [x] delete
 - [x] diff

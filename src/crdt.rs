@@ -7,6 +7,8 @@ use crate::store::ClientStore;
 use crate::types::Type;
 
 // integrate an item into the list of items
+// SF: start function to set the start item
+// EF: end function to set the end item
 pub(crate) fn integrate<SF, EF>(
     item: &Type,
     client_map: &ClientMap,

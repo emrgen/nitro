@@ -1275,7 +1275,7 @@ bitflags! {
         const STRING = 0x0D;
         const BINARY = 0x0E;
         const ARRAY = 0x0F;
-        const MAP = 0x10;
+        const MAP = 0x10; // 16
     }
 }
 

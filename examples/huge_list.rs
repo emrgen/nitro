@@ -1,4 +1,4 @@
-use nitro::{CloneDeep, Content, Doc, sync_docs, SyncDirection, Type};
+use nitro::{CloneDeep, Doc, sync_docs, SyncDirection, Type};
 
 fn main() {
     let doc1 = Doc::default();
@@ -9,6 +9,7 @@ fn main() {
     let mut l2 = doc2.get("list1").unwrap().clone();
 
     assert_eq!(doc1, doc2);
+    doc2.update_client();
 
     // 26 letters
     let mut chars = vec![
@@ -17,7 +18,7 @@ fn main() {
     ];
     let mut size = 2;
 
-    for _ in 0..500 {
+    for _ in 0..5000 {
         for c in &chars {
             let item = doc1.string(c.to_string());
             l1.append(item);
@@ -26,30 +27,54 @@ fn main() {
     println!("{:?}", l1.size());
     chars.reverse();
 
-    for _ in 0..500 {
+    let mut size = 1;
+    for _ in 0..5000 {
         for c in &chars {
             let item = doc2.string(c.to_string());
-            l2.append(item);
+            // random index
+            let index = rand::random::<usize>() % size;
+            l2.insert(index as u32, item);
+            size += 1;
         }
     }
-    println!("{:?}", l2.size());
-    // sync_docs(&t1.doc, &t2.doc, SyncDirection::LeftToRight);
+
+    let now = std::time::Instant::now();
+
+    // sync_docs(&doc1, &doc2, SyncDirection::LeftToRight);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
 
     sync_docs(&doc1, &doc2, SyncDirection::Both);
 
-    if let Content::Types(list) = l1.content() {
-        let content = list
-            .iter()
-            .map(|item| match item.content() {
-                Content::String(s) => s,
-                _ => "".parse().unwrap(),
-            })
-            .collect::<Vec<_>>()
-            .join("");
+    println!("{:?}", now.elapsed());
 
-        println!("{:?}", content);
-    }
+    println!("{:?}", l1.size());
+    // println!("{:?}", l2.size());
+
+    // if let Content::Types(list) = l1.content() {
+    //     let content = list
+    //         .iter()
+    //         .map(|item| match item.content() {
+    //             Content::String(s) => s,
+    //             _ => "".parse().unwrap(),
+    //         })
+    //         .collect::<Vec<_>>()
+    //         .join("");
+    //
+    //     println!("{:?}", content);
+    // }
+    //
+    // if let Content::Types(list) = l2.content() {
+    //     let content = list
+    //         .iter()
+    //         .map(|item| match item.content() {
+    //             Content::String(s) => s,
+    //             _ => "".parse().unwrap(),
+    //         })
+    //         .collect::<Vec<_>>()
+    //         .join("");
+    //
+    //     println!("{:?}", content);
+    // }
 
     // for i in 0..l2.size() {
     //     let item1 = l1.get(i).unwrap();
@@ -58,7 +83,7 @@ fn main() {
     //     // assert_eq!(item1, item2);
     // }
 
-    // assert_eq!(doc1, doc2);
+    assert_eq!(doc1, doc2);
 
     // print_yaml(l1.content());
     // print_yaml(l2.content());

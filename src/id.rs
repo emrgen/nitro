@@ -241,7 +241,6 @@ impl Id {
             let right = calculate_hash(&format!("{}{}", other_client, other.clock));
             return left.cmp(&right);
         }
-
         self.compare_without_client(other)
     }
 

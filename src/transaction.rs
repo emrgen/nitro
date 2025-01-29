@@ -199,7 +199,6 @@ impl Transaction {
         let mut store = store.borrow_mut();
 
         while let Some(data) = self.ready.queue.pop() {
-            println!("integrating: {:?}", data.id);
             let parent = {
                 if let Some(parent_id) = &data.parent_id {
                     store.find(parent_id)
@@ -238,10 +237,7 @@ impl Transaction {
                     },
                 )?;
 
-                print!("{}", &item.left_id().unwrap_or_default());
-                if let Some(left) = item.left() {
-                    print!(" -> {}", left.id());
-                }
+                parent.on_insert(&item);
                 store.insert(item);
 
                 // println!("integrated with count: {}", count);

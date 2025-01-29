@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub(crate) struct SkipList {
     head: Node,
     tail: Node,

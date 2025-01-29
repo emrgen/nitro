@@ -733,7 +733,7 @@ impl ItemData {
             s.serialize_field("field", &field.to_string())?;
         }
 
-        s.serialize_field("content", &self.content)?;
+        // s.serialize_field("content", &self.content)?;
 
         Ok(())
     }
@@ -758,6 +758,10 @@ impl ItemData {
         }
 
         if self.mover_id.is_some() {
+            size += 1;
+        }
+
+        if self.field.is_some() {
             size += 1;
         }
 

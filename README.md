@@ -1,6 +1,12 @@
 A high performance CRDT library.
 
 
+### Bench
+```
+sudo sysctl kernel.perf_event_paranoid=3
+flamegraph -- cargo run --example huge_list
+```
+
 ### Features
 - [x] document
 - [x] list

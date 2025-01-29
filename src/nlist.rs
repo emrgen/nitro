@@ -81,26 +81,25 @@ impl NList {
         self.on_insert(&item);
     }
 
-    pub(crate) fn appenda(&self, item: impl Into<Type>) {
+    pub(crate) fn append(&self, item: impl Into<Type>) {
         let item = item.into();
         self.item.append(item.clone());
         Type::add_frac_index(&item);
-        self.list.borrow_mut().append(item.clone());
         self.on_insert(&item);
     }
 
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let size = self.list.borrow().size();
         let typ = item.into();
+
         if offset == 0 {
-            self.list.borrow_mut().prepend(typ.clone());
             self.prepend(typ);
         } else if offset >= size as u32 {
-            self.list.borrow_mut().append(typ.clone());
             self.append(typ);
         } else {
             let list = self.list.borrow();
             let next = list.at_index(offset);
+
             if let Some(next) = next {
                 next.insert_before(typ);
             } else {

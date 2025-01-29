@@ -29,7 +29,6 @@ mod diff;
 pub mod diffstore;
 mod doc;
 pub mod encoder;
-mod frac_index;
 mod hash;
 mod ibtree;
 mod id;

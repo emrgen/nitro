@@ -471,7 +471,7 @@ impl Type {
     #[inline]
     pub fn append(&self, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.appenda(item),
+            Type::List(n) => n.append(item),
             Type::Text(n) => n.append(item),
             _ => panic!("append: not implemented"),
         }
@@ -591,6 +591,7 @@ impl Type {
                 // Self::add_frac_index(child);
                 n.on_insert(child)
             }
+            Type::Map(n) => {}
             _ => panic!("on_insert: not implemented for {:?}", self.kind()),
         }
     }

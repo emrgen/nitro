@@ -6,10 +6,10 @@ use std::ops::Add;
 use bimap::BiMap;
 use serde::{Serialize, Serializer};
 
+use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
-use crate::Client;
 
 pub type ClientId = u32;
 
@@ -71,8 +71,9 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
     pub fn as_per(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
         let mut clone = other.clone();
         let mut entries = self.map.iter().collect::<Vec<_>>();
-        // TODO: check if this
-        // entries.sort_by(|a, b| a.1.cmp(b.1));
+        // NOTE: sort by id to ensure the values are in increasing order
+        // this is necessary because map is a bimap and the order of entries is not guaranteed
+        entries.sort_by(|a, b| a.1.cmp(b.1));
 
         for (l, _) in entries {
             clone.get_or_insert(l);
@@ -418,10 +419,10 @@ impl Decode for FieldMap {
 #[cfg(test)]
 mod test {
     use crate::bimapid::ClientMap;
+    use crate::Client;
     use crate::codec_v1::EncoderV1;
     use crate::decoder::{Decode, DecodeContext};
     use crate::encoder::{Encode, EncodeContext, Encoder};
-    use crate::Client;
 
     #[test]
     fn test_encode_decode_client_map() {

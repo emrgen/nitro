@@ -1,11 +1,10 @@
 use std::cell::RefMut;
 use std::ops::Add;
 
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 
 use crate::bimapid::FieldMap;
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -13,6 +12,7 @@ use crate::id::Id;
 use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore};
+use crate::Client;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct Diff {

@@ -144,6 +144,10 @@ impl Type {
         self.item_ref().store.clone()
     }
 
+    pub(crate) fn depth(&self) -> u32 {
+        self.item_ref().depth()
+    }
+
     #[inline]
     pub(crate) fn right_origin(&self) -> Option<Type> {
         self.item_ref().borrow().right_origin(self.store())
@@ -449,7 +453,7 @@ impl Type {
         }
     }
 
-    pub(crate) fn content(&self) -> Content {
+    pub fn content(&self) -> Content {
         match self {
             Type::String(n) => n.content(),
             Type::Atom(n) => n.content(),
@@ -457,14 +461,17 @@ impl Type {
             Type::Proxy(n) => n.content(),
             Type::Move(n) => n.content(),
             Type::Mark(n) => n.content(),
-            _ => panic!("content: not implemented"),
+            Type::List(n) => n.content(),
+            _ => {
+                panic!("content: not implemented for {:?}", self.kind())
+            }
         }
     }
 
     #[inline]
     pub fn append(&self, item: impl Into<Type>) {
         match self {
-            Type::List(n) => n.append(item),
+            Type::List(n) => n.appenda(item),
             Type::Text(n) => n.append(item),
             _ => panic!("append: not implemented"),
         }
@@ -497,9 +504,10 @@ impl Type {
     }
 
     #[inline]
-    pub fn get(&self, key: String) -> Option<Type> {
+    pub fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {
         match self {
-            Type::Map(n) => n.get(key),
+            Type::Map(n) => n.get(key.into()),
+            Type::List(n) => n.get(key.into()),
             _ => panic!("get: not implemented"),
         }
     }

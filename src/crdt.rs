@@ -7,19 +7,19 @@ use crate::store::ClientStore;
 use crate::types::Type;
 
 // integrate an item into the list of items
-pub(crate) fn integrate<SF, EF>(
+pub(crate) fn integrate<SS, SE>(
     item: &Type,
     client_map: &ClientMap,
     parent: &Type,
     start: Option<Type>,
     left: &mut Option<Type>,
     right: Option<Type>,
-    set_start: SF,
-    set_end: EF,
+    set_start: SS,
+    set_end: SE,
 ) -> Result<(i32), String>
 where
-    SF: FnOnce(Option<Type>) -> Result<(), String>,
-    EF: FnOnce(Option<Type>) -> Result<(), String>,
+    SS: FnOnce(Option<Type>) -> Result<(), String>,
+    SE: FnOnce(Option<Type>) -> Result<(), String>,
 {
     // let item: Type = ItemRef::new(data.into(), store.clone()).into();
     // print_yaml(&item);

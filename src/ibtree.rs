@@ -36,6 +36,14 @@ impl ItemListContainer for IBTree {
         self.btree.insert(value.index(), value);
     }
 
+    fn append(&mut self, value: Type) {
+        self.btree.insert(value.index(), value);
+    }
+
+    fn prepend(&mut self, value: Type) {
+        self.btree.insert(value.index(), value);
+    }
+
     fn remove(&mut self, item: &Type) {
         self.btree.remove(&item.index());
     }

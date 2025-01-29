@@ -199,6 +199,7 @@ impl Transaction {
         let mut store = store.borrow_mut();
 
         while let Some(data) = self.ready.queue.pop() {
+            println!("integrating: {:?}", data.id);
             let parent = {
                 if let Some(parent_id) = &data.parent_id {
                     store.find(parent_id)

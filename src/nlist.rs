@@ -40,15 +40,22 @@ impl NList {
         }
     }
 
-    pub(crate) fn size(&self) -> u32 {
+    pub fn size(&self) -> u32 {
         self.list.borrow().size() as u32
+    }
+
+    pub fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {
+        if let ItemKey::Number(offset) = key.into() {
+            return self.list.borrow().at_index(offset).map(|v| v.clone());
+        }
+        None
     }
 
     pub(crate) fn field(&self) -> Option<String> {
         self.borrow().field(self.item_ref().store.clone())
     }
 
-    pub(crate) fn content(&self) -> Content {
+    pub fn content(&self) -> Content {
         let types = self.borrow().as_list();
         Content::Types(types)
     }
@@ -74,26 +81,30 @@ impl NList {
         self.on_insert(&item);
     }
 
-    fn append(&self, item: impl Into<Type>) {
+    pub(crate) fn appenda(&self, item: impl Into<Type>) {
         let item = item.into();
         self.item.append(item.clone());
         Type::add_frac_index(&item);
+        self.list.borrow_mut().append(item.clone());
         self.on_insert(&item);
     }
 
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let size = self.list.borrow().size();
+        let typ = item.into();
         if offset == 0 {
-            self.prepend(item.into());
+            self.list.borrow_mut().prepend(typ.clone());
+            self.prepend(typ);
         } else if offset >= size as u32 {
-            self.append(item.into());
+            self.list.borrow_mut().append(typ.clone());
+            self.append(typ);
         } else {
             let list = self.list.borrow();
             let next = list.at_index(offset);
             if let Some(next) = next {
-                next.insert_before(item.into());
+                next.insert_before(typ);
             } else {
-                self.append(item.into());
+                self.append(typ);
             }
         }
     }

@@ -32,8 +32,11 @@ pub fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
     } else if direction == SyncDirection::RightToLeft {
         d1.apply(diff2);
     } else {
+        println!("sync_docs: d1 -> d2");
         d1.apply(diff2);
+        println!("sync_docs: d2 -> d1");
         d2.apply(diff1);
+        println!("sync_docs: done");
     }
 }
 

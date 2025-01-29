@@ -51,7 +51,7 @@ impl NProxy {
         }
     }
 
-    fn get(&self, key: String) -> Option<Type> {
+    fn get(&self, key: ItemKey) -> Option<Type> {
         if let Some(target) = self.target.as_ref() {
             target.get(key)
         } else {

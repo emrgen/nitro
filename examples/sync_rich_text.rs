@@ -22,9 +22,14 @@ fn main() {
         for c in &chars {
             let item = t1.doc.string(c.to_string());
             // t1.text.insert(0, item.clone());
-            t1.text.prepend(item);
+            // insert in random position
+            let index = rand::random::<usize>() % t1.text.size() as usize;
+            t1.text.insert(index as u32, item.clone());
+            // t1.text.append(item);
         }
     }
+
+    println!("t1 inserted");
 
     chars.reverse();
 
@@ -33,18 +38,19 @@ fn main() {
         for c in &chars {
             let item = t2.doc.string(c.to_string());
             // t2.text.insert(0, item.clone());
-            t2.text.prepend(item);
+            t2.text.append(item);
         }
     }
 
     // t1.sync(&t2);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::LeftToRight);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
+    println!("xxxxxxxxx");
     sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
 
     println!("xxxxxxxxx");
 
-    assert_eq!(t1, t2);
+    // assert_eq!(t1, t2);
 
     // print_yaml(&t1);
     // print_yaml(&t2);

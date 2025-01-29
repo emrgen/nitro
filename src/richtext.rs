@@ -402,4 +402,7 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn remote_slice() {}
 }

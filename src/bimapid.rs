@@ -6,10 +6,10 @@ use std::ops::Add;
 use bimap::BiMap;
 use serde::{Serialize, Serializer};
 
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
+use crate::Client;
 
 pub type ClientId = u32;
 
@@ -35,18 +35,27 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         EncoderMap { map: BiMap::new() }
     }
 
-    pub fn size(&self) -> usize {
-        self.map.len()
+    pub fn insert(&mut self, key: T, value: u32) {
+        self.map.insert(key, value);
+    }
+
+    pub fn get_key(&self, id: &u32) -> Option<&T> {
+        self.map.get_by_right(id)
+    }
+
+    pub fn get_value(&self, key: &T) -> Option<&u32> {
+        self.map.get_by_left(key)
+    }
+
+    pub fn remove_by_left(&mut self, left: &T) {
+        self.map.remove_by_left(left);
     }
 
     pub fn remove_by_right(&mut self, right: &u32) {
         self.map.remove_by_right(right);
     }
 
-    pub fn insert(&mut self, key: T, value: u32) {
-        self.map.insert(key, value);
-    }
-
+    // get the id of the key, if not present insert the key:u32 pair and return the id
     pub fn get_or_insert(&mut self, key: &T) -> u32 {
         match self.map.get_by_left(key) {
             Some(&id) => id,
@@ -58,19 +67,12 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         }
     }
 
-    pub fn get(&self, key: &T) -> Option<&u32> {
-        self.map.get_by_left(key)
-    }
-
-    pub fn get_key(&self, id: &u32) -> Option<&T> {
-        self.map.get_by_right(id)
-    }
-
     // insert self clients into other clients
     pub fn as_per(&self, other: &EncoderMap<T>) -> EncoderMap<T> {
         let mut clone = other.clone();
         let mut entries = self.map.iter().collect::<Vec<_>>();
-        entries.sort_by(|a, b| a.1.cmp(b.1));
+        // TODO: check if this
+        // entries.sort_by(|a, b| a.1.cmp(b.1));
 
         for (l, _) in entries {
             clone.get_or_insert(l);
@@ -80,17 +82,18 @@ impl<T: EncoderMapEntry> EncoderMap<T> {
         clone
     }
 
+    // merge self clients into other clients
     pub(crate) fn merge(&self, other: &EncoderMap<T>) -> Self {
-        let mut merged = Self::default();
-        for (client, client_id) in self.map.iter() {
-            merged.insert(client.clone(), *client_id);
-        }
-
+        let mut merged = self.clone();
         for (client, client_id) in other.map.iter() {
             merged.insert(client.clone(), *client_id);
         }
 
         merged
+    }
+
+    pub fn size(&self) -> usize {
+        self.map.len()
     }
 }
 
@@ -273,7 +276,7 @@ impl ClientMap {
     }
 
     pub(crate) fn contains_client(&self, client: &Client) -> bool {
-        self.map.get(client).is_some()
+        self.map.get_value(client).is_some()
     }
 
     pub(crate) fn remove_client(&mut self, client: &Client) {
@@ -281,7 +284,7 @@ impl ClientMap {
     }
 
     pub(crate) fn get_client_id(&self, client_id: &Client) -> Option<&ClientId> {
-        self.map.get(client_id)
+        self.map.get_value(client_id)
     }
 
     pub(crate) fn get_client(&self, client: &ClientId) -> Option<&Client> {
@@ -366,7 +369,7 @@ impl FieldMap {
     }
 
     pub(crate) fn get_field_id(&self, field_id: &Field) -> Option<&FieldId> {
-        self.map.get(field_id)
+        self.map.get_value(field_id)
     }
 
     pub(crate) fn get_field(&self, field_id: &FieldId) -> Option<&Field> {
@@ -415,10 +418,10 @@ impl Decode for FieldMap {
 #[cfg(test)]
 mod test {
     use crate::bimapid::ClientMap;
-    use crate::Client;
     use crate::codec_v1::EncoderV1;
     use crate::decoder::{Decode, DecodeContext};
     use crate::encoder::{Encode, EncodeContext, Encoder};
+    use crate::Client;
 
     #[test]
     fn test_encode_decode_client_map() {

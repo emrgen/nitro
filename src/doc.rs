@@ -94,9 +94,7 @@ impl Serialize for DocId {
     where
         S: serde::ser::Serializer,
     {
-        let mut s = serializer.serialize_struct("DocId", 1)?;
-        s.serialize_field("guid", &self.0.to_string())?;
-        s.end()
+        serializer.serialize_str(&self.0.to_string())
     }
 }
 
@@ -347,7 +345,7 @@ impl Serialize for Doc {
         size += root.borrow().serialize_size();
 
         let mut s = serializer.serialize_struct("Doc", size + 1)?;
-        s.serialize_field("guid", &self.opts.id)?;
+        s.serialize_field("doc_id", &self.opts.id)?;
         s.serialize_field("created_by", &self.opts.crated_by)?;
         s.serialize_field("root", &root)?;
 
@@ -549,5 +547,32 @@ mod test {
         // println!("right: {}", right);
 
         assert_eq!(left, right);
+    }
+
+    #[test]
+    fn test_item_depth() {
+        let d1 = Doc::default();
+        let list = d1.list();
+        d1.set("list", list.clone());
+
+        let a1 = d1.atom("a1");
+        let a2 = d1.atom("a2");
+
+        list.append(a1.clone());
+        list.append(a2.clone());
+
+        let list2 = d1.list();
+
+        list.append(list2.clone());
+
+        let a3 = d1.atom("a3");
+        let a4 = d1.atom("a4");
+
+        list2.append(a3.clone());
+        list2.append(a4.clone());
+
+        assert_eq!(list.depth(), 1);
+        assert_eq!(a1.depth(), 2);
+        assert_eq!(a3.depth(), 3);
     }
 }

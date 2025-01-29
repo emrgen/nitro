@@ -76,9 +76,11 @@ impl NMap {
         self.item_ref().add_mark(mark);
     }
 
-    pub(crate) fn get(&self, key: String) -> Option<Type> {
+    pub(crate) fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {
         let item = self.borrow();
         let map = item.as_map(self.store.clone());
+
+        let key = key.into().as_string();
 
         let item = map.get(&key);
         item.cloned()

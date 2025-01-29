@@ -9,7 +9,7 @@ use bitflags::bitflags;
 use fractional_index::FractionalIndex;
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
-use serde::ser::SerializeStruct;
+use serde::ser::{SerializeSeq, SerializeStruct};
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
@@ -35,6 +35,14 @@ pub struct ItemRef {
 impl ItemRef {
     pub(crate) fn set_content(&self, content: Content) {
         self.borrow_mut().content = content;
+    }
+
+    pub(crate) fn depth(&self) -> u32 {
+        if let Some(parent) = &self.item.borrow().parent {
+            parent.depth() + 1
+        } else {
+            0
+        }
     }
 
     pub(crate) fn size(&self) -> u32 {
@@ -349,9 +357,9 @@ pub struct Item {
     pub(crate) end: Option<Type>,      // linked children end
     pub(crate) target: Option<Type>,   // indirect item ref (proxy, mover)
     pub(crate) mover: Option<Type>,    // mover ref (proxy)
-    pub(crate) marks: Option<Type>,    // linked movers
     pub(crate) movers: Option<Type>,   // linked movers
-    pub(crate) index: FractionalIndex, // runtime index for quick index lookup
+    pub(crate) marks: Option<Type>,    // linked marks
+    pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list
     pub(crate) flags: u8,
 }
 
@@ -365,17 +373,7 @@ impl Item {
     pub(crate) fn new(data: ItemData) -> Self {
         Self {
             data,
-            parent: None,
-            left: None,
-            right: None,
-            start: None,
-            end: None,
-            target: None,
-            mover: None,
-            marks: None,
-            movers: None,
-            index: FractionalIndex::default(),
-            flags: 0,
+            ..Default::default()
         }
     }
 
@@ -391,13 +389,6 @@ impl Item {
         let store = store.upgrade().unwrap();
         let store = store.borrow();
         let field = store.get_field(&self.data.field.unwrap());
-
-        // let k: String = rand::thread_rng()
-        //     .sample_iter(&Alphanumeric)
-        //     .take(7)
-        //     .map(char::from)
-        //     .collect();
-        //
         field.map(|s| s.to_string())
     }
 
@@ -742,6 +733,8 @@ impl ItemData {
             s.serialize_field("field", &field.to_string())?;
         }
 
+        s.serialize_field("content", &self.content)?;
+
         Ok(())
     }
 
@@ -1007,14 +1000,20 @@ impl From<usize> for ItemKey {
     }
 }
 
+impl From<u32> for ItemKey {
+    fn from(n: u32) -> Self {
+        Self::Number(n as u32)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) enum Content {
+pub enum Content {
+    Doc(DocProps),
+    Types(Vec<Type>), // list of types, backbone for crdt types
     Mark(MarkContent),
     Binary(Vec<u8>),
     String(String),
-    Types(Vec<Type>),
     Embed(Any),
-    Doc(DocProps),
     Null,
 }
 
@@ -1055,6 +1054,13 @@ impl Serialize for Content {
             // Self::Embed(a) => a.serialize(serializer),
             Self::Doc(d) => serializer.serialize_str(&serde_json::to_string(&d.id).unwrap()),
             Self::Null => serializer.serialize_none(),
+            Self::Types(list) => {
+                let mut seq = serializer.serialize_seq(Some(list.len()))?;
+                for item in list {
+                    seq.serialize_element(&item.content())?;
+                }
+                seq.end()
+            }
             _ => serializer.serialize_none(),
         }
     }

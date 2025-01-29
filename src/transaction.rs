@@ -8,7 +8,7 @@ use crate::crdt::integrate;
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
-use crate::item::{ItemData, ItemRef, StartEnd};
+use crate::item::{ItemData, ItemRef, Linked, StartEnd};
 use crate::print_yaml;
 use crate::queue_store::ClientQueueStore;
 use crate::store::{
@@ -238,6 +238,10 @@ impl Transaction {
                     },
                 )?;
 
+                print!("{}", &item.left_id().unwrap_or_default());
+                if let Some(left) = item.left() {
+                    print!(" -> {}", left.id());
+                }
                 store.insert(item);
 
                 // println!("integrated with count: {}", count);

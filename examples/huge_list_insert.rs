@@ -14,7 +14,7 @@ fn main() {
     let mut size = 1;
     let now = std::time::Instant::now();
 
-    for _ in 0..5000 {
+    for _ in 0..1000 {
         for c in &chars {
             let item = doc1.string(c.to_string());
             // random index

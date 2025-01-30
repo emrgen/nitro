@@ -2,20 +2,6 @@ use fractional_index::FractionalIndex;
 
 use crate::item::WithIndex;
 use crate::Type;
-
-pub(crate) trait ItemListContainer {
-    fn size(&self) -> u32;
-    fn at_index(&self, index: u32) -> Option<&Type>;
-    fn index_of(&self, item: &Type) -> u32;
-    fn insert(&mut self, item: Type);
-    fn append(&mut self, value: Type);
-    fn prepend(&mut self, value: Type);
-    fn remove(&mut self, item: &Type);
-    fn delete(&mut self, item: &Type);
-    fn undelete(&mut self, item: &Type);
-    fn contains(&self, item: &Type) -> bool;
-}
-
 #[derive(Clone, Debug, Default)]
 pub(crate) struct IndexTree {
     root: Option<Box<TreeNode>>,
@@ -80,6 +66,7 @@ pub(crate) enum Color {
     Black,
 }
 
+// Red Black Tree implementation for FractionalIndex to store items
 impl IndexTree {
     pub(crate) fn new() -> Self {
         Self { root: None }
@@ -464,9 +451,9 @@ mod test {
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
 
-    use crate::{Doc, Type};
+    use crate::index::rbtree::IndexTree;
     use crate::item::WithIndex;
-    use crate::rbtree::IndexTree;
+    use crate::{Doc, Type};
 
     #[test]
     fn test_insert_node() {

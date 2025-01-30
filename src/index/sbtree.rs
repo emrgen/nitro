@@ -1,17 +1,27 @@
-use std::collections::BTreeMap;
-
-use fractional_index::FractionalIndex;
-
+use crate::index::ItemListContainer;
 use crate::item::WithIndex;
-use crate::rbtree::ItemListContainer;
 use crate::Type;
+use btree_slab::BTreeMap;
+use fractional_index::FractionalIndex;
+use std::fmt::Debug;
 
-#[derive(Debug, Default)]
-pub(crate) struct IBTree {
-    pub(crate) btree: BTreeMap<FractionalIndex, Type>,
+pub(crate) struct SlabBTree {
+    btree: BTreeMap<FractionalIndex, Type>,
 }
 
-impl IBTree {
+impl Debug for SlabBTree {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ABTree").finish()
+    }
+}
+
+impl Default for SlabBTree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SlabBTree {
     pub(crate) fn new() -> Self {
         Self {
             btree: BTreeMap::new(),
@@ -19,7 +29,7 @@ impl IBTree {
     }
 }
 
-impl ItemListContainer for IBTree {
+impl ItemListContainer for SlabBTree {
     fn size(&self) -> u32 {
         self.btree.len() as u32
     }

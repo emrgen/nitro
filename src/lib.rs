@@ -20,6 +20,8 @@ pub use crate::sync::*;
 pub use crate::types::*;
 pub use crate::utils::*;
 
+use crate::index::*;
+
 mod bimapid;
 pub mod codec_v1;
 mod crdt;
@@ -30,9 +32,9 @@ pub mod diffstore;
 mod doc;
 pub mod encoder;
 mod hash;
-mod ibtree;
 mod id;
 mod id_store;
+mod index;
 mod item;
 mod mark;
 mod natom;
@@ -45,7 +47,6 @@ mod nstring;
 mod ntext;
 mod persist;
 mod queue_store;
-mod rbtree;
 mod richtext;
 mod skiplist;
 mod state;

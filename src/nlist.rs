@@ -1,22 +1,18 @@
-use std::cell::RefCell;
-use std::default::Default;
-use std::ops::Deref;
-use std::rc::Rc;
-
-use serde::ser::{Serialize, SerializeStruct};
-
-use crate::ibtree::IBTree;
 use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::index::IndexTree;
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
-use crate::rbtree::ItemListContainer;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
+use serde::ser::{Serialize, SerializeStruct};
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::ops::Deref;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, Default)]
 pub struct NList {
     item: ItemRef,
-    cache: Option<Vec<Type>>,
-    list: Rc<RefCell<IBTree>>,
+    list: Rc<RefCell<IndexTree>>,
 }
 
 impl NList {
@@ -35,7 +31,6 @@ impl NList {
 
         Self {
             item: ItemRef::new(data.into(), store),
-            cache: None,
             list: Rc::new(RefCell::new(Default::default())),
         }
     }
@@ -98,6 +93,8 @@ impl NList {
             self.append(typ);
         } else {
             let list = self.list.borrow();
+
+            // quickly find the item at the offset index using the binary search
             let next = list.at_index(offset);
 
             if let Some(next) = next {

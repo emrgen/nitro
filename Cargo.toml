@@ -27,6 +27,8 @@ rand = "0.8.5"
 chrono = "0.4.38"
 fractional_index = "2.0.0"
 rand_chacha = "0.3.1"
+btree-plus-store = "0.2.1"
+btree-slab = "0.6.1"
 
 [dependencies.serde_json]
 version = "1.0"

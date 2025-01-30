@@ -196,7 +196,7 @@ mod test {
         }
 
         for _ in 0..5000 {
-            store.take_first();
+            store.pop_first();
         }
 
         println!("store time: {:?}", now.elapsed());

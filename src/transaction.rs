@@ -72,6 +72,7 @@ impl Transaction {
             });
     }
 
+    /// Prepare the transaction for integration
     pub(crate) fn prepare(&mut self) -> Result<(), String> {
         let store = self.store.upgrade().unwrap();
         let store = store.borrow();
@@ -89,21 +90,24 @@ impl Transaction {
         }
 
         // if all item dependencies are satisfied put the item in ready store
+        // TODO: check if HashMap is better than BTreeMap
+        // we should even be able to use a vector (of clients ids) as ClientId is a u32
         let mut stage: BTreeMap<ClientId, ItemData> = BTreeMap::new();
 
         let mut progress = false;
         let mut count = 0;
 
-        // self.pending_queue.reverse();
-
-        let clients = self.pending.items.keys().cloned().collect::<Vec<_>>();
+        let clients = self.pending.items.clients();
+        // take the first pending item for each client and put it in stage
         for client in &clients {
-            if let Some(data) = self.pending.take_first(&client) {
+            if let Some(data) = self.pending.pop_first(&client) {
                 stage.insert(*client, data.clone());
             }
         }
 
-        let mut orphans: Vec<ItemData> = Vec::new();
+        // items that have no dependencies are put in lonely store
+        let mut lonely: Vec<ItemData> = Vec::new();
+
         // let now = std::time::Instant::now();
         loop {
             if stage.is_empty() {
@@ -114,21 +118,19 @@ impl Transaction {
                 if let Some(item) = stage.get(&client_id) {
                     let id = item.id;
 
-                    // let clone = item.clone();
-
+                    // check the state of the item and take action accordingly
                     if self.is_integrated(item, &store) {
                         progress = true;
                     } else if self.is_ready(item, &store) {
-                        progress = true;
                         self.ready.insert(item.clone());
-                    } else if self.is_orphan(item) {
-                        orphans.push(item.clone());
+                        progress = true;
+                    } else if self.is_lonely(item) {
+                        lonely.push(item.clone());
                         progress = true;
                     }
 
                     if progress {
-                        if let Some(data) = self.pending.take_first(&client_id) {
-                            // println!("count: {}", count);
+                        if let Some(data) = self.pending.pop_first(&client_id) {
                             stage.insert(*client_id, data);
                         } else {
                             stage.remove(client_id);
@@ -149,29 +151,27 @@ impl Transaction {
                 break;
             }
 
-            if count > 1000000 {
-                panic!("Infinite loop while collecting ready items");
-            }
-
             progress = false;
         }
 
         // println!("Time taken: {:?}", now.elapsed());
 
         // remaining items has unmet dependencies and are put in pending store
-        for (_, data) in stage.iter() {
+        // they will again try to integrate in the next iteration of prepare
+        for (_, data) in stage {
             // self.pending.insert(data.clone());
             self.pending.insert(data.clone());
         }
 
-        for orphan in orphans {
-            // self.pending.insert(orphan.clone());
-            self.pending.insert(orphan.clone());
+        for alone in lonely {
+            self.pending.insert(alone);
         }
 
-        // now that all ready items are collected, collected the ready delete items
+        // now that all ready items are collected, collect the ready delete items
         for (_, store) in self.pending.iter_delete_items() {
             for (_, data) in store.iter() {
+                // FIXME: if the the target item is split or merged,
+                // the delete item should be split or merged before integration
                 let id = data.range().id();
                 if self.ready.contains(&id) || store.contains(&id) {
                     self.ready.insert_delete(data.clone());
@@ -182,6 +182,7 @@ impl Transaction {
         Ok(())
     }
 
+    /// Apply the transaction to the store
     pub(crate) fn apply(&mut self) -> Result<(), String> {
         // println!("[items ready to integrate: {}]", self.ready.queue.len());
 
@@ -193,7 +194,6 @@ impl Transaction {
 
         let now = std::time::Instant::now();
         let mut times: Vec<Duration> = Vec::new();
-        let mut counters: Vec<i32> = Vec::new();
         let client_map = self.store.upgrade().unwrap().borrow().state.clients.clone();
         let store = self.store.upgrade().unwrap();
         let mut store = store.borrow_mut();
@@ -221,8 +221,8 @@ impl Transaction {
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 
                 let count = integrate(
-                    &item,
                     &client_map,
+                    &item,
                     &parent,
                     parent.start(),
                     &mut left,
@@ -241,7 +241,6 @@ impl Transaction {
                 store.insert(item);
 
                 // println!("integrated with count: {}", count);
-                counters.push(count);
             }
 
             times.push(now.elapsed());
@@ -314,7 +313,8 @@ impl Transaction {
         true
     }
 
-    pub(crate) fn is_orphan(&self, data: &ItemData) -> bool {
+    // check if the item is an orphan, i.e. it has no parent, left or right siblings
+    pub(crate) fn is_lonely(&self, data: &ItemData) -> bool {
         if data.is_root() {
             return false;
         }

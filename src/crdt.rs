@@ -6,10 +6,10 @@ use crate::item::Linked;
 use crate::store::ClientStore;
 use crate::types::Type;
 
-// integrate an item into the list of items
+// integrate an item into the list of items, resolving conflicts
 pub(crate) fn integrate<SS, SE>(
-    item: &Type,
     client_map: &ClientMap,
+    item: &Type,
     parent: &Type,
     start: Option<Type>,
     left: &mut Option<Type>,
@@ -25,23 +25,25 @@ where
     // print_yaml(&item);
 
     let left_conflict = || {
-        let next = item.right();
-        let next_id = next.map(|n| n.id());
-        let right_id = right.as_ref().map(|r| r.id());
-
-        !Id::eq_opt(&next_id, &right_id)
-    };
-
-    let right_conflict = || {
         let prev = item.left();
         let prev_id = prev.map(|p| p.id());
         let left_id = left.as_ref().map(|l| l.id());
 
+        // if prev item's id is not equal to the items left origin id
         !Id::eq_opt(&prev_id, &left_id)
     };
 
+    let right_conflict = || {
+        let next = item.right();
+        let next_id = next.map(|n| n.id());
+        let right_id = right.as_ref().map(|r| r.id());
+
+        // if next item's id is not equal to the items right origin id
+        !Id::eq_opt(&next_id, &right_id)
+    };
+
     let mut conflict: Option<Type> = None;
-    if left.is_none() && right.is_none() || left_conflict() || right_conflict() {
+    if left.is_none() && right.is_none() || right_conflict() || left_conflict() {
         if let Some(left) = &left {
             conflict.clone_from(&left.right());
         } else {
@@ -122,7 +124,7 @@ where
             // println!("integrated after left, {}", left.id());
         } else {
             // println!("parent start: {:?}", parent.id());
-            integrate_start(item, parent, start, set_start);
+            integrate_start(item, parent, start, set_start)?;
             // println!("integrated at start, {:?}", item.id());
         }
 
@@ -130,24 +132,29 @@ where
             set_end(Some(item.clone()))?;
         }
     }
-    // store.upgrade().unwrap().borrow_mut().insert(item.clone());
 
-    Ok((counter))
+    Ok(counter)
 }
 
 #[inline]
-fn integrate_start<F>(item: &Type, parent: &Type, start: Option<Type>, set_start: F)
+fn integrate_start<F>(
+    item: &Type,
+    parent: &Type,
+    start: Option<Type>,
+    set_start: F,
+) -> Result<(), String>
 where
     F: FnOnce(Option<Type>) -> Result<(), String>,
 {
     if let Some(start) = start {
         start.set_left(item.clone());
         item.set_right(start);
-        // println!("has existing start item");
     }
-    set_start(Some(item.clone())).expect("TODO: panic message");
+    set_start(Some(item.clone()))?;
     item.set_parent_id(parent.id());
     item.set_parent(parent.clone());
+
+    Ok(())
 }
 
 #[inline]

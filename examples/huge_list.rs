@@ -1,4 +1,4 @@
-use nitro::{sync_docs, CloneDeep, Doc, SyncDirection, Type};
+use nitro::{CloneDeep, Doc, Type};
 
 fn main() {
     let doc1 = Doc::default();
@@ -17,9 +17,10 @@ fn main() {
         "s", "t", //"u", "v", "w", "x", "y", "z",
     ];
     let mut size = 2;
+    let now = std::time::Instant::now();
 
     let mut size = 1;
-    for _ in 0..500 {
+    for _ in 0..5000 {
         for c in &chars {
             let item = doc1.string(c.to_string());
             // random index
@@ -30,11 +31,16 @@ fn main() {
             size += 1;
         }
     }
+
+    println!("first doc: {:?}", now.elapsed());
+
     println!("{:?}", l1.size());
     chars.reverse();
 
+    let now = std::time::Instant::now();
+
     let mut size = 1;
-    for _ in 0..2000 {
+    for _ in 0..5000 {
         for c in &chars {
             let item = doc2.string(c.to_string());
             // random index
@@ -44,9 +50,11 @@ fn main() {
         }
     }
 
+    println!("second doc: {:?}", now.elapsed());
+
     let now = std::time::Instant::now();
 
-    sync_docs(&doc1, &doc2, SyncDirection::LeftToRight);
+    // sync_docs(&doc1, &doc2, SyncDirection::LeftToRight);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
 
     // sync_docs(&doc1, &doc2, SyncDirection::Both);

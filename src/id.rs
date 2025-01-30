@@ -244,10 +244,12 @@ impl Id {
         self.compare_without_client(other)
     }
 
+    #[inline]
     pub(crate) fn next(&self) -> Id {
         Id::new(self.client, self.clock + 1)
     }
 
+    #[inline]
     pub(crate) fn range(&self, size: u32) -> IdRange {
         IdRange::new(self.client, self.clock, self.clock + size - 1)
     }
@@ -359,10 +361,12 @@ impl IdRange {
         IdRange { client, start, end }
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> Clock {
         self.end - self.start + 1
     }
 
+    #[inline]
     pub(crate) fn eq_opt(a: Option<&IdRange>, b: Option<&IdRange>) -> bool {
         match (a, b) {
             (Some(a), Some(b)) => {
@@ -373,14 +377,17 @@ impl IdRange {
         }
     }
 
+    #[inline]
     pub(crate) fn equals(&self, other: &IdRange) -> bool {
         self.client == other.client && self.start == other.start && self.end == other.end
     }
 
+    #[inline]
     pub(crate) fn start_id(&self) -> Id {
         Id::new(self.client, self.start)
     }
 
+    #[inline]
     pub(crate) fn end_id(&self) -> Id {
         Id::new(self.client, self.end)
     }
@@ -398,9 +405,12 @@ impl IdRange {
         self.compare_without_client(other)
     }
 
-    // Compare two Ids without considering the client field
+    // Compare two Ids assuming the clients are same
     // e.g. [1...3] < [2..2] < [1...3] will help to find [1...3] using [2..2]
+    #[inline]
     pub fn compare_without_client(&self, other: &IdRange) -> std::cmp::Ordering {
+        assert_eq!(self.client, other.client);
+
         if self.end < other.start {
             std::cmp::Ordering::Less
         } else if other.end < self.start {
@@ -410,6 +420,7 @@ impl IdRange {
         }
     }
 
+    // split the IdRange at the given offset, left side will have the offset size
     pub(crate) fn split(&self, offset: u32) -> Result<(IdRange, IdRange), String> {
         if offset == 0 || offset >= self.size() {
             return Err("Cannot split IdRange at invalid position".to_string());
@@ -421,6 +432,7 @@ impl IdRange {
         ))
     }
 
+    #[inline]
     pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> IdRange {
         self.id().adjust(before, after).range(self.size())
     }
@@ -442,7 +454,7 @@ impl Serialize for IdRange {
 }
 
 impl Encode for IdRange {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, _cx: &EncodeContext) {
         e.u32(self.client);
         e.u32(self.start);
         e.u32(self.size());
@@ -450,7 +462,7 @@ impl Encode for IdRange {
 }
 
 impl Decode for IdRange {
-    fn decode<T: Decoder>(d: &mut T, _ctx: &DecodeContext) -> Result<Self, String> {
+    fn decode<T: Decoder>(d: &mut T, _cx: &DecodeContext) -> Result<Self, String> {
         let client = d.u32()?;
         let start = d.u32()?;
         let size = d.u32()?;
@@ -492,6 +504,7 @@ pub(crate) trait WithIdRange {
 
 impl Split for IdRange {
     type Target = IdRange;
+    #[inline]
     fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
         self.split(at)
     }

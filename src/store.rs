@@ -208,12 +208,10 @@ impl PendingStore {
         self.items.remove(id);
     }
 
-    pub(crate) fn take_first(&mut self, client_id: &ClientId) -> Option<ItemData> {
-        let store = self.items.items.get_mut(client_id)?;
-        let (_, item) = store.iter_mut().next()?;
-        let item = item.clone();
-        store.remove(&item.id());
-        Some(item)
+    /// pop the first pending item for the given client
+    pub(crate) fn pop_first(&mut self, client_id: &ClientId) -> Option<ItemData> {
+        let store = self.items.id_store_mut(client_id)?;
+        store.pop_first()
     }
 
     pub(crate) fn remove_delete(&mut self, id: &Id) {
@@ -445,9 +443,21 @@ pub struct ClientStore<T: ClientStoreEntry> {
     pub(crate) items: BTreeMap<ClientId, IdStore<T>>,
 }
 
-impl<T: ClientStoreEntry> ClientStore<T> {}
+impl<T: ClientStoreEntry> ClientStore<T> {
+    pub(crate) fn clients(&self) -> Vec<ClientId> {
+        self.items.keys().cloned().collect()
+    }
+}
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    pub(crate) fn id_store(&self, client: &ClientId) -> Option<&IdStore<T>> {
+        self.items.get(client)
+    }
+
+    pub(crate) fn id_store_mut(&mut self, client: &ClientId) -> Option<&mut IdStore<T>> {
+        self.items.get_mut(client)
+    }
+
     pub(crate) fn size(&self) -> u32 {
         self.iter().map(|(_, store)| store.size() as u32).sum()
     }
@@ -623,15 +633,12 @@ impl<T: IdStoreEntry> IdStore<T> {
         self.map.len()
     }
 
-    pub(crate) fn take_first(&mut self) -> Option<T> {
-        let (_, item) = self.map.iter().next()?;
-        let item = item.clone();
-        self.map.remove(&item.id());
-        Some(item)
+    pub(crate) fn pop_first(&mut self) -> Option<T> {
+        self.map.pop_first().map(|(_, v)| v)
     }
 
     pub(crate) fn first(&self) -> Option<&T> {
-        self.map.iter().next().map(|(_, item)| item)
+        self.map.first_key_value().map(|(_, v)| v)
     }
 }
 

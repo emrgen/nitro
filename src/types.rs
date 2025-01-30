@@ -328,7 +328,8 @@ impl Type {
         }
     }
 
-    pub(crate) fn insert_after(&self, item: impl Into<Type>) {
+    // insert after skips the list index lookup and directly inserts the item after the current item
+    pub fn insert_after(&self, item: impl Into<Type>) {
         let item = item.into();
 
         let parent = self.parent();
@@ -351,7 +352,8 @@ impl Type {
         }
     }
 
-    pub(crate) fn insert_before(&self, item: Type) {
+    // insert before skips the list index lookup and directly inserts the item before the current item
+    pub fn insert_before(&self, item: Type) {
         let parent = self.parent();
         let prev = self.left();
 
@@ -819,7 +821,8 @@ impl Ord for Type {
 }
 impl PartialOrd for Type {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        // Some(self.cmp(other))
+        Option::from(Ordering::Equal)
     }
 }
 

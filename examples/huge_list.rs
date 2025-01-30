@@ -1,4 +1,4 @@
-use nitro::{CloneDeep, Doc, sync_docs, SyncDirection, Type};
+use nitro::{sync_docs, CloneDeep, Doc, SyncDirection, Type};
 
 fn main() {
     let doc1 = Doc::default();
@@ -18,37 +18,43 @@ fn main() {
     ];
     let mut size = 2;
 
-    for _ in 0..5000 {
+    let mut size = 1;
+    for _ in 0..500 {
         for c in &chars {
             let item = doc1.string(c.to_string());
-            l1.append(item);
+            // random index
+            let index = rand::random::<usize>() % size;
+
+            l1.insert(index as u32, item);
+            // l1.append(item);
+            size += 1;
         }
     }
     println!("{:?}", l1.size());
     chars.reverse();
 
     let mut size = 1;
-    for _ in 0..5000 {
+    for _ in 0..2000 {
         for c in &chars {
             let item = doc2.string(c.to_string());
             // random index
             let index = rand::random::<usize>() % size;
-            l2.insert(index as u32, item);
+            l2.append(item);
             size += 1;
         }
     }
 
     let now = std::time::Instant::now();
 
-    // sync_docs(&doc1, &doc2, SyncDirection::LeftToRight);
+    sync_docs(&doc1, &doc2, SyncDirection::LeftToRight);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
 
-    sync_docs(&doc1, &doc2, SyncDirection::Both);
+    // sync_docs(&doc1, &doc2, SyncDirection::Both);
 
     println!("{:?}", now.elapsed());
 
     println!("{:?}", l1.size());
-    // println!("{:?}", l2.size());
+    println!("{:?}", l2.size());
 
     // if let Content::Types(list) = l1.content() {
     //     let content = list
@@ -83,7 +89,7 @@ fn main() {
     //     // assert_eq!(item1, item2);
     // }
 
-    assert_eq!(doc1, doc2);
+    // assert_eq!(doc1, doc2);
 
     // print_yaml(l1.content());
     // print_yaml(l2.content());

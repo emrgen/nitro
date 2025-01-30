@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = ["uuid-client"]
 uuid-client = []
+nightly = []
 
 [profile.release]
 # or "z"

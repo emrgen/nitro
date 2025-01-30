@@ -25,6 +25,9 @@ pub(crate) trait EncoderMapEntry:
 
 impl<T: Debug + Encode + Decode + Clone + Default + Eq + PartialEq + Hash> EncoderMapEntry for T {}
 
+/// EncoderMap is a map that maps a key to an u32 id
+///
+/// It is a wrapper around BiMap that provides a more ergonomic interface
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct EncoderMap<L: EncoderMapEntry> {
     map: BiMap<L, u32>,
@@ -232,7 +235,7 @@ impl Decode for EncoderMap<Mark> {
     }
 }
 
-// #[derive(Debug, Clone, Default)]
+/// ClientMap is a map that maps a client to an u32 id
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ClientMap {
     map: EncoderMap<Client>,

@@ -2,6 +2,7 @@ use crate::decoder::Decoder;
 use crate::item::ItemData;
 use crate::store::WeakStoreRef;
 
+//
 pub trait Encoder: Clone {
     fn u8(&mut self, value: u8);
     fn u16(&mut self, value: u16);

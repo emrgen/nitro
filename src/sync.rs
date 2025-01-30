@@ -1,5 +1,4 @@
 use crate::doc::Doc;
-use crate::print_yaml;
 
 pub fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     let left = serde_json::to_string(d1).unwrap();
@@ -30,7 +29,6 @@ pub fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
 
     if direction == SyncDirection::LeftToRight {
         println!("sync_docs: d1 -> d2");
-        print_yaml(&diff1);
         d2.apply(diff1);
     } else if direction == SyncDirection::RightToLeft {
         d1.apply(diff2);

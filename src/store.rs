@@ -1,15 +1,14 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
 use std::collections::btree_map::IterMut;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::ops::Add;
 use std::rc::{Rc, Weak};
 
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
@@ -20,6 +19,7 @@ use crate::id_store::ClientIdStore;
 use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
 use crate::types::Type;
+use crate::Client;
 
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
@@ -163,7 +163,7 @@ impl ReadyStore {
         let id = self.id_range_map.find(id);
         self.items.find(&id)
     }
-    
+
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
         self.delete_items.insert(item);
     }
@@ -577,6 +577,11 @@ pub(crate) trait IdStoreEntry:
 
 // blanket implementation for all types that implement dependencies
 impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize> IdStoreEntry for T {}
+
+// #[derive(Default, Debug, Clone, Eq, PartialEq)]
+// pub struct IdStore<T: IdStoreEntry> {
+//     map: BTreeMap<Id, T>,
+// }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct IdStore<T: IdStoreEntry> {

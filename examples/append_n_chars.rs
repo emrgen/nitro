@@ -1,11 +1,10 @@
 use miniz_oxide::deflate::compress_to_vec;
-
 use nitro::codec_v1::EncoderV1;
-use nitro::Doc;
 use nitro::encoder::{Encode, Encoder};
+use nitro::Doc;
+use rand::prelude::SliceRandom;
 
 fn main() {
-    let now = std::time::Instant::now();
     let doc = Doc::default();
     let text = doc.text();
     doc.set("text", text.clone());
@@ -15,9 +14,17 @@ fn main() {
         "s", "t", "u", "v", "w", "x", "y", "z",
     ];
 
+    let mut vec = Vec::new();
+
+    let now = std::time::Instant::now();
     for i in 0..6000 {
-        text.append(doc.string(chars[i % 26]));
+        vec.push(chars[i % 26]);
     }
+
+    println!("elapsed: {:?}", now.elapsed());
+    vec.shuffle(&mut rand::thread_rng());
+
+    text.append(doc.string(vec.join("")));
 
     let mut encoder = EncoderV1::new();
     doc.encode(&mut encoder, &Default::default());
@@ -26,6 +33,4 @@ fn main() {
 
     println!("Doc size: {}", encoder.buffer().len());
     println!("Compressed size: {}", comp.len());
-
-    println!("elapsed: {:?}", now.elapsed());
 }

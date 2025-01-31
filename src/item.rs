@@ -8,21 +8,22 @@ use std::rc::Rc;
 use bitflags::bitflags;
 use fractional_index::FractionalIndex;
 use indexmap::IndexMap;
-use serde::{Serialize, Serializer};
 use serde::ser::{SerializeSeq, SerializeStruct};
+use serde::{Serialize, Serializer};
 use serde_json::Value;
 
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, Split, WithId};
+use crate::item::Any::U32;
 use crate::mark::MarkContent;
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
+use crate::Client;
 
 type ItemRefInner = Rc<RefCell<Item>>;
 
@@ -1170,6 +1171,12 @@ impl From<Vec<u8>> for Content {
     }
 }
 
+impl From<u32> for Content {
+    fn from(b: u32) -> Self {
+        Self::Embed(U32(b))
+    }
+}
+
 impl From<Vec<Type>> for Content {
     fn from(t: Vec<Type>) -> Self {
         Self::Types(t)
@@ -1238,16 +1245,16 @@ pub(crate) enum Any {
     Null,
     True,
     False,
-    Float32(f32),
-    Float64(f64),
-    Int8(i8),
-    Int16(i16),
-    Int32(i32),
-    Int64(i64),
-    Uint8(u8),
-    Uint16(u16),
-    Uint32(u32),
-    Uint64(u64),
+    F32(f32),
+    F64(f64),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
     String(String),
     Binary(Vec<u8>),
     Array(Vec<Any>),
@@ -1260,16 +1267,16 @@ impl Any {
             Self::Null => Value::Null,
             Self::True => Value::Bool(true),
             Self::False => Value::Bool(false),
-            Self::Float32(f) => Value::Number(serde_json::Number::from_f64(*f as f64).unwrap()),
-            Self::Float64(f) => Value::Number(serde_json::Number::from_f64(*f).unwrap()),
-            Self::Int8(i) => Value::Number(serde_json::Number::from(*i)),
-            Self::Int16(i) => Value::Number(serde_json::Number::from(*i)),
-            Self::Int32(i) => Value::Number(serde_json::Number::from(*i)),
-            Self::Int64(i) => Value::Number(serde_json::Number::from(*i)),
-            Self::Uint8(u) => Value::Number(serde_json::Number::from(*u)),
-            Self::Uint16(u) => Value::Number(serde_json::Number::from(*u)),
-            Self::Uint32(u) => Value::Number(serde_json::Number::from(*u)),
-            Self::Uint64(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::F32(f) => Value::Number(serde_json::Number::from_f64(*f as f64).unwrap()),
+            Self::F64(f) => Value::Number(serde_json::Number::from_f64(*f).unwrap()),
+            Self::I8(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::I16(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::I32(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::I64(i) => Value::Number(serde_json::Number::from(*i)),
+            Self::U8(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::U16(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::U32(u) => Value::Number(serde_json::Number::from(*u)),
+            Self::U64(u) => Value::Number(serde_json::Number::from(*u)),
             Self::String(s) => Value::String(s.clone()),
             Self::Binary(b) => Value::String(serde_json::to_string(b).unwrap()),
             Self::Array(a) => Value::Array(a.iter().map(|a| a.to_json()).collect()),
@@ -1318,22 +1325,22 @@ impl Encode for Any {
             Any::False => {
                 e.u8(AnyFlags::FALSE.bits());
             }
-            Any::Float32(_) => {
+            Any::F32(_) => {
                 e.u8(AnyFlags::FLOAT32.bits());
                 // e.f32(*d);
             }
-            Any::Float64(d_) => {
+            Any::F64(d_) => {
                 e.u8(AnyFlags::FLOAT64.bits());
                 // e.f64(*d);
             }
-            Any::Int8(_) => {}
-            Any::Int16(_) => {}
-            Any::Int32(_) => {}
-            Any::Int64(_) => {}
-            Any::Uint8(_) => {}
-            Any::Uint16(_) => {}
-            Any::Uint32(_) => {}
-            Any::Uint64(_) => {}
+            Any::I8(_) => {}
+            Any::I16(_) => {}
+            Any::I32(_) => {}
+            Any::I64(_) => {}
+            Any::U8(_) => {}
+            Any::U16(_) => {}
+            Any::U32(_) => {}
+            Any::U64(_) => {}
             Any::String(_) => {}
             Any::Binary(_) => {}
             Any::Array(_) => {}

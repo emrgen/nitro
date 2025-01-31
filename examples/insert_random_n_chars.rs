@@ -1,9 +1,9 @@
 use miniz_oxide::deflate::compress_to_vec;
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 
 use nitro::codec_v1::EncoderV1;
-use nitro::Doc;
 use nitro::encoder::{Encode, Encoder};
+use nitro::Doc;
 
 fn main() {
     let mut indexes = Vec::new();
@@ -12,7 +12,6 @@ fn main() {
         indexes.push(index);
     }
 
-    let now = std::time::Instant::now();
     let doc = Doc::default();
     let list = doc.list();
     doc.set("list", list.clone());
@@ -24,11 +23,14 @@ fn main() {
 
     let mut size = 0;
 
+    let now = std::time::Instant::now();
     for i in 0..6000 {
         // random index
         let index = indexes[i];
         list.insert(index as u32, doc.string(chars[i % 26]));
     }
+
+    println!("elapsed: {:?}", now.elapsed());
 
     let mut encoder = EncoderV1::new();
     doc.encode(&mut encoder, &Default::default());
@@ -37,8 +39,6 @@ fn main() {
 
     println!("Doc size: {}", encoder.buffer().len());
     println!("Compressed size: {}", comp.len());
-
-    println!("elapsed: {:?}", now.elapsed());
 
     // print_yaml(&doc);
 }

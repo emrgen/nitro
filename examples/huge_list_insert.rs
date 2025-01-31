@@ -1,9 +1,12 @@
+use miniz_oxide::deflate::compress_to_vec;
+use nitro::codec_v1::EncoderV1;
+use nitro::encoder::{Encode, Encoder};
 use nitro::{Doc, Type};
 
 fn main() {
-    let doc1 = Doc::default();
-    let mut l1: Type = doc1.list().into();
-    doc1.set("list1", l1.clone());
+    let doc = Doc::default();
+    let mut l1: Type = doc.list().into();
+    doc.set("list1", l1.clone());
 
     // 26 letters
     let chars = vec![
@@ -12,11 +15,10 @@ fn main() {
     ];
 
     let mut size = 1;
-    let now = std::time::Instant::now();
 
-    for _ in 0..1000 {
+    for _ in 0..230 {
         for c in &chars {
-            let item = doc1.string(c.to_string());
+            let item = doc.atom(size as u32);
             // random index
             let index = rand::random::<usize>() % size;
 
@@ -27,7 +29,16 @@ fn main() {
         }
     }
 
+    let now = std::time::Instant::now();
+
+    let mut encoder = EncoderV1::new();
+    doc.encode(&mut encoder, &Default::default());
+
+    let comp = compress_to_vec(&encoder.buffer(), 1);
     println!("first doc: {:?}", now.elapsed());
+
+    println!("Doc size: {}", encoder.buffer().len());
+    println!("Compressed size: {}", comp.len());
 
     println!("{:?}", l1.size());
 

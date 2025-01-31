@@ -1,10 +1,9 @@
 use miniz_oxide::deflate::compress_to_vec;
 use nitro::codec_v1::EncoderV1;
-use nitro::Doc;
 use nitro::encoder::{Encode, Encoder};
+use nitro::Doc;
 
 fn main() {
-    let now = std::time::Instant::now();
     let doc = Doc::default();
     let text = doc.text();
     doc.set("text", text.clone());
@@ -18,13 +17,13 @@ fn main() {
         text.prepend(doc.string(chars[i % 26]));
     }
 
+    let now = std::time::Instant::now();
     let mut encoder = EncoderV1::new();
     doc.encode(&mut encoder, &Default::default());
 
     let comp = compress_to_vec(&encoder.buffer(), 1);
+    println!("elapsed: {:?}", now.elapsed());
 
     println!("Doc size: {}", encoder.buffer().len());
     println!("Compressed size: {}", comp.len());
-
-    println!("elapsed: {:?}", now.elapsed());
 }

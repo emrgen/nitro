@@ -1,5 +1,5 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::index::{IBTree, ItemIndexMap};
+use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -13,7 +13,7 @@ use std::rc::Rc;
 pub struct NList {
     item: ItemRef,
     // TODO: dynamically create/destroy the list when the nlist is too big/small
-    list: Rc<RefCell<IBTree>>,
+    list: Rc<RefCell<BTreeIndex>>,
 }
 
 impl NList {

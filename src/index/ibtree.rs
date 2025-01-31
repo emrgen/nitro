@@ -24,7 +24,6 @@ impl ItemIndexMap<Type> for IBTree {
     }
 
     fn at_index(&self, index: u32) -> Option<&Type> {
-        println!("index: {}, size: {}", index, self.btree.len());
         self.btree.iter().nth(index as usize).map(|(_, v)| v)
     }
 

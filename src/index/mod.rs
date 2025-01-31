@@ -1,3 +1,4 @@
+mod btee_index;
 mod btree;
 mod ibtree;
 mod rbtree;
@@ -5,6 +6,7 @@ mod sbtree;
 mod skiplist;
 mod vecmap;
 
+pub(crate) use btee_index::BTreeIndex;
 pub(crate) use ibtree::IBTree;
 
 use crate::Type;

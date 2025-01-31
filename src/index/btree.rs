@@ -249,14 +249,9 @@ impl<'a, K: Ord + Clone + Display + Debug, V: Debug> Iterator for ValueIter<'a, 
                         continue;
                     }
 
-                    while let (Node::Internal(internal), index) = self.internals.last().unwrap() {
-                        if index < &internal.children.len() {
-                            let child = &internal.children[index + 1];
-                            self.internals.push((child, 0));
-                            break;
-                        } else {
-                            self.internals.pop();
-                        }
+                    while let (Node::Internal(internal), _) = self.internals.last().unwrap() {
+                        let child = &internal.children[0];
+                        self.internals.push((child, 0));
                     }
 
                     let (leaf, _) = self.internals.pop().unwrap();

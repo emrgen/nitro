@@ -52,6 +52,7 @@ mod skiplist;
 mod state;
 mod store;
 mod sync;
+mod table;
 mod transaction;
 mod types;
 mod utils;

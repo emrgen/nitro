@@ -159,7 +159,7 @@ impl Serialize for MarkContent {
 }
 
 impl Encode for MarkContent {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         self.range.encode(e, ctx);
         self.data.encode(e, ctx);
     }
@@ -220,7 +220,7 @@ impl Serialize for Mark {
 }
 
 impl Encode for Mark {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {}
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {}
 }
 
 impl Decode for Mark {

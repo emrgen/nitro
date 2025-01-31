@@ -1,7 +1,7 @@
 use uuid::Error;
 
-use nitro::Doc;
 use nitro::encoder::{Encode, Encoder};
+use nitro::Doc;
 
 fn insert_text(doc: &Doc, text: &str) {
     doc.update_client();
@@ -27,7 +27,7 @@ fn main() -> Result<(), Error> {
 
     let mut encoder = nitro::codec_v1::EncoderV1::new();
 
-    doc.encode(&mut encoder, &Default::default());
+    doc.encode(&mut encoder, &mut Default::default());
 
     let buf = encoder.buffer();
 
@@ -42,11 +42,11 @@ fn main() -> Result<(), Error> {
     let clients = v.clients();
 
     println!("Clients: {:?}", clients.len());
-    let ctx = Default::default();
+    let mut ctx = Default::default();
 
     encoder.u32(clients.len() as u32);
     for (client, id) in clients {
-        client.encode(&mut encoder, &ctx);
+        client.encode(&mut encoder, &mut ctx);
         encoder.u32(id);
     }
 

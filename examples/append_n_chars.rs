@@ -27,7 +27,7 @@ fn main() {
     text.append(doc.string(vec.join("")));
 
     let mut encoder = EncoderV1::new();
-    doc.encode(&mut encoder, &Default::default());
+    doc.encode(&mut encoder, &mut Default::default());
 
     let comp = compress_to_vec(&encoder.buffer(), 1);
 

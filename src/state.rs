@@ -2,14 +2,14 @@ use std::collections::BTreeMap;
 use std::default::Default;
 use std::ops::Add;
 
-use serde::{Serialize, Serializer};
 use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 
 use crate::bimapid::{ClientId, ClientMap};
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Clock;
+use crate::Client;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct ClientState {
@@ -207,7 +207,7 @@ impl Serialize for ClientState {
 }
 
 impl Encode for ClientState {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         self.state.encode(e, ctx);
         self.clients.encode(e, ctx);
     }
@@ -271,7 +271,7 @@ impl Serialize for ClientIdState {
 }
 
 impl Encode for ClientIdState {
-    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &mut EncodeContext) {
         e.u32(self.clients.len() as u32);
         for (client, clock) in &self.clients {
             e.u32(*client);
@@ -322,7 +322,7 @@ mod tests {
         state.update_max(2, 2);
 
         let mut encoder = EncoderV1::default();
-        state.encode(&mut encoder, &EncodeContext::default());
+        state.encode(&mut encoder, &mut EncodeContext::default());
 
         let mut d = encoder.decoder();
 
@@ -341,7 +341,7 @@ mod tests {
         }
 
         let mut encoder = EncoderV1::default();
-        state.encode(&mut encoder, &EncodeContext::default());
+        state.encode(&mut encoder, &mut EncodeContext::default());
 
         let buf = encoder.buffer();
         let comp = compress_to_vec(&buf, 1);

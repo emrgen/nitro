@@ -31,6 +31,7 @@ btree-plus-store = "0.2.1"
 btree-slab = "0.6.1"
 skiplist = "0.5.1"
 ptree = "0.5.2"
+serde_columnar = "0.3.10"
 
 [dependencies.serde_json]
 version = "1.0"

@@ -101,8 +101,8 @@ impl Encoder for EncoderV1 {
         self.pos += value.len();
     }
 
-    fn item(&mut self, ctx: &EncodeContext, value: &ItemData) {
-        encode_item(self, ctx, value);
+    fn item(&mut self, cx: &mut EncodeContext, value: &ItemData) {
+        encode_item(self, cx, value);
     }
 
     fn finish(&mut self) {
@@ -237,7 +237,7 @@ impl Decoder for DecoderV1 {
     }
 }
 
-fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
+fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
     // | kind, content, field, parent | left, right | ...
     // println!("encode_item: {}, {:?}", value.kind, value.id);
     let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
@@ -265,32 +265,34 @@ fn encode_item(e: &mut EncoderV1, ctx: &EncodeContext, value: &ItemData) {
     // println!("flags: {:b}", flags);
 
     if !matches!(value.content, Content::Null) {
-        value.content.encode(e, ctx);
+        value.content.encode(e, cx);
     }
 
     if let Some(field) = value.field {
         e.u32(field);
     }
 
-    value.id.encode(e, ctx);
+    cx.table.add(value);
 
-    if let Some(left_id) = value.left_id {
-        left_id.encode(e, ctx);
-    } else if let Some(parent_id) = value.parent_id {
-        parent_id.encode(e, ctx);
-    }
-
-    if let Some(right_id) = value.right_id {
-        right_id.encode(e, ctx);
-    }
-
-    if let Some(target_id) = value.target_id {
-        target_id.encode(e, ctx);
-    }
-
-    if let Some(mover_id) = value.mover_id {
-        mover_id.encode(e, ctx);
-    }
+    // value.id.encode(e, cx);
+    //
+    // if let Some(left_id) = value.left_id {
+    //     left_id.encode(e, cx);
+    // } else if let Some(parent_id) = value.parent_id {
+    //     parent_id.encode(e, cx);
+    // }
+    //
+    // if let Some(right_id) = value.right_id {
+    //     right_id.encode(e, cx);
+    // }
+    //
+    // if let Some(target_id) = value.target_id {
+    //     target_id.encode(e, cx);
+    // }
+    //
+    // if let Some(mover_id) = value.mover_id {
+    //     mover_id.encode(e, cx);
+    // }
 }
 
 fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, String> {

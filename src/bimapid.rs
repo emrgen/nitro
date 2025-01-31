@@ -6,10 +6,10 @@ use std::ops::Add;
 use bimap::BiMap;
 use serde::{Serialize, Serializer};
 
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
+use crate::Client;
 
 pub type ClientId = u32;
 
@@ -144,7 +144,7 @@ impl<T: EncoderMapEntry> Add<&EncoderMap<T>> for &EncoderMap<T> {
 // }
 
 impl Encode for EncoderMap<Client> {
-    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &mut EncodeContext) {
         e.u32(self.size() as u32);
         for (client, client_id) in self.map.iter() {
             client.encode(e, _ctx);
@@ -154,7 +154,7 @@ impl Encode for EncoderMap<Client> {
 }
 
 impl Encode for EncoderMap<String> {
-    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, _ctx: &mut EncodeContext) {
         e.u32(self.size() as u32);
         for (client_id, client) in self.map.iter() {
             let size = client_id.len();
@@ -185,7 +185,7 @@ impl Decode for EncoderMap<String> {
 }
 
 impl Encode for EncoderMap<Mark> {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         let len = self.map.len();
         e.u32(len as u32);
         if len > u16::MAX as usize {
@@ -321,7 +321,7 @@ impl Serialize for ClientMap {
 }
 
 impl Encode for ClientMap {
-    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &mut EncodeContext) {
         self.map.encode(encoder, ctx);
     }
 }
@@ -407,7 +407,7 @@ impl Serialize for FieldMap {
 }
 
 impl Encode for FieldMap {
-    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, encoder: &mut E, ctx: &mut EncodeContext) {
         self.map.encode(encoder, ctx);
     }
 }
@@ -422,10 +422,10 @@ impl Decode for FieldMap {
 #[cfg(test)]
 mod test {
     use crate::bimapid::ClientMap;
-    use crate::Client;
     use crate::codec_v1::EncoderV1;
     use crate::decoder::{Decode, DecodeContext};
     use crate::encoder::{Encode, EncodeContext, Encoder};
+    use crate::Client;
 
     #[test]
     fn test_encode_decode_client_map() {
@@ -436,7 +436,7 @@ mod test {
         map.insert(Client::default(), 3);
 
         let mut e = EncoderV1::new();
-        map.encode(&mut e, &EncodeContext::default());
+        map.encode(&mut e, &mut EncodeContext::default());
 
         let mut d = e.decoder();
 

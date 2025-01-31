@@ -306,7 +306,7 @@ impl Serialize for ItemRef {
 }
 
 impl Encode for ItemRef {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         self.borrow().data.encode(e, ctx);
     }
 }
@@ -557,6 +557,8 @@ impl Item {
             map.insert("mover".to_string(), mover.id().to_string().into());
         }
 
+        // map.insert("content".to_string(), self.data.content.to_json());
+
         map
     }
 
@@ -734,7 +736,7 @@ impl ItemData {
             s.serialize_field("field", &field.to_string())?;
         }
 
-        // s.serialize_field("content", &self.content)?;
+        s.serialize_field("content", &self.content)?;
 
         Ok(())
     }
@@ -1072,7 +1074,7 @@ impl Serialize for Content {
 }
 
 impl Encode for Content {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         match self {
             Self::Mark(m) => {
                 e.u8(ContentFlags::MARK.bits());
@@ -1215,7 +1217,7 @@ impl DocProps {
 }
 
 impl Encode for DocProps {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         self.id.encode(e, ctx);
         self.created_by.encode(e, ctx);
         self.props.encode(e, ctx);
@@ -1314,7 +1316,7 @@ bitflags! {
 }
 
 impl Encode for Any {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         match self {
             Any::Null => {
                 e.u8(AnyFlags::NULL.bits());

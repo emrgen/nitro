@@ -124,7 +124,7 @@ impl Serialize for Client {
 }
 
 impl Encode for Client {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         match self {
             #[cfg(feature = "uuid-client")]
             Client::UUID(client) => e.uuid(client.as_bytes().as_slice()),
@@ -334,7 +334,7 @@ impl Ord for Id {
 }
 
 impl Encode for Id {
-    fn encode<T: Encoder>(&self, e: &mut T, _ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, _ctx: &mut EncodeContext) {
         e.u32(self.client);
         e.u32(self.clock);
     }
@@ -454,7 +454,7 @@ impl Serialize for IdRange {
 }
 
 impl Encode for IdRange {
-    fn encode<T: Encoder>(&self, e: &mut T, _cx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, _cx: &mut EncodeContext) {
         e.u32(self.client);
         e.u32(self.start);
         e.u32(self.size());

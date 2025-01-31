@@ -4,7 +4,6 @@ use fractional_index::FractionalIndex;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::{Doc, DocOpts};
@@ -21,6 +20,7 @@ use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::store::WeakStoreRef;
+use crate::Client;
 
 #[derive(Debug, Clone, Default)]
 pub enum Type {
@@ -670,7 +670,7 @@ impl Serialize for Type {
 }
 
 impl Encode for Type {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         e.item(ctx, &self.item_ref().borrow().data.clone());
     }
 }

@@ -68,7 +68,7 @@ impl<T: QueryStoreEntry> ClientQueueStore<T> {
 }
 
 impl<T: QueryStoreEntry> Encode for ClientQueueStore<T> {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         e.u32(self.items.len() as u32);
         for (client_id, store) in &self.items {
             e.u32(*client_id);
@@ -149,7 +149,7 @@ impl<T: QueryStoreEntry> QueueStore<T> {
 }
 
 impl<T: QueryStoreEntry> Encode for QueueStore<T> {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         e.u32(self.vec.len() as u32);
         for entry in &self.vec {
             entry.encode(e, ctx);

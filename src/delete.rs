@@ -44,7 +44,7 @@ impl Serialize for DeleteItem {
 }
 
 impl Encode for DeleteItem {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         self.id.encode(e, ctx);
         self.range.encode(e, ctx);
     }
@@ -79,9 +79,9 @@ mod tests {
         let d3 = DeleteItem::new(Id::new(3, 3), IdRange::new(3, 30, 31));
 
         let mut e = EncoderV1::new();
-        d1.encode(&mut e, &EncodeContext::default());
-        d2.encode(&mut e, &EncodeContext::default());
-        d3.encode(&mut e, &EncodeContext::default());
+        d1.encode(&mut e, &mut EncodeContext::default());
+        d2.encode(&mut e, &mut EncodeContext::default());
+        d3.encode(&mut e, &mut EncodeContext::default());
 
         let mut d = e.decoder();
 

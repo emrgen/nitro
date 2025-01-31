@@ -13,7 +13,7 @@ use std::rc::Rc;
 pub struct NList {
     item: ItemRef,
     // TODO: dynamically create/destroy the list when the nlist is too big/small
-    list: Rc<RefCell<BTreeIndex>>,
+    list: Rc<RefCell<IBTree>>,
 }
 
 impl NList {

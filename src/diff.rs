@@ -213,7 +213,7 @@ impl Serialize for Diff {
 }
 
 impl Encode for Diff {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &EncodeContext) {
+    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         self.doc_id.encode(e, ctx);
         self.created_by.encode(e, ctx);
         self.fields.encode(e, ctx);
@@ -267,7 +267,7 @@ mod test {
         let mut encoder = EncoderV1::default();
 
         let diff = doc.diff(ClientState::default());
-        diff.encode(&mut encoder, &Default::default());
+        diff.encode(&mut encoder, &mut Default::default());
 
         let mut d = encoder.decoder();
 

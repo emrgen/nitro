@@ -6,7 +6,6 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::{Client, Clock};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -22,6 +21,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
+use crate::{Client, Clock};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocOpts {
@@ -72,7 +72,7 @@ impl DocId {
 }
 
 impl Encode for DocId {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         e.uuid(self.0.as_bytes().as_slice());
     }
 }
@@ -354,7 +354,7 @@ impl Serialize for Doc {
 }
 
 impl Encode for Doc {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         let diff = self.diff(ClientState::default());
         diff.encode(e, ctx)
     }
@@ -378,8 +378,8 @@ impl CloneDeep for Doc {
 #[cfg(test)]
 mod test {
     use byte_unit::{AdjustedByte, Byte, Unit};
-    use fake::Fake;
     use fake::faker::lorem::en::Words;
+    use fake::Fake;
     use miniz_oxide::deflate::compress_to_vec;
     use rand::random;
 
@@ -433,7 +433,7 @@ mod test {
         }
 
         let mut encoder = EncoderV1::new();
-        doc.encode(&mut encoder, &Default::default());
+        doc.encode(&mut encoder, &mut Default::default());
 
         encoder.buffer()
     }

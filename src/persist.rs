@@ -3,7 +3,6 @@ use std::default::Default;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::FieldMap;
-use crate::Client;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::doc::DocId;
@@ -14,6 +13,7 @@ use crate::store::{
     DeleteItemStore, DocStore, IdDiff, IdRangeMap, ItemDataStore, PendingStore, ReadyStore,
     WeakStoreRef,
 };
+use crate::Client;
 
 pub(crate) type StrongStoreDataRef = Rc<RefCell<DocStoreData>>;
 pub(crate) type WeakStoreDataRef = Weak<RefCell<DocStoreData>>;
@@ -93,7 +93,7 @@ impl From<DocStore> for DocStoreData {
 }
 
 impl Encode for DocStoreData {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &EncodeContext) {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         self.doc_id.encode(e, ctx);
         self.created_by.encode(e, ctx);
         self.fields.encode(e, ctx);

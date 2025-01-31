@@ -1,4 +1,4 @@
-use nitro::{CloneDeep, RichText, sync_docs, SyncDirection, Type};
+use nitro::{sync_docs, CloneDeep, RichText, SyncDirection, Type};
 
 fn main() {
     let mut t1 = RichText::new();
@@ -45,10 +45,7 @@ fn main() {
     // t1.sync(&t2);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::LeftToRight);
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
-    println!("xxxxxxxxx");
     sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
-
-    println!("xxxxxxxxx");
 
     // assert_eq!(t1, t2);
 

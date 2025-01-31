@@ -130,7 +130,10 @@ impl<K: Ord + Clone + Display + Debug, V: Debug> Node<K, V> {
                     }
                     total += node.children[i].size();
                 }
-                node.children.last().unwrap().index_of(key)
+                node.children
+                    .last()
+                    .and_then(|child| child.index_of(key))
+                    .and_then(|index| Some(total + index))
             }
             Node::Leaf(node) => node.keys.iter().position(|k| k == key),
         }
@@ -155,11 +158,12 @@ impl<K: Ord + Clone + Display + Debug, V: Debug> Node<K, V> {
             Node::Internal(node) => {
                 for (i, child) in node.children.iter().enumerate() {
                     if i != 0 {
-                        let mut tree = ptree.begin_child(format!("{}", node.keys[i - 1]));
+                        let mut tree =
+                            ptree.begin_child(format!("{}:{}", node.keys[i - 1], child.size()));
                         child.ptree(tree);
                         tree.end_child();
                     } else {
-                        let mut tree = ptree.begin_child("".to_string());
+                        let mut tree = ptree.begin_child("ۛ⊙ۛ".to_string());
                         child.ptree(tree);
                         tree.end_child();
                     }
@@ -201,16 +205,6 @@ impl<'a, K: Ord + Clone + Display + Debug, V: Debug> ValueIter<'a, K, V> {
         while let (Node::Internal(internal), _) = internals.last().unwrap() {
             let child = &internal.children[0];
             internals.push((child, 0));
-        }
-
-        for (node, index) in internals.iter() {
-            if let Node::Leaf(leaf) = node {
-                println!("leaf keys: {:#?}", leaf.keys);
-            }
-
-            if let Node::Internal(internal) = node {
-                println!("internal keys: {:#?}", internal.keys);
-            }
         }
 
         let (leaf, _) = internals.pop().unwrap();
@@ -383,7 +377,7 @@ impl<K: Ord + Clone + Display + Debug, V: std::fmt::Debug> InternalNode<K, V> {
         let right = child.insert(key, value);
 
         // child node is split
-        if let Some((key, child_right)) = right {
+        let right = if let Some((key, child_right)) = right {
             if self.keys.len() + 1 == self.keys.capacity() {
                 let mut self_right = self.split();
                 // println!("key: {:#?}, index: {:#?}", key, index);
@@ -414,7 +408,12 @@ impl<K: Ord + Clone + Display + Debug, V: std::fmt::Debug> InternalNode<K, V> {
             }
         } else {
             None
-        }
+        };
+
+        // update size of the internal node
+        self.total = self.children.iter().map(|child| child.size()).sum();
+
+        right
     }
 
     // split child node at index into two, return right node
@@ -511,15 +510,16 @@ mod test {
     #[test]
     fn insert_into_btree_with_split() {
         let mut tree = super::BTree::new(4);
+        let now = std::time::Instant::now();
         // random unia 40 digit numbers
-        let mut vec: Vec<u32> = (0..100).collect();
+        // let mut vec: Vec<u32> = (0..1000).collect();
         // shuffle the keys to test the split
         // vec.shuffle(&mut thread_rng());
 
         // println!("{:?}", vec);
 
         // shuffle the keys to test the split
-        for i in vec {
+        for i in (0..50) {
             // println!("inserting {}", i);
             tree.insert(i, i);
         }
@@ -529,8 +529,15 @@ mod test {
 
         // println!("{:#?}", tree);
 
-        tree.into_iter().for_each(|(k, v)| {
-            println!("{}: {}", k, v);
-        });
+        let keys = tree.into_iter().map(|(k, v)| k).collect::<Vec<_>>();
+        println!("{:?}", keys);
+
+        assert_eq!(tree.index_of(&0), Some(0));
+        assert_eq!(tree.index_of(&10), Some(10));
+        assert_eq!(tree.index_of(&20), Some(20));
+        assert_eq!(tree.index_of(&30), Some(30));
+        assert_eq!(tree.index_of(&40), Some(40));
+
+        println!("ellapsed: {:?}", now.elapsed());
     }
 }

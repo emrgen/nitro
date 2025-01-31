@@ -1,5 +1,5 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::index::IndexTree;
+use crate::index::{IBTree, ItemIndexMap};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
@@ -12,7 +12,8 @@ use std::rc::Rc;
 #[derive(Clone, Debug, Default)]
 pub struct NList {
     item: ItemRef,
-    list: Rc<RefCell<IndexTree>>,
+    // TODO: dynamically create/destroy the list when the nlist is too big/small
+    list: Rc<RefCell<IBTree>>,
 }
 
 impl NList {
@@ -96,7 +97,6 @@ impl NList {
 
             // quickly find the item at the offset index using the binary search
             let next = list.at_index(offset);
-
             if let Some(next) = next {
                 next.insert_before(typ);
             } else {

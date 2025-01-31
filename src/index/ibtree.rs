@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::index::ItemListContainer;
+use crate::index::ItemIndexMap;
 use crate::item::WithIndex;
 use crate::Type;
 use fractional_index::FractionalIndex;
@@ -18,12 +18,13 @@ impl IBTree {
     }
 }
 
-impl ItemListContainer for IBTree {
+impl ItemIndexMap<Type> for IBTree {
     fn size(&self) -> u32 {
         self.btree.len() as u32
     }
 
     fn at_index(&self, index: u32) -> Option<&Type> {
+        println!("index: {}, size: {}", index, self.btree.len());
         self.btree.iter().nth(index as usize).map(|(_, v)| v)
     }
 
@@ -35,24 +36,8 @@ impl ItemListContainer for IBTree {
         self.btree.insert(value.index(), value);
     }
 
-    fn append(&mut self, value: Type) {
-        self.btree.insert(value.index(), value);
-    }
-
-    fn prepend(&mut self, value: Type) {
-        self.btree.insert(value.index(), value);
-    }
-
     fn remove(&mut self, item: &Type) {
         self.btree.remove(&item.index());
-    }
-
-    fn delete(&mut self, item: &Type) {
-        todo!()
-    }
-
-    fn undelete(&mut self, item: &Type) {
-        todo!()
     }
 
     fn contains(&self, item: &Type) -> bool {

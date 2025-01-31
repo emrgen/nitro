@@ -1,4 +1,4 @@
-use crate::index::ItemListContainer;
+use crate::index::ItemIndexMap;
 use crate::item::WithIndex;
 use crate::Type;
 use btree_slab::BTreeMap;
@@ -29,7 +29,7 @@ impl SlabBTree {
     }
 }
 
-impl ItemListContainer for SlabBTree {
+impl ItemIndexMap<Type> for SlabBTree {
     fn size(&self) -> u32 {
         self.btree.len() as u32
     }
@@ -46,24 +46,8 @@ impl ItemListContainer for SlabBTree {
         self.btree.insert(value.index(), value);
     }
 
-    fn append(&mut self, value: Type) {
-        self.btree.insert(value.index(), value);
-    }
-
-    fn prepend(&mut self, value: Type) {
-        self.btree.insert(value.index(), value);
-    }
-
     fn remove(&mut self, item: &Type) {
         self.btree.remove(&item.index());
-    }
-
-    fn delete(&mut self, item: &Type) {
-        todo!()
-    }
-
-    fn undelete(&mut self, item: &Type) {
-        todo!()
     }
 
     fn contains(&self, item: &Type) -> bool {

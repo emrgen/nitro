@@ -447,6 +447,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "skiplist",
  "uuid",
  "zstd",
 ]
@@ -708,6 +709,15 @@ name = "simdutf8"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27f6278552951f1f2b8cf9da965d10969b2efdea95a6ec47987ab46edfe263a"
+
+[[package]]
+name = "skiplist"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0eec25f46463fcdc5e02f388c2780b1b58e01be81a8378e62ec60931beccc3f6"
+dependencies = [
+ "rand",
+]
 
 [[package]]
 name = "slab"

@@ -22,6 +22,7 @@ fn main() {
 
             l1.insert(index as u32, item);
             // l1.append(item);
+            // l1.prepend(item);
             size += 1;
         }
     }

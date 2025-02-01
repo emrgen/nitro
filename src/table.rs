@@ -1,5 +1,5 @@
 use crate::bimapid::ClientId;
-use crate::{Id, ItemData};
+use crate::{Content, Id, ItemData};
 use serde::{Deserialize, Serialize};
 use serde_columnar::columnar;
 use std::default::Default;
@@ -9,42 +9,58 @@ use std::default::Default;
 struct Data {
     #[columnar(strategy = "Rle")]
     id_client: ClientId,
-    #[columnar(strategy = "Rle")]
+    #[columnar(strategy = "DeltaRle")]
     id_clock: u32,
     #[columnar(strategy = "Rle")]
     parent_id_client: ClientId,
-    #[columnar(strategy = "Rle")]
+    #[columnar(strategy = "DeltaRle")]
     parent_id_clock: u32,
     #[columnar(strategy = "Rle")]
     left_id_client: ClientId,
+    #[columnar(strategy = "DeltaRle")]
     left_id_clock: u32,
     #[columnar(strategy = "Rle")]
     right_id_client: ClientId,
-    #[columnar(strategy = "Rle")]
+    #[columnar(strategy = "DeltaRle")]
     right_id_clock: u32,
     #[columnar(strategy = "Rle")]
     target_id: ClientId,
-    #[columnar(strategy = "Rle")]
+    #[columnar(strategy = "DeltaRle")]
     target_id_clock: u32,
     #[columnar(strategy = "Rle")]
     mover_id: ClientId,
-    #[columnar(strategy = "Rle")]
+    #[columnar(strategy = "DeltaRle")]
     mover_id_clock: u32,
+    #[columnar(strategy = "Rle")]
+    content: String,
+    #[columnar(strategy = "Rle")]
+    flags: u8,
 }
 
-#[columnar]
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[columnar(ser, de)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct Table {
+    #[columnar(class = "vec")]
     pub(crate) data: Vec<Data>,
+    // #[columnar(strategy = "Rle")]
+    // pub(crate) content: Vec<String>,
 }
 
 impl Table {
-    pub(crate) fn add(&mut self, item: &ItemData) {
+    pub(crate) fn add(&mut self, item: &ItemData, flag: u8) {
         let mut data = Data {
             id_client: item.id.client,
             id_clock: item.id.clock,
+            flags: flag,
             ..Default::default()
         };
+
+        if !matches!(item.content, Content::Null) {
+            let content = serde_json::to_string(&item.content).unwrap();
+            // println!("content: {}", content);
+            data.content = content;
+            // self.content.push(content);
+        }
 
         if let Some(left_id) = item.left_id {
             data.left_id_client = left_id.client;
@@ -75,6 +91,43 @@ impl Table {
     pub(crate) fn buffer(&self) -> Vec<u8> {
         let bytes = serde_columnar::to_vec(&self).unwrap();
 
+        println!("size: {}", bytes.len());
+
         bytes
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serde::{Deserialize, Serialize};
+    use serde_columnar::columnar;
+
+    #[columnar(vec, ser, de)]
+    #[derive(Debug, Clone, PartialEq, Eq, Default)]
+    struct Row {
+        #[columnar(strategy = "Rle")]
+        id: String,
+    }
+
+    #[columnar(ser, de)]
+    #[derive(Default, Debug, Clone)]
+    struct Table {
+        #[columnar(class = "vec")]
+        data: Vec<Row>,
+    }
+
+    #[test]
+    fn test_table() {
+        let mut table = Table::default();
+
+        for i in (0..6000) {
+            let random_char = std::char::from_u32(i).unwrap();
+            table.data.push(Row {
+                id: random_char.to_string(),
+            });
+        }
+
+        let bytes = serde_columnar::to_vec(&table).unwrap();
+        println!("size: {}", bytes.len());
     }
 }

@@ -261,18 +261,15 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
         flags |= 1;
     }
 
-    e.u8(flags);
-    // println!("flags: {:b}", flags);
-
-    if !matches!(value.content, Content::Null) {
-        value.content.encode(e, cx);
-    }
+    // if !matches!(value.content, Content::Null) {
+    //     value.content.encode(e, cx);
+    // }
 
     if let Some(field) = value.field {
         e.u32(field);
     }
 
-    cx.table.add(value);
+    cx.table.add(value, flags);
 
     // value.id.encode(e, cx);
     //

@@ -14,17 +14,18 @@ fn main() {
         "s", "t", "u", "v", "w", "x", "y", "z",
     ];
 
-    let mut vec = Vec::new();
-
     let now = std::time::Instant::now();
+    let mut vec = Vec::new();
     for i in 0..6000 {
         vec.push(chars[i % 26]);
     }
-
-    println!("elapsed: {:?}", now.elapsed());
     vec.shuffle(&mut rand::thread_rng());
 
-    text.append(doc.string(vec.join("")));
+    for c in vec {
+        text.prepend(doc.string(c));
+    }
+
+    println!("elapsed: {:?}", now.elapsed());
 
     let mut encoder = EncoderV1::new();
     doc.encode(&mut encoder, &mut Default::default());

@@ -213,13 +213,13 @@ impl Serialize for Diff {
 }
 
 impl Encode for Diff {
-    fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
-        self.doc_id.encode(e, ctx);
-        self.created_by.encode(e, ctx);
-        self.fields.encode(e, ctx);
-        self.state.encode(e, ctx);
-        self.deletes.encode(e, ctx);
-        self.items.encode(e, ctx);
+    fn encode<E: Encoder>(&self, e: &mut E, cx: &mut EncodeContext) {
+        self.doc_id.encode(e, cx);
+        self.created_by.encode(e, cx);
+        self.fields.encode(e, cx);
+        self.state.encode(e, cx);
+        self.deletes.encode(e, cx);
+        self.items.encode(e, cx);
     }
 }
 

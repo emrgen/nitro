@@ -27,7 +27,7 @@ fn main() {
     for i in 0..6000 {
         // random index
         let index = indexes[i];
-        list.insert(index as u32, doc.string(chars[i % 26]));
+        list.insert(index as u32, doc.atom(i as u32));
     }
 
     println!("elapsed: {:?}", now.elapsed());

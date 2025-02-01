@@ -261,35 +261,38 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
         flags |= 1;
     }
 
-    // if !matches!(value.content, Content::Null) {
-    //     value.content.encode(e, cx);
-    // }
+    e.u8(flags);
+    // println!("flags: {:b}", flags);
+
+    if !matches!(value.content, Content::Null) {
+        value.content.encode(e, cx);
+    }
 
     if let Some(field) = value.field {
         e.u32(field);
     }
 
-    cx.table.add(value, flags);
+    value.id.encode(e, cx);
 
-    // value.id.encode(e, cx);
-    //
-    // if let Some(left_id) = value.left_id {
-    //     left_id.encode(e, cx);
-    // } else if let Some(parent_id) = value.parent_id {
-    //     parent_id.encode(e, cx);
-    // }
-    //
-    // if let Some(right_id) = value.right_id {
-    //     right_id.encode(e, cx);
-    // }
-    //
-    // if let Some(target_id) = value.target_id {
-    //     target_id.encode(e, cx);
-    // }
-    //
-    // if let Some(mover_id) = value.mover_id {
-    //     mover_id.encode(e, cx);
-    // }
+    if let Some(left_id) = value.left_id {
+        left_id.encode(e, cx);
+    } else if let Some(parent_id) = value.parent_id {
+        parent_id.encode(e, cx);
+    }
+
+    if let Some(right_id) = value.right_id {
+        right_id.encode(e, cx);
+    }
+
+    if let Some(target_id) = value.target_id {
+        target_id.encode(e, cx);
+    }
+
+    if let Some(mover_id) = value.mover_id {
+        mover_id.encode(e, cx);
+    }
+
+    // cx.table.add(value, flags);
 }
 
 fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, String> {

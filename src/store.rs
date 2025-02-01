@@ -667,7 +667,7 @@ impl<T: IdStoreEntry> Encode for IdStore<T> {
             value.encode(e, cx);
         }
 
-        e.bytes(&*cx.table.buffer());
+        // e.bytes(&*cx.table.buffer());
     }
 }
 

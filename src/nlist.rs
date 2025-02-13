@@ -132,9 +132,7 @@ impl NList {
 
         let content = items.iter().map(|item| item.to_json()).collect();
 
-        json.insert("content".to_string(), serde_json::Value::Array(content));
-
-        serde_json::to_value(json).unwrap()
+        serde_json::Value::Array(content)
     }
 }
 

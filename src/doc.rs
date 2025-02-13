@@ -303,7 +303,14 @@ impl Doc {
             serde_json::Value::String(self.opts.crated_by.to_string()),
         );
 
-        map.insert("root".to_string(), self.root.to_json());
+        match self.root.to_json() {
+            Value::Object(root) => {
+                for (key, value) in root {
+                    map.insert(key, value);
+                }
+            }
+            _ => {}
+        }
 
         serde_json::Value::Object(map)
     }

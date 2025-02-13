@@ -46,10 +46,7 @@ impl NAtom {
     }
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
-        let mut map = self.borrow().to_json();
-        map.insert("content".to_string(), self.content().to_json());
-
-        serde_json::to_value(map).unwrap()
+        self.content().to_json()
     }
 }
 

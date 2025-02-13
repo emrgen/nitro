@@ -1,12 +1,12 @@
+use bimap::BiMap;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::collections::btree_map::IterMut;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Debug;
 use std::ops::Add;
 use std::rc::{Rc, Weak};
-
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
 
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};

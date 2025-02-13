@@ -61,8 +61,8 @@ impl Deref for NMap {
 }
 
 impl NMap {
-    pub(crate) fn add_mark(&self, mark: Mark) {
-        let content = MarkContent::new(self.id().into(), mark.clone());
+    pub(crate) fn add_mark(&self, mark: impl Into<Mark>) {
+        let content = MarkContent::new(self.id().into(), mark.into());
         let id = self
             .store
             .upgrade()
@@ -86,12 +86,13 @@ impl NMap {
         item.cloned()
     }
 
-    pub(crate) fn set(&self, field: impl Into<String>, item: Type) {
-        let item_ref = item.item_ref();
+    pub(crate) fn set(&self, field: impl Into<String>, item: impl Into<Type>) {
+        let typ = item.into();
+        let item_ref = typ.item_ref();
         let store = item_ref.store.upgrade().unwrap();
         let field_id = store.borrow_mut().get_field_id(&field.into());
         item_ref.borrow_mut().data.field = Some(field_id);
-        self.item_ref().append(item);
+        self.item_ref().append(typ);
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {
@@ -136,9 +137,7 @@ impl NMap {
             content.insert(key.clone(), value.to_json());
         }
 
-        json.insert("content".to_string(), serde_json::Value::Object(content));
-
-        serde_json::to_value(map).unwrap()
+        serde_json::Value::Object(content)
     }
 }
 
@@ -193,6 +192,7 @@ impl From<ItemRef> for NMap {
 #[cfg(test)]
 mod tests {
     use crate::doc::Doc;
+    use crate::print_yaml;
 
     #[test]
     fn test_map() {
@@ -229,5 +229,46 @@ mod tests {
         //     parent_id: (1, 1)
         // "#;
         //         assert_eq!(yaml, expect);
+    }
+
+    #[test]
+    fn test_node_1() {
+        let doc = Doc::default();
+        let map = doc.map();
+        doc.set("content", map.clone());
+
+        // map.set("kind", doc.atom("node"));
+        // map.set("id", doc.atom("1"));
+        map.set("name", doc.atom("page"));
+
+        let list = doc.list();
+        map.set("children", list.clone());
+
+        let p1 = doc.map();
+        // p1.set("kind", doc.atom("node"));
+        // p1.set("id", doc.atom("2"));
+        p1.set("name", doc.atom("paragraph"));
+
+        let t1 = doc.text();
+        t1.insert(0, doc.string("Hello, world!"));
+        p1.set("children", t1.clone());
+
+        let p2 = doc.map();
+        // p2.set("kind", doc.atom("node"));
+        // p2.set("id", doc.atom("3"));
+        p2.set("name", doc.atom("paragraph"));
+
+        let t2 = doc.text();
+        t2.insert(0, doc.string("Goodbye, world!"));
+        p2.set("children", t2.clone());
+
+        list.append(p1.clone());
+        list.append(p2.clone());
+        // let yaml = serde_json::to_string(&doc).unwrap();
+        // println!("---\n{}", yaml);
+        //
+        let json = doc.to_json();
+        println!("---\n{}", serde_json::to_string_pretty(&json).unwrap());
+        // print_yaml(&doc);
     }
 }

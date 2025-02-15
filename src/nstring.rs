@@ -47,8 +47,12 @@ impl NString {
         self.item.delete(self.size());
     }
 
+    // add mark to string
     pub(crate) fn add_mark(&self, mark: Mark) {
+        // create mark content, which includes the string id range
+        // e.g. the range of the string "hello" is 0..5 the mark content will be (0..5, mark)
         let content = MarkContent::new(self.id().range(self.size()), mark.clone());
+        // get next id within the range of the string
         let id = self
             .store
             .upgrade()

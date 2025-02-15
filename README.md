@@ -21,6 +21,7 @@ flamegraph -- cargo run --example huge_list
 - [x] diff
 - [x] merge
 - [x] sync docs
+- [ ] move without copy(feature)
 
 ### TODO
 - [ ] use queue store for pending items instead of IdStore<T>

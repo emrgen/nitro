@@ -33,6 +33,7 @@ skiplist = "0.5.1"
 ptree = "0.5.2"
 serde_columnar = { version = "0.3.2", features = ["bench"] }
 flate2 = { version = "1.0.35", features = ["cloudflare_zlib"] }
+hashbrown = { version = "0.11.2", features = ["serde"] }
 
 [dependencies.serde_json]
 version = "1.0"

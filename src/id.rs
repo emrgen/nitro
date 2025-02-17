@@ -192,7 +192,7 @@ pub(crate) trait Split {
     fn split(&self, offset: u32) -> Result<(Self::Target, Self::Target), String>;
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Hash)]
 pub struct Id {
     pub(crate) client: ClientId,
     pub(crate) clock: Clock,
@@ -209,7 +209,7 @@ impl Id {
 
 impl Id {
     #[inline]
-    pub(crate) fn new(client: ClientId, clock: Clock) -> Id {
+    pub fn new(client: ClientId, clock: Clock) -> Id {
         Id { client, clock }
     }
 

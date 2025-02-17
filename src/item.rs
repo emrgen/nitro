@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
-use std::collections::HashMap;
+use hashbrown::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -485,7 +485,7 @@ impl Item {
             }
         }
 
-        marks.into_values().collect()
+        marks.values().cloned().collect()
     }
 
     // all marks need to match for adjacent string items to be merged into a single string

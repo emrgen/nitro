@@ -1,5 +1,6 @@
 use std::cell::Ref;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap};
+use hashbrown::HashMap;
 use std::default::Default;
 use std::time::Duration;
 

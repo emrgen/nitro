@@ -105,6 +105,7 @@ where
                     // println!("->item right id is equal to item conflict right id");
                     break;
                 }
+                // item right id is not matched with confict right id
             } else if conflict_left_id.is_some()
                 && items_before_origin.contains(&conflict_left_id.unwrap())
             {

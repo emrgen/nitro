@@ -3,7 +3,7 @@ use std::ops::Deref;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
-use crate::item::{Content, ItemData, ItemKind, ItemKindFlags};
+use crate::item::{Content, ItemData, ItemKind, ItemKindFlags, ItemSide, ItemSideFlags};
 
 const VERSION: u8 = 1;
 const BUF_STEP: usize = 1024;
@@ -240,15 +240,18 @@ impl Decoder for DecoderV1 {
 fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
     // | kind, content, field, parent | left, right | ...
     // println!("encode_item: {}, {:?}", value.kind, value.id);
-    let mut flags = ItemKindFlags::from(&value.kind).bits() << 4;
+    let kind_flags = ItemKindFlags::from(&value.kind).bits();
+    e.u8(kind_flags);
+
+    let mut flags = ItemSideFlags::from(&value.side).bits() << 4;
 
     // let is_root = matches!(value.content, Content::Doc(_));
     if !matches!(value.content, Content::Null) {
-        flags |= 1 << 3;
+        flags |= 1 << 3; // has content
     }
 
     if value.field.is_some() {
-        flags |= 1 << 2;
+        flags |= 1 << 2; // has field
     }
 
     // if left_id is not None then we can get the parent_id from left item during integration,
@@ -262,6 +265,7 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
     }
 
     e.u8(flags);
+
     // println!("flags: {:b}", flags);
 
     if !matches!(value.content, Content::Null) {
@@ -276,12 +280,18 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
 
     if let Some(left_id) = value.left_id {
         left_id.encode(e, cx);
-    } else if let Some(parent_id) = value.parent_id {
-        parent_id.encode(e, cx);
     }
 
     if let Some(right_id) = value.right_id {
         right_id.encode(e, cx);
+    }
+
+    // if side is none, that means we are using yata
+    // else we are using fugue
+    if value.side.is_none() && value.left_id.is_none() {
+        if let Some(parent_id) = value.parent_id {
+            parent_id.encode(e, cx);
+        }
     }
 
     if let Some(target_id) = value.target_id {
@@ -292,14 +302,19 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
         mover_id.encode(e, cx);
     }
 
-    // cx.table.add(value, flags);
+    // cx.table.add(value, kind_flags, flags);
 }
 
 fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, String> {
-    let flags = d.u8()?;
+    let kind_flag = d.u8()?;
     // println!("flags: {:b}", flags);
 
-    let kind: ItemKind = ItemKindFlags::from_bits(flags >> 4).unwrap().into();
+    let kind: ItemKind = ItemKindFlags::from_bits(kind_flag).unwrap().into();
+
+    let flags = d.u8()?;
+
+    let side: ItemSide = ItemSideFlags::from_bits(flags >> 4).unwrap().into();
+
     let content = if flags & 0b1000 != 0 {
         Content::decode(d, ctx)?
     } else {
@@ -315,36 +330,31 @@ fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, Strin
     let id = Id::decode(d, ctx)?;
 
     let is_root = matches!(content, Content::Doc(_));
+    let mut left_id = None;
+    let mut right_id = None;
+    let mut parent_id = None;
+    let mut target_id = None;
+    let mut mover_id = None;
 
-    let parent_id = if !is_root && flags & 0b10 == 0 {
-        Some(Id::decode(d, ctx)?)
-    } else {
-        None
-    };
+    if !is_root && flags & 0b10 != 0 {
+        left_id = Some(Id::decode(d, ctx)?)
+    }
 
-    let left_id = if !is_root && flags & 0b10 != 0 {
-        Some(Id::decode(d, ctx)?)
-    } else {
-        None
-    };
+    if flags & 0b1 != 0 {
+        right_id = Some(Id::decode(d, ctx)?)
+    }
 
-    let right_id = if flags & 0b1 != 0 {
-        Some(Id::decode(d, ctx)?)
-    } else {
-        None
-    };
+    if side.is_none() && !is_root && flags & 0b10 == 0 {
+        parent_id = Some(Id::decode(d, ctx)?)
+    }
 
-    let target_id = if flags & 0b1 != 0 {
-        Some(Id::decode(d, ctx)?)
-    } else {
-        None
-    };
+    if flags & 0b1 != 0 {
+        target_id = Some(Id::decode(d, ctx)?)
+    }
 
-    let mover_id = if flags & 0b1 != 0 {
-        Some(Id::decode(d, ctx)?)
-    } else {
-        None
-    };
+    if flags & 0b1 != 0 {
+        mover_id = Some(Id::decode(d, ctx)?)
+    }
 
     // println!("id: {:?}, field: {:?}", id, field);
 
@@ -353,6 +363,7 @@ fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, Strin
         kind,
         content,
         field,
+        side,
         left_id,
         parent_id,
         right_id,

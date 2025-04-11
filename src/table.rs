@@ -35,6 +35,8 @@ struct Data {
     content: String,
     #[columnar(strategy = "Rle")]
     flags: u8,
+    #[columnar(strategy = "Rle")]
+    kind_flag: u8,
 }
 
 #[columnar(ser, de)]
@@ -47,10 +49,11 @@ pub(crate) struct Table {
 }
 
 impl Table {
-    pub(crate) fn add(&mut self, item: &ItemData, flag: u8) {
+    pub(crate) fn add(&mut self, item: &ItemData, kind_flag: u8, flag: u8) {
         let mut data = Data {
             id_client: item.id.client,
             id_clock: item.id.clock,
+            kind_flag,
             flags: flag,
             ..Default::default()
         };

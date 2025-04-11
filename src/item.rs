@@ -1,6 +1,6 @@
+use hashbrown::HashMap;
 use std::cell::RefCell;
 use std::cmp::{Ordering, PartialEq};
-use hashbrown::HashMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
@@ -356,6 +356,7 @@ pub struct Item {
     pub(crate) right: Option<Type>,    // right link
     pub(crate) start: Option<Type>,    // linked children start
     pub(crate) end: Option<Type>,      // linked children end
+    pub(crate) container: Option<Id>,  // container id
     pub(crate) target: Option<Type>,   // indirect item ref (proxy, mover)
     pub(crate) mover: Option<Type>,    // mover ref (proxy)
     pub(crate) movers: Option<Type>,   // linked movers
@@ -399,6 +400,10 @@ impl Item {
             Content::Mark(m) => m.size(),
             _ => 1,
         }
+    }
+
+    pub(crate) fn container_id(&self) -> Option<Id> {
+        self.container
     }
 
     pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {
@@ -625,6 +630,68 @@ impl DerefMut for Item {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(crate) enum ItemSide {
+    #[default]
+    None,
+    Left,
+    Right,
+}
+
+bitflags! {
+    pub(crate) struct ItemSideFlags: u8 {
+        const NONE = 0x00;
+        const LEFT = 0x01;
+        const RIGHT = 0x02;
+    }
+}
+
+impl ItemSide {
+    pub(crate) fn is_left(&self) -> bool {
+        matches!(self, ItemSide::Left)
+    }
+
+    pub(crate) fn is_right(&self) -> bool {
+        matches!(self, ItemSide::Right)
+    }
+
+    pub(crate) fn is_none(&self) -> bool {
+        matches!(self, ItemSide::None)
+    }
+}
+
+impl From<ItemSide> for ItemSideFlags {
+    fn from(kind: ItemSide) -> Self {
+        match kind {
+            ItemSide::None => ItemSideFlags::NONE,
+            ItemSide::Left => ItemSideFlags::LEFT,
+            ItemSide::Right => ItemSideFlags::RIGHT,
+        }
+    }
+}
+
+impl From<&ItemSide> for ItemSideFlags {
+    fn from(kind: &ItemSide) -> Self {
+        match kind {
+            ItemSide::None => ItemSideFlags::NONE,
+            ItemSide::Left => ItemSideFlags::LEFT,
+            ItemSide::Right => ItemSideFlags::RIGHT,
+        }
+    }
+}
+
+impl From<ItemSideFlags> for ItemSide {
+    fn from(flags: ItemSideFlags) -> Self {
+        let flag = flags.bits();
+        match flag {
+            0 => ItemSide::None,
+            1 => ItemSide::Left,
+            2 => ItemSide::Right,
+            _ => panic!("Invalid item side flag: {}", flag),
+        }
+    }
+}
+
 // item data is encoded and saved into persistent storage
 #[derive(Debug, Clone, Default, Eq)]
 pub struct ItemData {
@@ -633,6 +700,7 @@ pub struct ItemData {
     pub(crate) parent_id: Option<Id>,
     pub(crate) left_id: Option<Id>,
     pub(crate) right_id: Option<Id>,
+    pub(crate) side: ItemSide,
 
     pub(crate) target_id: Option<Id>, // for proxy & move
     pub(crate) mover_id: Option<Id>,  // for proxy
@@ -649,6 +717,7 @@ impl ItemData {
             parent_id: None,
             left_id: None,
             right_id: None,
+            side: ItemSide::None,
             target_id: None,
             mover_id: None,
             field: None,
@@ -880,6 +949,14 @@ impl From<ItemData> for ItemRefInner {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ContainerKind {
+    Map,
+    List,
+    Text,
+    PlainText,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
 pub(crate) enum ItemKind {
     Map,
@@ -890,6 +967,13 @@ pub(crate) enum ItemKind {
     Proxy,
     Move,
     Mark,
+    PlaintText,
+}
+
+impl ItemKind {
+    pub(crate) fn is_list(&self) -> bool {
+        self == &Self::List
+    }
 }
 
 bitflags! {
@@ -902,6 +986,7 @@ bitflags! {
         const PROXY = 0x5;
         const MOVE = 0x6;
         const MARK = 0x7;
+        const PLAINTEXT = 0x8;
     }
 }
 
@@ -916,6 +1001,7 @@ impl From<ItemKind> for ItemKindFlags {
             ItemKind::Proxy => Self::PROXY,
             ItemKind::Move => Self::MOVE,
             ItemKind::Mark => Self::MARK,
+            ItemKind::PlaintText => Self::PLAINTEXT,
         }
     }
 }
@@ -931,6 +1017,7 @@ impl From<&ItemKind> for ItemKindFlags {
             ItemKind::Proxy => Self::PROXY,
             ItemKind::Move => Self::MOVE,
             ItemKind::Mark => Self::MARK,
+            ItemKind::PlaintText => Self::PLAINTEXT,
         }
     }
 }
@@ -943,10 +1030,11 @@ impl From<ItemKindFlags> for ItemKind {
             0x01 => ItemKind::List,
             0x02 => ItemKind::Text,
             0x03 => ItemKind::String,
-            0x10 => ItemKind::Atom,
-            0x11 => ItemKind::Proxy,
-            0x12 => ItemKind::Move,
-            0x13 => ItemKind::Mark,
+            0x04 => ItemKind::Atom,
+            0x05 => ItemKind::Proxy,
+            0x06 => ItemKind::Move,
+            0x07 => ItemKind::Mark,
+            0x08 => ItemKind::PlaintText,
             _ => ItemKind::Atom,
         }
     }
@@ -963,6 +1051,7 @@ impl Display for ItemKind {
             Self::Proxy => write!(f, "proxy"),
             Self::Move => write!(f, "move"),
             Self::Mark => write!(f, "mark"),
+            Self::PlaintText => write!(f, "plaintext"),
         }
     }
 }

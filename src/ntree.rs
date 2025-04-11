@@ -23,26 +23,27 @@ impl NTree {
         self.nodes.insert(id, NTreeNode::new(id));
 
         // get the parent node
-        let parent_node = self.nodes.get_mut(&parent_id).ok_or_else(|| {
-            format!("Parent node {} not found", parent_id)
-        })?;
+        let parent_node = self
+            .nodes
+            .get_mut(&parent_id)
+            .ok_or_else(|| format!("Parent node {} not found", parent_id))?;
 
         match side {
             NodeSide::Left => {
                 // insert in sorted order by id
-                let pos = parent_node.left_children.binary_search(&id)?;
-                match pos {
-                    Ok(_) => panic!("Node already exists"),
-                    Err(pos) => parent_node.left_children.insert(pos, id),
-                }
+                // let pos = parent_node.left_children.binary_search(&id)?;
+                // match pos {
+                //     Ok(_) => panic!("Node already exists"),
+                //     Err(pos) => parent_node.left_children.insert(pos, id),
+                // }
             }
             NodeSide::Right => {
                 // insert in sorted order by id
-                let pos = parent_node.right_children.binary_search(&id)?;
-                match pos {
-                    Ok(_) => panic!("Node already exists"),
-                    Err(pos) => parent_node.right_children.insert(pos, id),
-                }
+                // let pos = parent_node.right_children.binary_search(&id)?;
+                // match pos {
+                //     Ok(_) => panic!("Node already exists"),
+                //     Err(pos) => parent_node.right_children.insert(pos, id),
+                // }
             }
         }
 
@@ -51,9 +52,10 @@ impl NTree {
 
     // remove a node from the tree
     pub(crate) fn remove(&mut self, id: Id, parent_id: Id, side: NodeSide) -> Result<(), String> {
-       let mut parent  = self.nodes.get_mut(&parent_id).ok_or_else(|| {
-            format!("Parent node {} not found", parent_id)
-        })?;
+        let mut parent = self
+            .nodes
+            .get_mut(&parent_id)
+            .ok_or_else(|| format!("Parent node {} not found", parent_id))?;
 
         match side {
             NodeSide::Left => {
@@ -65,9 +67,9 @@ impl NTree {
         }
 
         // remove the node
-        self.nodes.remove(&id).ok_or_else(|| {
-            format!("Node {} not found", id)
-        })?;
+        self.nodes
+            .remove(&id)
+            .ok_or_else(|| format!("Node {} not found", id))?;
 
         Ok(())
     }
@@ -120,7 +122,7 @@ impl NTreeNode {
     }
 }
 
-// placement of chilren wrt the parent
+// placement of children wrt the parent
 enum NodeSide {
     Left,
     Right,

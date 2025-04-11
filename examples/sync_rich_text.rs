@@ -47,7 +47,7 @@ fn main() {
     // sync_docs(&t1.doc, &t2.doc, SyncDirection::RightToLeft);
     sync_docs(&t1.doc, &t2.doc, SyncDirection::Both);
 
-    // assert_eq!(t1, t2);
+    assert_eq!(t1, t2);
 
     // print_yaml(&t1);
     // print_yaml(&t2);

@@ -1,6 +1,8 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
-use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
+use crate::item::{
+    ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked,
+};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 use serde::ser::{Serialize, SerializeStruct};
@@ -72,13 +74,17 @@ impl Deref for NList {
 impl NList {
     fn prepend(&self, item: impl Into<Type>) {
         let item = item.into();
-        self.item.prepend(item.clone());
-        Type::add_frac_index(&item);
-        self.on_insert(&item);
+        #[cfg(feature = "fugue1")]
+        {
+            self.item.prepend(item.clone());
+            Type::add_frac_index(&item);
+            self.on_insert(&item);
+        }
     }
 
-    pub(crate) fn append(&self, item: impl Into<Type>) {
+    pub fn append(&self, item: impl Into<Type>) {
         let item = item.into();
+        // item.set_container(self.item.clone());
         self.item.append(item.clone());
         Type::add_frac_index(&item);
         self.on_insert(&item);
@@ -86,24 +92,29 @@ impl NList {
 
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let size = self.list.borrow().size();
-        let typ = item.into();
+        let item = item.into();
+        // item.set_container(self.item.clone());
 
         if offset == 0 {
-            self.prepend(typ);
+            self.prepend(item);
         } else if offset >= size as u32 {
-            self.append(typ);
+            self.append(item);
         } else {
             let list = self.list.borrow();
 
             // quickly find the item at the offset index using the binary search
             let next = list.at_index(offset);
             if let Some(next) = next {
-                next.insert_before(typ);
+                next.insert_before(item);
             } else {
-                self.append(typ);
+                self.append(item);
             }
         }
     }
+
+    fn fugue_append(&self, offset: u32, item: impl Into<Type>) {}
+    fn fugue_prepend(&self, offset: u32, item: impl Into<Type>) {}
+    fn fugue_insert(&self, offset: u32, item: impl Into<Type>) {}
 
     fn remove(&self, key: ItemKey) {
         if let ItemKey::Number(offset) = key {

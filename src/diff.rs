@@ -5,6 +5,7 @@ use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
 use crate::bimapid::FieldMap;
+use crate::change::Change;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -19,6 +20,7 @@ pub struct Diff {
     pub created_by: Client,
     pub doc_id: DocId,
     pub fields: FieldMap,
+    pub changes: Vec<Change>,
     pub state: ClientState,
     pub items: ItemDataStore,
     pub deletes: DeleteItemStore,
@@ -56,6 +58,7 @@ impl Diff {
             created_by,
             doc_id,
             fields,
+            changes: vec![],
             state,
             items,
             deletes,
@@ -68,9 +71,10 @@ impl Diff {
             doc_id: self.doc_id.clone(),
             created_by: self.created_by.clone(),
             fields: self.fields.clone(),
+            changes: vec![],
+            state: self.state.clone(),
             items: self.items.diff(state),
             deletes: self.deletes.diff(state),
-            state: self.state.clone(),
         }
     }
 
@@ -236,6 +240,7 @@ impl Decode for Diff {
             doc_id,
             created_by,
             fields,
+            changes: vec![],
             state,
             deletes,
             items,

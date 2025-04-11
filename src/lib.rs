@@ -7,6 +7,7 @@
 #![allow(unused_assignments)]
 #![allow(unused_must_use)]
 
+pub use crate::change::*;
 pub use crate::diff::*;
 pub use crate::diffstore::*;
 pub use crate::doc::*;
@@ -23,8 +24,11 @@ pub use crate::utils::*;
 use crate::index::*;
 
 mod bimapid;
+mod change;
 pub mod codec_v1;
-mod crdt;
+mod crdt_fugue;
+mod crdt_yata;
+mod dag;
 pub mod decoder;
 mod delete;
 mod diff;
@@ -32,6 +36,7 @@ pub mod diffstore;
 mod doc;
 pub mod encoder;
 mod hash;
+mod history;
 mod id;
 mod id_store;
 mod index;
@@ -55,6 +60,7 @@ mod sync;
 mod table;
 mod transaction;
 mod types;
+mod undo_redo;
 mod utils;
 mod version;
 mod frontier;

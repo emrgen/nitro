@@ -5,7 +5,7 @@ use std::default::Default;
 use std::time::Duration;
 
 use crate::bimapid::ClientId;
-use crate::crdt::integrate;
+use crate::crdt_yata::integrate;
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;

@@ -1,11 +1,11 @@
-use std::cell::Ref;
-use std::collections::{BTreeMap};
 use hashbrown::HashMap;
+use std::cell::Ref;
+use std::collections::BTreeMap;
 use std::default::Default;
 use std::time::Duration;
 
 use crate::bimapid::ClientId;
-use crate::crdt_yata::integrate;
+use crate::crdt_yata::integrate_yata;
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
@@ -217,25 +217,19 @@ impl Transaction {
                 let mut left = data.left_id.as_ref().map(|id| store.find(id)).flatten();
                 let right = data.right_id.as_ref().map(|id| store.find(id)).flatten();
 
-                // println!("\nintegrating: {:?}", data.id);
+                // println!("integrating: {:?}", data.id);
 
                 let item: Type = ItemRef::new(data.into(), self.store.clone()).into();
 
-                let count = integrate(
+                let count = integrate_yata(
                     &client_map,
                     &item,
                     &parent,
                     parent.start(),
                     &mut left,
                     right,
-                    |start| {
-                        parent.set_start(start);
-                        Ok(())
-                    },
-                    |end| {
-                        parent.set_end(end);
-                        Ok(())
-                    },
+                    |start| parent.set_start(start),
+                    |end| parent.set_end(end),
                 )?;
 
                 parent.on_insert(&item);

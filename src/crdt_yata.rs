@@ -7,7 +7,7 @@ use crate::store::ClientStore;
 use crate::types::Type;
 
 // integrate an item into the list of items, resolving conflicts
-pub(crate) fn integrate<SS, SE>(
+pub(crate) fn integrate_yata<SS, SE>(
     client_map: &ClientMap,
     item: &Type,
     parent: &Type,
@@ -18,8 +18,8 @@ pub(crate) fn integrate<SS, SE>(
     set_end: SE,
 ) -> Result<(i32), String>
 where
-    SS: FnOnce(Option<Type>) -> Result<(), String>,
-    SE: FnOnce(Option<Type>) -> Result<(), String>,
+    SS: FnOnce(Option<Type>),
+    SE: FnOnce(Option<Type>),
 {
     // let item: Type = ItemRef::new(data.into(), store.clone()).into();
     // print_yaml(&item);
@@ -105,7 +105,7 @@ where
                     // println!("->item right id is equal to item conflict right id");
                     break;
                 }
-                // item right id is not matched with confict right id
+                // item right id is not matched with conflict right id
             } else if conflict_left_id.is_some()
                 && items_before_origin.contains(&conflict_left_id.unwrap())
             {
@@ -130,7 +130,7 @@ where
         }
 
         if item.right().is_none() {
-            set_end(Some(item.clone()))?;
+            set_end(Some(item.clone()));
         }
     }
 
@@ -145,13 +145,13 @@ fn integrate_start<F>(
     set_start: F,
 ) -> Result<(), String>
 where
-    F: FnOnce(Option<Type>) -> Result<(), String>,
+    F: FnOnce(Option<Type>),
 {
     if let Some(start) = start {
         start.set_left(item.clone());
         item.set_right(start);
     }
-    set_start(Some(item.clone()))?;
+    set_start(Some(item.clone()));
     item.set_parent_id(parent.id());
     item.set_parent(parent.clone());
 

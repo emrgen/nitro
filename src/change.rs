@@ -8,3 +8,17 @@ pub(crate) struct Change {
     start: Id,
     end: Id,
 }
+
+impl Change {
+    pub fn new(start: Id, end: Id) -> Self {
+        Self { start, end }
+    }
+
+    pub fn start(&self) -> Id {
+        self.start
+    }
+
+    pub fn end(&self) -> Id {
+        self.end
+    }
+}

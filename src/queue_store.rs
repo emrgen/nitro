@@ -173,7 +173,7 @@ impl<T: QueryStoreEntry> Decode for QueueStore<T> {
 mod test {
     use crate::id::Id;
     use crate::queue_store::QueueStore;
-    use crate::store::IdStore;
+    use crate::store::ItemStore;
 
     #[test]
     fn test_queue_vs_store() {
@@ -190,7 +190,7 @@ mod test {
         println!("queue time: {:?}", now.elapsed());
 
         let now = std::time::Instant::now();
-        let mut store = IdStore::default();
+        let mut store = ItemStore::default();
         for i in 0..50000 {
             store.insert(Id::new(0, i as u32));
         }

@@ -36,7 +36,7 @@ pub(crate) struct DocStore {
     pub(crate) id_map: IdRangeMap,
     pub(crate) state: ClientState,
 
-    pub(crate) items: ItemStore,
+    pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
 }
@@ -178,13 +178,13 @@ impl ReadyStore {
 
     pub(crate) fn iter_items(
         &self,
-    ) -> std::collections::btree_map::Iter<ClientId, IdStore<ItemData>> {
+    ) -> std::collections::btree_map::Iter<ClientId, ItemStore<ItemData>> {
         self.items.iter()
     }
 
     pub(crate) fn iter_delete_items(
         &self,
-    ) -> std::collections::btree_map::Iter<ClientId, IdStore<DeleteItem>> {
+    ) -> std::collections::btree_map::Iter<ClientId, ItemStore<DeleteItem>> {
         self.delete_items.iter()
     }
 }
@@ -220,19 +220,19 @@ impl PendingStore {
 
     pub(crate) fn iter_items(
         &self,
-    ) -> std::collections::btree_map::Iter<ClientId, IdStore<ItemData>> {
+    ) -> std::collections::btree_map::Iter<ClientId, ItemStore<ItemData>> {
         self.items.iter()
     }
 
     pub(crate) fn iter_mut_items(
         &mut self,
-    ) -> std::collections::btree_map::IterMut<ClientId, IdStore<ItemData>> {
+    ) -> std::collections::btree_map::IterMut<ClientId, ItemStore<ItemData>> {
         self.items.iter_mut()
     }
 
     pub(crate) fn iter_delete_items(
         &self,
-    ) -> std::collections::btree_map::Iter<ClientId, IdStore<DeleteItem>> {
+    ) -> std::collections::btree_map::Iter<ClientId, ItemStore<DeleteItem>> {
         self.delete_items.iter()
     }
 
@@ -301,8 +301,8 @@ impl Add<PendingStore> for PendingStore {
 
 pub type ItemDataStore = ClientStore<ItemData>;
 
-impl From<ItemStore> for ItemDataStore {
-    fn from(value: ItemStore) -> Self {
+impl From<TypeStore> for ItemDataStore {
+    fn from(value: TypeStore) -> Self {
         let mut store = ItemDataStore::default();
         for (_, items) in value.items.iter() {
             for (_, item) in items.iter() {
@@ -315,10 +315,13 @@ impl From<ItemStore> for ItemDataStore {
 }
 
 pub type DeleteItemStore = ClientStore<DeleteItem>;
-pub type ItemStore = ClientStore<Type>;
+pub type TypeStore = ClientStore<Type>;
 
+/// A map of client ids to a set of id ranges
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IdRangeMap {
+    // TODO: check if the clientId is needed in IdRange
+    // as it is already in the BTreeMap key may be we can remove it from the IdRange
     pub(crate) map: BTreeMap<ClientId, BTreeSet<IdRange>>,
 }
 
@@ -387,7 +390,7 @@ impl IdDiff for DeleteItemStore {
     }
 }
 
-impl IdDiff for ItemStore {
+impl IdDiff for TypeStore {
     type Target = ItemDataStore;
 
     fn diff(&self, state: &ClientState) -> ItemDataStore {
@@ -438,23 +441,22 @@ impl<T: Default + WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize>
 {
 }
 
+/// A map of items created by a client at local site
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
 pub struct ClientStore<T: ClientStoreEntry> {
-    pub(crate) items: BTreeMap<ClientId, IdStore<T>>,
+    pub(crate) items: BTreeMap<ClientId, ItemStore<T>>,
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn clients(&self) -> Vec<ClientId> {
         self.items.keys().cloned().collect()
     }
-}
 
-impl<T: ClientStoreEntry> ClientStore<T> {
-    pub(crate) fn id_store(&self, client: &ClientId) -> Option<&IdStore<T>> {
+    pub(crate) fn id_store(&self, client: &ClientId) -> Option<&ItemStore<T>> {
         self.items.get(client)
     }
 
-    pub(crate) fn id_store_mut(&mut self, client: &ClientId) -> Option<&mut IdStore<T>> {
+    pub(crate) fn id_store_mut(&mut self, client: &ClientId) -> Option<&mut ItemStore<T>> {
         self.items.get_mut(client)
     }
 
@@ -484,9 +486,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn client_size(&self, id: &ClientId) -> usize {
         self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
     }
-}
 
-impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn find(&self, id: &Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
@@ -497,15 +497,15 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         store.insert(item);
     }
 
-    pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, IdStore<T>> {
+    pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, ItemStore<T>> {
         self.items.keys()
     }
 
-    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, IdStore<T>> {
+    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, ItemStore<T>> {
         self.items.iter()
     }
 
-    pub(crate) fn iter_mut(&mut self) -> IterMut<ClientId, IdStore<T>> {
+    pub(crate) fn iter_mut(&mut self) -> IterMut<ClientId, ItemStore<T>> {
         self.items.iter_mut()
     }
 
@@ -539,8 +539,8 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 }
 
 impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
-    type Item = (ClientId, IdStore<T>);
-    type IntoIter = std::collections::btree_map::IntoIter<ClientId, IdStore<T>>;
+    type Item = (ClientId, ItemStore<T>);
+    type IntoIter = std::collections::btree_map::IntoIter<ClientId, ItemStore<T>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
@@ -572,7 +572,7 @@ impl<T: ClientStoreEntry> Decode for ClientStore<T> {
         let mut items = BTreeMap::new();
         for _ in 0..len {
             let client = d.u32()?;
-            let store = IdStore::decode(d, cx)?;
+            let store = ItemStore::decode(d, cx)?;
             items.insert(client, store);
         }
 
@@ -580,35 +580,21 @@ impl<T: ClientStoreEntry> Decode for ClientStore<T> {
     }
 }
 
-pub(crate) trait IdStoreEntry:
+pub(crate) trait ItemStoreEntry:
     WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize
 {
 }
 
 // blanket implementation for all types that implement dependencies
-impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize> IdStoreEntry for T {}
+impl<T: WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize> ItemStoreEntry for T {}
 
-// #[derive(Default, Debug, Clone, Eq, PartialEq)]
-// pub struct IdStore<T: IdStoreEntry> {
-//     map: BTreeMap<Id, T>,
-// }
-
+/// A map of ids to items by item id
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct IdStore<T: IdStoreEntry> {
+pub struct ItemStore<T: ItemStoreEntry> {
     map: BTreeMap<Id, T>,
 }
 
-impl<T: IdStoreEntry> IdStore<T> {
-    pub(crate) fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<Id, T> {
-        self.map.iter_mut()
-    }
-
-    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<Id, T> {
-        self.map.iter()
-    }
-}
-
-impl<T: IdStoreEntry> IdStore<T> {
+impl<T: ItemStoreEntry> ItemStore<T> {
     pub(crate) fn insert(&mut self, value: T) {
         self.map.insert(value.id(), value);
     }
@@ -642,7 +628,17 @@ impl<T: IdStoreEntry> IdStore<T> {
     }
 }
 
-impl<T: IdStoreEntry> IntoIterator for IdStore<T> {
+impl<T: ItemStoreEntry> ItemStore<T> {
+    pub(crate) fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<Id, T> {
+        self.map.iter_mut()
+    }
+
+    pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<Id, T> {
+        self.map.iter()
+    }
+}
+
+impl<T: ItemStoreEntry> IntoIterator for ItemStore<T> {
     type Item = (Id, T);
     type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
 
@@ -651,7 +647,7 @@ impl<T: IdStoreEntry> IntoIterator for IdStore<T> {
     }
 }
 
-impl<T: IdStoreEntry> Serialize for IdStore<T> {
+impl<T: ItemStoreEntry> Serialize for ItemStore<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -660,26 +656,24 @@ impl<T: IdStoreEntry> Serialize for IdStore<T> {
     }
 }
 
-impl<T: IdStoreEntry> Encode for IdStore<T> {
+impl<T: ItemStoreEntry> Encode for ItemStore<T> {
     fn encode<E: Encoder>(&self, e: &mut E, cx: &mut EncodeContext) {
         e.u32(self.map.len() as u32);
         for (_, value) in self.map.iter() {
             value.encode(e, cx);
         }
-
-        // e.bytes(&*cx.table.buffer());
     }
 }
 
-impl<T: IdStoreEntry> Decode for IdStore<T> {
-    fn decode<D: Decoder>(d: &mut D, cx: &DecodeContext) -> Result<IdStore<T>, String> {
+impl<T: ItemStoreEntry> Decode for ItemStore<T> {
+    fn decode<D: Decoder>(d: &mut D, cx: &DecodeContext) -> Result<ItemStore<T>, String> {
         let len = d.u32()? as usize;
         let mut data = BTreeMap::new();
         for _ in 0..len {
             let value = T::decode(d, cx)?;
             data.insert(value.id(), value);
         }
-        Ok(IdStore { map: data })
+        Ok(ItemStore { map: data })
     }
 }
 
@@ -688,11 +682,11 @@ pub(crate) trait IdClockDiff {
     fn diff(&self, clock: Clock) -> Self::Target;
 }
 
-impl IdClockDiff for IdStore<ItemRef> {
-    type Target = IdStore<ItemData>;
+impl IdClockDiff for ItemStore<ItemRef> {
+    type Target = ItemStore<ItemData>;
 
     fn diff(&self, clock: Clock) -> Self::Target {
-        let mut items = IdStore::default();
+        let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             let data = item.borrow().data.clone();
             let ticks = data.ticks();
@@ -710,11 +704,11 @@ impl IdClockDiff for IdStore<ItemRef> {
     }
 }
 
-impl IdClockDiff for IdStore<Type> {
-    type Target = IdStore<ItemData>;
+impl IdClockDiff for ItemStore<Type> {
+    type Target = ItemStore<ItemData>;
 
     fn diff(&self, clock: Clock) -> Self::Target {
-        let mut items = IdStore::default();
+        let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             let data = item.item_ref().borrow().data.clone();
             let ticks = data.ticks();
@@ -732,11 +726,11 @@ impl IdClockDiff for IdStore<Type> {
     }
 }
 
-impl IdClockDiff for IdStore<ItemData> {
-    type Target = IdStore<ItemData>;
+impl IdClockDiff for ItemStore<ItemData> {
+    type Target = ItemStore<ItemData>;
 
     fn diff(&self, clock: Clock) -> Self::Target {
-        let mut items = IdStore::default();
+        let mut items = ItemStore::default();
         for (id, data) in self.map.iter() {
             let ticks = data.ticks();
             // collect items that are newer than the given clock
@@ -753,11 +747,11 @@ impl IdClockDiff for IdStore<ItemData> {
     }
 }
 
-impl IdClockDiff for IdStore<DeleteItem> {
-    type Target = IdStore<DeleteItem>;
+impl IdClockDiff for ItemStore<DeleteItem> {
+    type Target = ItemStore<DeleteItem>;
 
     fn diff(&self, clock: Clock) -> Self::Target {
-        let mut items = IdStore::default();
+        let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             if id.clock > clock {
                 items.insert(item.clone());
@@ -780,7 +774,7 @@ mod tests {
 
     #[test]
     fn test_id_store() {
-        let mut store = IdStore::default();
+        let mut store = ItemStore::default();
         assert!(!store.contains(&Id::new(1, 1,)));
         store.insert(Id::new(1, 1));
         assert!(store.contains(&Id::new(1, 1)));
@@ -811,7 +805,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_client_id_store() {
-        let mut store = IdStore::default();
+        let mut store = ItemStore::default();
         let id1 = Id::new(1, 1);
         let id2 = Id::new(1, 2);
         let id3 = Id::new(1, 3);
@@ -824,7 +818,7 @@ mod tests {
         store.encode(&mut e, &mut EncodeContext::default());
 
         let mut d = e.decoder();
-        let dd = IdStore::<Id>::decode(&mut d, &DecodeContext::default()).unwrap();
+        let dd = ItemStore::<Id>::decode(&mut d, &DecodeContext::default()).unwrap();
 
         assert_eq!(store, dd);
     }

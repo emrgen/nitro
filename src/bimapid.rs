@@ -11,6 +11,7 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
 use crate::Client;
 
+/// ClientId is an u32 id that is used to identify a client
 pub type ClientId = u32;
 
 pub(crate) trait BiMapEntry:
@@ -344,6 +345,8 @@ impl Decode for ClientMap {
 pub(crate) type Field = String;
 pub(crate) type FieldId = u32;
 
+/// FieldMap is a map that maps a field to an u32 id. This is used to
+/// encode the field names in into the binary format.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct FieldMap {
     map: EncoderMap<String>,

@@ -258,8 +258,8 @@ impl<K: Ord + Clone + Display + Debug, V: Debug> LeafNode<K, V> {
     // insert key-value pair into leaf node, return right node if split
     fn insert(&mut self, key: K, value: V) -> Option<(K, Node<K, V>)> {
         let index = self.keys.binary_search(&key).unwrap_or_else(|x| x);
-        if self.keys.len() == self.keys.capacity() {
-            let mut right = self.split();
+        if self.keys.len() + 1 == self.keys.capacity() {
+            let mut right = self.split(index < self.keys.capacity() / 2);
 
             if index < self.keys.len() {
                 self.keys.insert(index, key);
@@ -279,10 +279,14 @@ impl<K: Ord + Clone + Display + Debug, V: Debug> LeafNode<K, V> {
     }
 
     // split leaf node into two, return right node
-    fn split(&mut self) -> LeafNode<K, V> {
-        let mut right = LeafNode::new(self.keys.capacity());
+    fn split(&mut self, on_left: bool) -> LeafNode<K, V> {
         let mut mid = self.keys.capacity() / 2;
-        
+        if on_left {
+            mid -= 1;
+        }
+
+        let mut right = LeafNode::new(self.keys.capacity());
+
         self.keys.split_off(mid).into_iter().for_each(|key| {
             right.keys.push(key);
         });

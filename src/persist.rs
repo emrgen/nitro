@@ -76,7 +76,6 @@ impl From<DocStore> for DocStoreData {
         let state = store.state.clone();
         let items = store.items.into();
         let deleted_items = store.deleted_items.clone();
-
         let pending = store.pending.clone();
 
         Self {

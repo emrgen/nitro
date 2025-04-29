@@ -13,7 +13,7 @@ use crate::item::{ItemData, ItemRef, Linked, StartEnd};
 use crate::print_yaml;
 use crate::queue_store::ClientQueueStore;
 use crate::store::{
-    ClientStore, DocStore, ItemDataStore, ItemStore, PendingStore, ReadyStore, WeakStoreRef,
+    ClientStore, DocStore, ItemDataStore, PendingStore, ReadyStore, TypeStore, WeakStoreRef,
 };
 use crate::types::Type;
 

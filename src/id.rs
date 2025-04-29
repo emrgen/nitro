@@ -10,6 +10,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 
+/// 32 bits Lamport Clock
 pub type Clock = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

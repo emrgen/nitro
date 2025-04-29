@@ -1,17 +1,3 @@
-use hashbrown::HashMap;
-use std::cell::RefCell;
-use std::cmp::{Ordering, PartialEq};
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
-
-use bitflags::bitflags;
-use fractional_index::FractionalIndex;
-use indexmap::IndexMap;
-use serde::ser::{SerializeSeq, SerializeStruct};
-use serde::{Serialize, Serializer};
-use serde_json::Value;
-
 use crate::bimapid::{ClientMap, FieldId, FieldMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
@@ -24,6 +10,20 @@ use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 use crate::Client;
+use bitflags::bitflags;
+use fractional_index::FractionalIndex;
+use hashbrown::HashMap;
+use indexmap::IndexMap;
+use serde::ser::{SerializeSeq, SerializeStruct};
+use serde::{Serialize, Serializer};
+use serde_json::Value;
+use std::cell::RefCell;
+use std::cmp::{Ordering, PartialEq};
+use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Timestamp;
 
 type ItemRefInner = Rc<RefCell<Item>>;
 
@@ -1289,6 +1289,7 @@ impl From<Any> for Content {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocProps {
     pub(crate) id: DocId,
+    pub(crate) created_at: u64,
     // user id of the creator
     pub(crate) created_by: Client,
     // custom create time props fot the document
@@ -1300,6 +1301,10 @@ impl DocProps {
         Self {
             id: guid,
             created_by,
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             props: Any::Null,
         }
     }
@@ -1308,6 +1313,7 @@ impl DocProps {
 impl Encode for DocProps {
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         self.id.encode(e, ctx);
+        e.u64(self.created_at);
         self.created_by.encode(e, ctx);
         self.props.encode(e, ctx);
     }
@@ -1319,11 +1325,13 @@ impl Decode for DocProps {
         Self: Sized,
     {
         let doc_id = DocId::decode(d, ctx)?;
+        let created_at = d.u64()?;
         let created_by = Client::decode(d, ctx)?;
         let props = Any::decode(d, ctx)?;
 
         Ok(Self {
             id: doc_id,
+            created_at: created_at.into(),
             created_by,
             props,
         })
@@ -1350,6 +1358,7 @@ pub(crate) enum Any {
     Binary(Vec<u8>),
     Array(Vec<Any>),
     Map(Vec<(String, Any)>),
+    KV(Vec<(String, String)>),
 }
 
 impl Any {
@@ -1378,6 +1387,25 @@ impl Any {
                 }
                 Value::Object(map)
             }
+            Self::KV(kv) => {
+                let mut map = serde_json::Map::new();
+                for (k, v) in kv.iter() {
+                    map.insert(k.clone(), Value::String(v.clone()));
+                }
+                Value::Object(map)
+            }
+        }
+    }
+
+    pub(crate) fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub(crate) fn into_kv_map(self) -> HashMap<String, String> {
+        if let Self::KV(kv) = self {
+            kv.into_iter().collect()
+        } else {
+            HashMap::new()
         }
     }
 }
@@ -1436,6 +1464,7 @@ impl Encode for Any {
             Any::Binary(_) => {}
             Any::Array(_) => {}
             Any::Map(_) => {}
+            Any::KV(_) => {}
         }
     }
 }

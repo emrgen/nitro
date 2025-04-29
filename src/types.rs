@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
-use crate::doc::{Doc, DocOpts};
+use crate::doc::{Doc, DocMeta};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef, Linked, StartEnd, WithIndex};
@@ -671,9 +671,11 @@ impl From<NList> for Type {
 impl From<NMap> for Type {
     fn from(n: NMap) -> Self {
         if let Content::Doc(d) = n.content() {
-            Type::Doc(Doc::new(DocOpts {
+            Type::Doc(Doc::new(DocMeta {
                 id: d.id,
+                created_at: d.created_at,
                 crated_by: Client::from(d.created_by),
+                props: d.props.into_kv_map(),
             }))
         } else {
             Self::Map(n)

@@ -78,6 +78,7 @@ impl WithId for Change {
 }
 
 impl Encode for Change {
+    #[inline]
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         e.u32(self.client);
         e.u32(self.start);
@@ -90,6 +91,7 @@ impl Decode for Change {
         let client = d.u32()?;
         let start = d.u32()?;
         let end = d.u32()?;
+
         Ok(Change::new(client, start, end))
     }
 }

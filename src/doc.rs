@@ -1,10 +1,11 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
+use hashbrown::HashMap;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
-use uuid::Uuid;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::{Timestamp, Uuid};
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
@@ -24,9 +25,11 @@ use crate::types::Type;
 use crate::{Client, ClockTick};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DocOpts {
+pub struct DocMeta {
     pub id: DocId,
+    pub created_at: u64,
     pub crated_by: Client,
+    pub props: HashMap<String, String>,
 }
 
 #[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -98,19 +101,24 @@ impl Serialize for DocId {
     }
 }
 
-impl Default for DocOpts {
+impl Default for DocMeta {
     fn default() -> Self {
         let client_id = Uuid::new_v4().into();
         Self {
             id: DocId(Uuid::new_v4()),
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
             crated_by: client_id,
+            props: HashMap::new(),
         }
     }
 }
 
 #[derive(Debug, Clone, Eq)]
 pub struct Doc {
-    pub(crate) meta: DocOpts,
+    pub(crate) meta: DocMeta,
     pub(crate) root: NMap,
     pub(crate) store: StoreRef,
 }
@@ -125,7 +133,7 @@ impl Doc {
 }
 
 impl Doc {
-    pub(crate) fn new(opts: DocOpts) -> Self {
+    pub(crate) fn new(opts: DocMeta) -> Self {
         let mut store = DocStore::default();
 
         store.doc_id = opts.id.clone();
@@ -161,9 +169,11 @@ impl Doc {
     pub(crate) fn from_diff(diff: &Diff) -> Option<Doc> {
         if let Some(root) = &diff.get_root() {
             if let Content::Doc(content) = &root.content {
-                let doc = Doc::new(DocOpts {
+                let doc = Doc::new(DocMeta {
                     id: content.id.clone(),
+                    created_at: content.created_at,
                     crated_by: content.created_by.clone().into(),
+                    props: content.props.clone().into_kv_map(),
                 });
 
                 doc.apply(diff.clone());

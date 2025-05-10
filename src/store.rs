@@ -24,6 +24,7 @@ use crate::{print_yaml, Client};
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
+/// DocStore is a store for the document crdt items and metadata.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocStore {
     pub(crate) doc_id: DocId,
@@ -39,6 +40,7 @@ pub(crate) struct DocStore {
     pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
+    // pub(crate) dag: TypeDag,
 }
 
 impl DocStore {
@@ -317,7 +319,7 @@ impl From<TypeStore> for ItemDataStore {
 pub type DeleteItemStore = ClientStore<DeleteItem>;
 pub type TypeStore = ClientStore<Type>;
 
-/// A map of client ids to a set of id ranges
+/// A map of client id to a set of id ranges
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct IdRangeMap {
     // TODO: check if the clientId is needed in IdRange

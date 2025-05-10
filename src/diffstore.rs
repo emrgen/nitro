@@ -2,6 +2,7 @@ use hashbrown::HashMap;
 
 use crate::{ClientState, Diff, DocId};
 
+/// DiffStore stores the doc diff
 pub trait DiffStore {
     type Error;
 
@@ -57,7 +58,7 @@ impl DiffStore for InMemoryDiffStore {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Doc, print_yaml};
+    use crate::{print_yaml, Doc};
 
     use super::*;
 

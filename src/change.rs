@@ -1,16 +1,25 @@
 use crate::bimapid::ClientId;
-use crate::id::IdRange;
-use crate::{ClockTick, Id};
-use btree_slab::BTreeMap;
+use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::encoder::{Encode, EncodeContext, Encoder};
+use crate::id::{IdRange, WithId};
+use crate::store::ClientStore;
+use crate::{ClockTick, Content, Id};
+use hashbrown::HashSet;
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+use std::collections::BTreeSet;
+use std::fmt::Debug;
+use std::hash::Hasher;
 use std::ops::Range;
-// Change represents a set of consecutive changes in the document by a client, which includes a range of clock ticks that are applied to the document.
-// It is used to track the changes made by a client in an editor transaction.
 
+/// Change represents a set of consecutive items inserted (insert, delete, move etc.) into the document by a client.
+/// One change includes a range of clock ticks associated with the items within a change.
+/// In context of an editor like carbon, a change is equivalent to a single editor transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub(crate) struct Change {
-    client: ClientId,
-    start: ClockTick,
-    end: ClockTick,
+    pub(crate) client: ClientId,
+    pub(crate) start: ClockTick,
+    pub(crate) end: ClockTick,
 }
 
 impl Change {
@@ -44,6 +53,12 @@ impl From<Id> for Change {
     }
 }
 
+impl From<IdRange> for Change {
+    fn from(id: IdRange) -> Self {
+        Change::new(id.client, id.start, id.end)
+    }
+}
+
 impl Ord for Change {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.compare(other)
@@ -56,24 +71,61 @@ impl PartialOrd for Change {
     }
 }
 
-/// ChangeStore is a collection of changes made to a document.
-/// It stores the serialized changes for sequential integration and rollback.
-#[derive(Clone, Default)]
-pub(crate) struct ChangeStore {
-    map: BTreeMap<Change, Change>,
-    changes: Vec<Change>,
+impl WithId for Change {
+    fn id(&self) -> Id {
+        Id::new(self.client, self.start)
+    }
 }
 
-impl ChangeStore {
-    pub(crate) fn new() -> Self {
-        ChangeStore {
-            map: BTreeMap::new(),
-            changes: Vec::new(),
-        }
+impl Encode for Change {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
+        e.u32(self.client);
+        e.u32(self.start);
+        e.u32(self.end);
     }
+}
 
-    pub(crate) fn add_change(&mut self, change: Change) {
-        self.changes.push(change.clone());
-        self.map.insert(change.id(), change.clone());
+impl Decode for Change {
+    fn decode<D: Decoder>(d: &mut D, ctx: &DecodeContext) -> Result<Change, String> {
+        let client = d.u32()?;
+        let start = d.u32()?;
+        let end = d.u32()?;
+        Ok(Change::new(client, start, end))
+    }
+}
+
+impl Serialize for Change {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Change", 3)?;
+        state.serialize_field("client", &self.client)?;
+        state.serialize_field("start", &self.start)?;
+        state.serialize_field("end", &self.end)?;
+        state.end()
+    }
+}
+
+/// ChangeStore is a store for changes made to a document.
+pub(crate) type ChangeStore = ClientStore<Change>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::id::Id;
+
+    #[test]
+    fn test_change() {
+        let mut cs = ChangeStore::default();
+        cs.insert(Change::new(1, 0, 1)); // [0,1]
+        cs.insert(Change::new(1, 2, 3)); // [1,2]
+        cs.insert(Change::new(1, 4, 4)); // [1,2]
+
+        // if the change is in the store, it should return the change
+        assert_eq!(cs.find(&Id::new(1, 0)), Some(Change::new(1, 0, 1)),);
+        assert_eq!(cs.find(&Id::new(1, 2)), Some(Change::new(1, 2, 3)),);
+        assert_eq!(cs.find(&Id::new(1, 4)), Some(Change::new(1, 4, 4)),);
+        assert_eq!(cs.find(&Id::new(1, 5)), None);
     }
 }

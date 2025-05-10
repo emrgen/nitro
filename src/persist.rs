@@ -3,6 +3,7 @@ use std::default::Default;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::FieldMap;
+use crate::change::ChangeStore;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::doc::DocId;
@@ -29,9 +30,11 @@ pub(crate) struct DocStoreData {
     pub(crate) state: ClientState,
 
     pub(crate) items: ItemDataStore,
-    pub(crate) deleted_items: DeleteItemStore,
+    pub(crate) deleted: DeleteItemStore,
 
     pub(crate) pending: PendingStore,
+
+    pub(crate) changes: ChangeStore,
 }
 
 impl DocStoreData {
@@ -46,7 +49,7 @@ impl DocStoreData {
 
         let items = self.items.diff(&state);
 
-        let deletes = self.deleted_items.diff(&state);
+        let deletes = self.deleted.diff(&state);
 
         let mut clients = self.state.clients.clone();
 
@@ -60,6 +63,7 @@ impl DocStoreData {
             self.doc_id.clone(),
             self.created_by.clone(),
             self.fields.clone(),
+            self.changes.clone(),
             state.clone(),
             items,
             deletes,
@@ -77,6 +81,7 @@ impl From<DocStore> for DocStoreData {
         let items = store.items.into();
         let deleted_items = store.deleted_items.clone();
         let pending = store.pending.clone();
+        let changes = store.changes.clone();
 
         Self {
             doc_id,
@@ -85,8 +90,9 @@ impl From<DocStore> for DocStoreData {
             id_map,
             state,
             items,
-            deleted_items,
+            deleted: deleted_items,
             pending,
+            changes,
         }
     }
 }
@@ -98,8 +104,9 @@ impl Encode for DocStoreData {
         self.fields.encode(e, ctx);
         self.state.encode(e, ctx);
         self.items.encode(e, ctx);
-        self.deleted_items.encode(e, ctx);
+        self.deleted.encode(e, ctx);
         self.pending.encode(e, ctx);
+        self.changes.encode(e, ctx);
     }
 }
 
@@ -115,6 +122,7 @@ impl Decode for DocStoreData {
         let items = ItemDataStore::decode(d, ctx)?;
         let deleted_items = DeleteItemStore::decode(d, ctx)?;
         let pending = PendingStore::decode(d, ctx)?;
+        let changes = ChangeStore::decode(d, ctx)?;
 
         let mut id_map = IdRangeMap::default();
         for (id, item) in items.iter() {
@@ -138,8 +146,9 @@ impl Decode for DocStoreData {
             id_map,
             state,
             items,
-            deleted_items,
+            deleted: deleted_items,
             pending,
+            changes,
         })
     }
 }

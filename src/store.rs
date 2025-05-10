@@ -9,6 +9,8 @@ use std::ops::Add;
 use std::rc::{Rc, Weak};
 
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
+use crate::change::{Change, ChangeStore};
+use crate::dag::ChangeDag;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
@@ -40,7 +42,9 @@ pub(crate) struct DocStore {
     pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
-    // pub(crate) dag: TypeDag,
+
+    pub(crate) changes: ChangeStore,
+    pub(crate) dag: ChangeDag,
 }
 
 impl DocStore {
@@ -136,7 +140,17 @@ impl DocStore {
 
         let state = state.merge(&self.state);
 
-        Diff::from(id, created_by, self.fields.clone(), state, items, deletes)
+        let changes = self.changes.clone();
+
+        Diff::from(
+            id,
+            created_by,
+            self.fields.clone(),
+            changes,
+            state,
+            items,
+            deletes,
+        )
     }
 }
 
@@ -607,6 +621,16 @@ impl<T: ItemStoreEntry> ItemStore<T> {
 
     pub(crate) fn get(&self, value: &Id) -> Option<T> {
         self.map.get(value).cloned()
+    }
+
+    // get items in the range
+    pub(crate) fn get_range(&self, range: &IdRange) -> Vec<T> {
+        let start = Id::new(range.client, range.start);
+        let end = Id::new(range.client, range.end);
+        self.map
+            .range(start..=end)
+            .map(|(_, v)| v.clone())
+            .collect()
     }
 
     pub(crate) fn remove(&mut self, value: &Id) -> Option<T> {

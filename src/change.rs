@@ -1,24 +1,27 @@
-use crate::bimapid::ClientId;
-use crate::Id;
+use btree_plus_store::map::Range;
+use btree_plus_store::set::Range;
 
-// Change represents a change in the document, which includes a range of IDs that are applied to the document.
+use crate::bimapid::ClientId;
+use crate::{Clock, Id};
+
+// Change represents a set of consecutive changes in the document by a client, which includes a range of clock ticks that are applied to the document.
 // It is used to track the changes made by a client in an editor transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
-    start: Id,
-    end: Id,
+    client: ClientId,
+    range: Range<Clock>,
 }
 
 impl Change {
-    pub fn new(start: Id, end: Id) -> Self {
-        Self { start, end }
+    pub fn new(client: ClientId, range: Range<Clock>) -> Self {
+        Self { client, range }
     }
 
     pub fn start(&self) -> Id {
-        self.start
+        self.range.min()
     }
 
     pub fn end(&self) -> Id {
-        self.end
+        self.range.max()
     }
 }

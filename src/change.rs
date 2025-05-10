@@ -1,6 +1,7 @@
 use crate::bimapid::ClientId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
+use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
 use crate::store::ClientStore;
 use crate::{ClockTick, Content, Id};
@@ -124,12 +125,25 @@ impl ChangeStore {
 
         result
     }
+
+    /// The most recent change for all clients
+    pub(crate) fn change_frontier(&self) {
+        let mut frontier = ChangeFrontier::default();
+        for (_, store) in self.iter() {
+            if let Some((_, change)) = store.iter().last() {
+                frontier.insert(change.clone());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::delete::DeleteItem;
     use crate::id::Id;
+    use crate::store::{DeleteItemStore, ItemStore};
+    use crate::Type::Atom;
 
     #[test]
     fn test_find_change_by_item_id() {
@@ -157,5 +171,20 @@ mod tests {
         assert!(changes.contains(&Change::new(1, 0, 1)));
         assert!(changes.contains(&Change::new(1, 2, 3)));
         assert!(changes.contains(&Change::new(1, 4, 4)));
+    }
+
+    #[test]
+    fn test_find_items_by_change() {
+        let mut items = DeleteItemStore::default();
+        items.insert(DeleteItem::from(Id::new(1, 1), IdRange::new(1, 0, 0)));
+        items.insert(DeleteItem::from(Id::new(1, 3), IdRange::new(1, 2, 2)));
+        items.insert(DeleteItem::from(Id::new(1, 5), IdRange::new(1, 4, 4)));
+        items.insert(DeleteItem::from(Id::new(1, 7), IdRange::new(2, 6, 6)));
+
+        let found = items.find_by_range(Change::new(1, 0, 5));
+        assert_eq!(found.len(), 3);
+
+        let found = items.find_by_range(Change::new(1, 6, 7));
+        assert_eq!(found.len(), 1);
     }
 }

@@ -37,6 +37,7 @@ flate2 = { version = "1.0.35", features = ["cloudflare_zlib"] }
 hashbrown = { version = "0.11.2", features = ["serde"] }
 rustc-hash = "2.1.1"
 ahash = "0.7.8"
+queues = "1.1.0"
 
 [dependencies.serde_json]
 version = "1.0"

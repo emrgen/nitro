@@ -499,18 +499,29 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    /// get the number of items for the given client
     pub(crate) fn client_size(&self, id: &ClientId) -> usize {
         self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
-    }
-
-    pub(crate) fn find(&self, id: &Id) -> Option<T> {
-        self.items.get(&id.client).and_then(|store| store.get(&id))
     }
 
     pub(crate) fn insert(&mut self, item: T) {
         let id = item.id();
         let store = self.items.entry(id.client).or_default();
         store.insert(item);
+    }
+
+    /// get the item for the given id
+    pub(crate) fn find(&self, id: &Id) -> Option<T> {
+        self.items.get(&id.client).and_then(|store| store.get(&id))
+    }
+
+    /// get items in the inclusive clock range [start, end] for the given client
+    pub(crate) fn find_by_range(&self, range: impl Into<IdRange>) -> Vec<T> {
+        let range = range.into();
+        self.items
+            .get(&range.client)
+            .map(|store| store.get_range(&range))
+            .unwrap_or_default()
     }
 
     pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, ItemStore<T>> {
@@ -623,10 +634,10 @@ impl<T: ItemStoreEntry> ItemStore<T> {
         self.map.get(value).cloned()
     }
 
-    // get items in the range
+    // get items in the inclusive clock range [start, end]
     pub(crate) fn get_range(&self, range: &IdRange) -> Vec<T> {
         let start = Id::new(range.client, range.start);
-        let end = Id::new(range.client, range.end);
+        let end = Id::new(range.client, range.end + 1);
         self.map
             .range(start..=end)
             .map(|(_, v)| v.clone())

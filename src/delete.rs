@@ -1,10 +1,12 @@
 use serde::ser::SerializeStruct;
 use serde::Serialize;
+use std::ops::{Range, RangeInclusive};
 
 use crate::bimapid::ClientMap;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::{Id, IdRange, WithId};
+use crate::ClockTick;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct DeleteItem {
@@ -15,6 +17,13 @@ pub(crate) struct DeleteItem {
 impl DeleteItem {
     pub(crate) fn new(id: Id, range: IdRange) -> DeleteItem {
         DeleteItem { id, range }
+    }
+
+    pub(crate) fn from(id: Id, range: IdRange) -> DeleteItem {
+        DeleteItem {
+            id,
+            range: IdRange::new(id.client, range.start, range.end),
+        }
     }
 
     pub(crate) fn range(&self) -> IdRange {

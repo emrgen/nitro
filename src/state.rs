@@ -1,15 +1,71 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::default::Default;
+use std::hash::{Hash, Hasher};
+use std::io::Write;
 use std::ops::Add;
-
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
 
 use crate::bimapid::{ClientId, ClientMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::ClockTick;
 use crate::Client;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
+use serde_columnar::Itertools;
+use sha1::digest::Update;
+use sha1::{Digest, Sha1};
+
+/// The ClientFrontier struct represents the most recent operations in a document from all clients.
+/// ClientFrontier is a wrapper around a HashMap that maps Client to ClockTick.
+#[derive(Default, Clone, Debug)]
+pub struct ClientFrontier {
+    frontier: HashMap<Client, ClockTick>,
+}
+
+impl ClientFrontier {
+    pub(crate) fn add(&mut self, client: Client, clock: ClockTick) {
+        self.frontier.insert(client, clock);
+    }
+
+    pub(crate) fn hash(&self) -> String {
+        let items = self.frontier.iter().sorted().collect::<Vec<_>>();
+        let mut hasher = Sha1::new();
+        for (client, clock) in items {
+            hasher.write(client.as_bytes().as_slice());
+            hasher.write(&clock.to_be_bytes());
+        }
+
+        let result = hasher.finalize();
+        let hash: [u8; 20] = result
+            .as_slice()
+            .try_into()
+            .expect("SHA1 should produce 20 bytes");
+
+        // convert hash to string
+        let mut hash_str = String::new();
+        for byte in hash.iter() {
+            hash_str.push_str(&format!("{:02x}", byte));
+        }
+
+        hash_str
+    }
+
+    pub(crate) fn short_hash(&self) -> String {
+        let hash = self.hash();
+        hash.chars().take(8).collect()
+    }
+}
+
+impl From<ClientState> for ClientFrontier {
+    fn from(state: ClientState) -> Self {
+        let mut frontier = HashMap::new();
+        for (client, clock) in state.state.clients.iter() {
+            let client = state.clients.get_client(client).unwrap();
+            frontier.insert(client.clone(), *clock);
+        }
+        ClientFrontier { frontier }
+    }
+}
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct ClientState {
@@ -222,8 +278,10 @@ impl Decode for ClientState {
     }
 }
 
+/// The ClientIdState struct represents the state of client ids and their corresponding clock ticks.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ClientIdState {
+    // if the client count is within a reasonable limit, not sure if hashmap is better
     pub(crate) clients: BTreeMap<ClientId, ClockTick>,
 }
 
@@ -295,9 +353,9 @@ impl Decode for ClientIdState {
 
 #[cfg(test)]
 mod tests {
-    use std::default::Default;
-
     use miniz_oxide::deflate::compress_to_vec;
+    use std::default::Default;
+    use std::hash::Hasher;
     use uuid::Uuid;
 
     use crate::codec_v1::EncoderV1;
@@ -375,5 +433,20 @@ mod tests {
         assert_eq!(s3.get(&1).unwrap(), &0);
         assert_eq!(s3.get(&2).unwrap(), &5);
         assert_eq!(s3.get(&3).unwrap(), &5);
+    }
+
+    #[test]
+    fn test_client_frontier() {
+        let mut state = ClientFrontier::default();
+        state.add(Client::default(), 1);
+        state.add(Client::default(), 2);
+        state.add(Client::default(), 3);
+
+        let hash = state.hash();
+        println!("hash: {}", hash);
+        let short_hash = state.short_hash();
+        println!("short_hash: {}", short_hash);
+
+        assert_eq!(hash.chars().take(8).collect::<String>(), short_hash);
     }
 }

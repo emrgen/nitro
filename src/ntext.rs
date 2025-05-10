@@ -69,6 +69,14 @@ impl NText {
             .fold(0, |acc, item| acc + item.size())
     }
 
+    pub fn append(&self, item: impl Into<Type>) {
+        self.item.append(item.into());
+    }
+
+    pub fn prepend(&self, item: impl Into<Type>) {
+        self.item.prepend(item.into());
+    }
+
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let item = item.into();
 

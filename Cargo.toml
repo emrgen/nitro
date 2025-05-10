@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["uuid-client", "fugue"]
+default = ["uuid-client"]
 uuid-client = []
-fugue = []
+#fugue = []
 nightly = []
 
 [profile.release]

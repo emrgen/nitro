@@ -88,7 +88,7 @@ impl ItemRef {
         self.borrow_mut().add_mark(mark);
     }
 
-    pub fn append(&self, value: impl Into<Type>) {
+    pub(crate) fn append(&self, value: impl Into<Type>) {
         let end = self.borrow().end.clone();
         let item = value.into();
 
@@ -109,7 +109,7 @@ impl ItemRef {
         // TODO: if item and prev are adjacent string items, merge them
     }
 
-    pub fn prepend(&self, value: impl Into<Type>) {
+    pub(crate) fn prepend(&self, value: impl Into<Type>) {
         let item = value.into();
         let start = self.borrow().start.clone();
         if let Some(ref start) = start {

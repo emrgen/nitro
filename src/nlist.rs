@@ -19,12 +19,6 @@ pub struct NList {
 }
 
 impl NList {
-    pub(crate) fn on_insert(&self, child: &Type) {
-        self.list.borrow_mut().insert(child.clone());
-    }
-}
-
-impl NList {
     pub(crate) fn new(id: Id, store: WeakStoreRef) -> Self {
         let data = ItemData {
             id,
@@ -74,7 +68,7 @@ impl Deref for NList {
 impl NList {
     fn prepend(&self, item: impl Into<Type>) {
         let item = item.into();
-        #[cfg(feature = "fugue1")]
+        #[cfg(feature = "fugue")]
         {
             self.item.prepend(item.clone());
             Type::add_frac_index(&item);
@@ -82,9 +76,9 @@ impl NList {
         }
     }
 
+    /// append an item to the end of the list
     pub fn append(&self, item: impl Into<Type>) {
         let item = item.into();
-        // item.set_container(self.item.clone());
         self.item.append(item.clone());
         Type::add_frac_index(&item);
         self.on_insert(&item);
@@ -144,6 +138,12 @@ impl NList {
         let content = items.iter().map(|item| item.to_json()).collect();
 
         serde_json::Value::Array(content)
+    }
+}
+
+impl NList {
+    pub(crate) fn on_insert(&self, child: &Type) {
+        self.list.borrow_mut().insert(child.clone());
     }
 }
 

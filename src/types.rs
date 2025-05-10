@@ -22,19 +22,20 @@ use crate::ntext::NText;
 use crate::store::{StoreRef, WeakStoreRef};
 use crate::Client;
 
+/// Type is a wrapper around the different item types in the store.
 #[derive(Debug, Clone, Default)]
 pub enum Type {
-    List(NList),
-    Map(NMap),
-    Text(NText),
-    String(NString),
-    Atom(NAtom),
-    Proxy(NProxy),
-    Move(NMove),
-    Mark(NMark),
-    Doc(Doc),
+    Doc(Doc),        // container
+    List(NList),     // container
+    Map(NMap),       // container
+    Text(NText),     // container
+    String(NString), // elementary
+    Atom(NAtom),     // elementary
+    Proxy(NProxy),   // elementary
+    Move(NMove),     // elementary
+    Mark(NMark),     // elementary
     #[default]
-    Identity,
+    Identity, // used for empty items
 }
 
 impl Type {

@@ -20,8 +20,8 @@ pub struct Diff {
     pub created_by: Client,
     pub doc_id: DocId,
     pub fields: FieldMap,
-    pub changes: ChangeStore,
     pub state: ClientState,
+    pub changes: ChangeStore,
     pub items: ItemDataStore,
     pub deletes: DeleteItemStore,
 }
@@ -59,8 +59,8 @@ impl Diff {
             created_by,
             doc_id,
             fields,
-            changes,
             state,
+            changes,
             items,
             deletes,
         }
@@ -72,8 +72,8 @@ impl Diff {
             doc_id: self.doc_id.clone(),
             created_by: self.created_by.clone(),
             fields: self.fields.clone(),
-            changes: self.changes.clone(),
             state: self.state.clone(),
+            changes: self.changes.clone(),
             items: self.items.diff(state),
             deletes: self.deletes.diff(state),
         }

@@ -110,7 +110,7 @@ impl Default for DocOpts {
 
 #[derive(Debug, Clone, Eq)]
 pub struct Doc {
-    pub(crate) opts: DocOpts,
+    pub(crate) meta: DocOpts,
     pub(crate) root: NMap,
     pub(crate) store: StoreRef,
 }
@@ -132,13 +132,11 @@ impl Doc {
         store.created_by = opts.crated_by.clone();
 
         // doc is always created by the client with clock 0,
+        // so we need to increment the clock for next client items
         store.update_client(&opts.crated_by, 1);
 
         let client = store.get_client(&opts.crated_by);
         let root_id = store.next_id();
-
-        // let client = Uuid::new_v4().to_string();
-        // store.update_client(&client, 1);
 
         let store_ref = Rc::new(RefCell::new(store));
         let weak = Rc::downgrade(&store_ref);
@@ -149,14 +147,14 @@ impl Doc {
         store_ref.borrow_mut().insert(root.clone());
 
         Self {
-            opts,
+            meta: opts,
             store: store_ref,
             root,
         }
     }
 
     pub fn id(&self) -> DocId {
-        self.opts.id.clone()
+        self.meta.id.clone()
     }
 
     // create a new doc from a diff
@@ -180,8 +178,8 @@ impl Doc {
     #[inline]
     pub fn diff(&self, state: impl Into<ClientState>) -> Diff {
         let mut diff = self.store.borrow().diff(
-            self.opts.id.clone(),
-            self.opts.crated_by.clone(),
+            self.meta.id.clone(),
+            self.meta.crated_by.clone(),
             state.into(),
         );
         diff.optimize();
@@ -296,11 +294,11 @@ impl Doc {
 
         map.insert(
             "id".to_string(),
-            serde_json::Value::String(self.opts.id.0.to_string()),
+            serde_json::Value::String(self.meta.id.0.to_string()),
         );
         map.insert(
             "created_by".to_string(),
-            serde_json::Value::String(self.opts.crated_by.to_string()),
+            serde_json::Value::String(self.meta.crated_by.to_string()),
         );
 
         match self.root.to_json() {
@@ -352,8 +350,8 @@ impl Serialize for Doc {
         size += root.borrow().serialize_size();
 
         let mut s = serializer.serialize_struct("Doc", size + 1)?;
-        s.serialize_field("doc_id", &self.opts.id)?;
-        s.serialize_field("created_by", &self.opts.crated_by)?;
+        s.serialize_field("doc_id", &self.meta.id)?;
+        s.serialize_field("created_by", &self.meta.crated_by)?;
         s.serialize_field("root", &root)?;
 
         s.end()
@@ -373,7 +371,7 @@ pub trait CloneDeep {
 
 impl CloneDeep for Doc {
     fn clone_deep(&self) -> Self {
-        let doc = Doc::new(self.opts.clone());
+        let doc = Doc::new(self.meta.clone());
         let diff = self.diff(ClientState::default());
 
         doc.apply(diff);

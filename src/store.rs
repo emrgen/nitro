@@ -26,7 +26,7 @@ use crate::{print_yaml, Client};
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
 
-/// DocStore is a store for the document crdt items and metadata.
+/// DocStore is a store for the document CRDT items and metadata.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct DocStore {
     pub(crate) doc_id: DocId,

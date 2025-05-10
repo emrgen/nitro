@@ -506,10 +506,12 @@ impl Add<IdRange> for IdRange {
     }
 }
 
+/// WithId trait is used to get the ID of an object
 pub(crate) trait WithId {
     fn id(&self) -> Id;
 }
 
+/// WithIdRange trait is used to get the ID range of an object
 pub(crate) trait WithIdRange {
     fn range(&self) -> IdRange;
 }

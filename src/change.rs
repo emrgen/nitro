@@ -110,13 +110,27 @@ impl Serialize for Change {
 /// ChangeStore is a store for changes made to a document.
 pub(crate) type ChangeStore = ClientStore<Change>;
 
+impl ChangeStore {
+    /// find all previous changes for a given dependencies
+    pub(crate) fn previous(&self, change: &Vec<Id>) -> HashSet<Change> {
+        let mut result = HashSet::new();
+        for id in change {
+            if let Some(c) = self.find(id) {
+                result.insert(c);
+            }
+        }
+
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::id::Id;
 
     #[test]
-    fn test_change() {
+    fn test_find_change_by_item_id() {
         let mut cs = ChangeStore::default();
         cs.insert(Change::new(1, 0, 1)); // [0,1]
         cs.insert(Change::new(1, 2, 3)); // [1,2]
@@ -127,5 +141,19 @@ mod tests {
         assert_eq!(cs.find(&Id::new(1, 2)), Some(Change::new(1, 2, 3)),);
         assert_eq!(cs.find(&Id::new(1, 4)), Some(Change::new(1, 4, 4)),);
         assert_eq!(cs.find(&Id::new(1, 5)), None);
+    }
+
+    #[test]
+    fn test_find_previous_changes_by_item_ids() {
+        let mut cs = ChangeStore::default();
+        cs.insert(Change::new(1, 0, 1)); // [0,1]
+        cs.insert(Change::new(1, 2, 3)); // [1,2]
+        cs.insert(Change::new(1, 4, 4)); // [1,2]
+
+        let changes = cs.previous(&vec![Id::new(1, 0), Id::new(1, 2), Id::new(1, 4)]);
+        assert_eq!(changes.len(), 3);
+        assert!(changes.contains(&Change::new(1, 0, 1)));
+        assert!(changes.contains(&Change::new(1, 2, 3)));
+        assert!(changes.contains(&Change::new(1, 4, 4)));
     }
 }

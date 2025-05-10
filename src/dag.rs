@@ -6,10 +6,8 @@ use crate::Id;
 use hashbrown::{HashMap, HashSet};
 use std::collections::VecDeque;
 
-// Dag stores the directed acyclic graph of item dependencies.
-// it is used to determine the order of item integration into the document.
+// Dag stores the directed acyclic graph of Change dependencies.
 // Dag can be used to roll back the document to a previous state.
-// The nodes in the dag are the Change object
 #[derive(Default, Clone, Debug)]
 pub(crate) struct ChangeDag {
     changes: HashMap<Change, u64>,
@@ -23,7 +21,7 @@ impl ChangeDag {
         Self::default()
     }
 
-    // connect the new change to the existing changes
+    /// connect the new change to the existing changes
     fn add_change(&mut self, change: &Change, previous: Vec<Change>) {
         if self.forward.contains_key(change) {
             return;
@@ -102,9 +100,9 @@ impl ChangeDag {
         result
     }
 
-    /// find all changes that are after the given changes in application order
-    /// the changes are sorted in the order they were added to the dag
-    /// to restore the document to the frontier, the changes must be rolled back in the reverse order
+    /// Find all changes that are after the given changes in integration order.
+    /// The changes are sorted in the order they were added to the dag
+    /// to restore the document to the frontier, the changes must be rolled back in the reverse order of integration.
     pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<Change> {
         let mut result = Vec::new();
 
@@ -132,6 +130,7 @@ impl ChangeDag {
                         if visited.contains(dep) {
                             continue;
                         }
+                        visited.insert(dep.clone());
                         result.push(dep.clone());
                         stack.push(dep.clone());
                     }
@@ -146,7 +145,29 @@ impl ChangeDag {
     }
 
     /// rollback removes the given changes from the dag
-    pub(crate) fn rollback(&mut self, changes: &Vec<Change>) {}
+    pub(crate) fn rollback(&mut self, changes: &Vec<Change>) {
+        // reverse iterate over the changes to remove them in the reverse order
+        // of integration
+        for change in changes.iter().rev() {
+            if let Some(deps) = self.forward.remove(change) {
+                for dep in deps {
+                    if let Some(backward_deps) = self.backward.get_mut(&dep) {
+                        backward_deps.retain(|c| c != change);
+                    }
+                }
+            }
+
+            if let Some(backward_deps) = self.backward.remove(change) {
+                for dep in backward_deps {
+                    if let Some(forward_deps) = self.forward.get_mut(&dep) {
+                        forward_deps.retain(|c| c != change);
+                    }
+                }
+            }
+
+            self.changes.remove(change);
+        }
+    }
 }
 
 impl PartialEq for ChangeDag {
@@ -166,6 +187,24 @@ mod tests {
     #[test]
     fn test_change_dag() {
         let mut dag = ChangeDag::new();
-        dag.add_change(&Change::new(1, 0, 0), vec![]);
+        dag.add_change(&Change::new(0, 0, 0), vec![]);
+        dag.add_change(&Change::new(2, 0, 0), vec![Change::new(1, 0, 0)]);
+        dag.add_change(&Change::new(3, 0, 0), vec![Change::new(1, 0, 0)]);
+        dag.add_change(
+            &Change::new(4, 0, 0),
+            vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
+        );
+
+        let frontier = ChangeFrontier {
+            changes: vec![Change::new(1, 0, 0)],
+        };
+        let after = dag.after(frontier);
+        assert_eq!(after.len(), 3);
+
+        let frontier = ChangeFrontier {
+            changes: vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
+        };
+        let after = dag.after(frontier);
+        assert_eq!(after.len(), 1);
     }
 }

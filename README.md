@@ -14,7 +14,7 @@ flamegraph -- cargo run --example huge_list
 - [x] test
 - [x] string
 - [x] atom
-- [ ] proxy
+- [ ] proxy - same block visible in multiple places, change in one place updates all places
 - [ ] move
 - [x] mark
 - [x] delete

@@ -1,11 +1,11 @@
 use hashbrown::HashMap;
 
 use crate::bimapid::ClientId;
-use crate::Clock;
+use crate::ClockTick;
 
 pub(crate) type VersionId = u64;
 
-pub(crate) type ClientTick = HashMap<VersionId, Clock>;
+pub(crate) type ClientTick = HashMap<VersionId, ClockTick>;
 
 // Version is a map of client ids to a map of version ids to clocks.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]

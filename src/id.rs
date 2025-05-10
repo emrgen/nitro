@@ -10,8 +10,8 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 
-/// 32 bits Lamport Clock
-pub type Clock = u32;
+/// 32 bits Lamport Clock tick
+pub type ClockTick = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Client {
@@ -196,7 +196,7 @@ pub(crate) trait Split {
 #[derive(Debug, Clone, Copy, Default, Hash)]
 pub struct Id {
     pub(crate) client: ClientId,
-    pub(crate) clock: Clock,
+    pub(crate) clock: ClockTick,
 }
 
 impl Id {
@@ -210,7 +210,7 @@ impl Id {
 
 impl Id {
     #[inline]
-    pub fn new(client: ClientId, clock: Clock) -> Id {
+    pub fn new(client: ClientId, clock: ClockTick) -> Id {
         Id { client, clock }
     }
 
@@ -278,8 +278,8 @@ impl WithId for Id {
     }
 }
 
-impl From<(ClientId, Clock)> for Id {
-    fn from((client, clock): (ClientId, Clock)) -> Self {
+impl From<(ClientId, ClockTick)> for Id {
+    fn from((client, clock): (ClientId, ClockTick)) -> Self {
         Id::new(client, clock)
     }
 }
@@ -290,26 +290,26 @@ impl From<IdRange> for Id {
     }
 }
 
-impl Sub<Clock> for Id {
+impl Sub<ClockTick> for Id {
     type Output = Id;
 
-    fn sub(self, rhs: Clock) -> Self::Output {
+    fn sub(self, rhs: ClockTick) -> Self::Output {
         Id::new(self.client, self.clock - rhs)
     }
 }
 
-impl Add<Clock> for Id {
+impl Add<ClockTick> for Id {
     type Output = Id;
 
-    fn add(self, rhs: Clock) -> Self::Output {
+    fn add(self, rhs: ClockTick) -> Self::Output {
         Id::new(self.client, self.clock + rhs)
     }
 }
 
-impl Add<Clock> for &Id {
+impl Add<ClockTick> for &Id {
     type Output = Id;
 
-    fn add(self, rhs: Clock) -> Self::Output {
+    fn add(self, rhs: ClockTick) -> Self::Output {
         Id::new(self.client, self.clock + rhs)
     }
 }
@@ -353,17 +353,17 @@ impl Decode for Id {
 #[derive(Clone, Copy, Default)]
 pub(crate) struct IdRange {
     pub(crate) client: ClientId,
-    pub(crate) start: Clock,
-    pub(crate) end: Clock,
+    pub(crate) start: ClockTick,
+    pub(crate) end: ClockTick,
 }
 
 impl IdRange {
-    pub(crate) fn new(client: ClientId, start: Clock, end: Clock) -> IdRange {
+    pub(crate) fn new(client: ClientId, start: ClockTick, end: ClockTick) -> IdRange {
         IdRange { client, start, end }
     }
 
     #[inline]
-    pub(crate) fn size(&self) -> Clock {
+    pub(crate) fn size(&self) -> ClockTick {
         self.end - self.start + 1
     }
 
@@ -506,7 +506,7 @@ pub(crate) trait WithIdRange {
 impl Split for IdRange {
     type Target = IdRange;
     #[inline]
-    fn split(&self, at: Clock) -> Result<(IdRange, IdRange), String> {
+    fn split(&self, at: ClockTick) -> Result<(IdRange, IdRange), String> {
         self.split(at)
     }
 }

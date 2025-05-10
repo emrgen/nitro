@@ -8,7 +8,7 @@ use serde::{Serialize, Serializer};
 use crate::bimapid::{ClientId, ClientMap};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::Clock;
+use crate::id::ClockTick;
 use crate::Client;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -33,7 +33,7 @@ impl ClientState {
         self.state.clients.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
-    pub(crate) fn get(&self, client: &ClientId) -> Option<&Clock> {
+    pub(crate) fn get(&self, client: &ClientId) -> Option<&ClockTick> {
         self.state.get(client)
     }
 
@@ -41,7 +41,7 @@ impl ClientState {
         self.state.remove(client);
     }
 
-    pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
+    pub(crate) fn update(&mut self, client: ClientId, clock: ClockTick) {
         self.state.update_max(client, clock);
     }
 
@@ -53,7 +53,7 @@ impl ClientState {
         self.clients.get_client_id(client)
     }
 
-    pub(crate) fn get_or_insert(&mut self, client: &Client) -> (ClientId, Clock) {
+    pub(crate) fn get_or_insert(&mut self, client: &Client) -> (ClientId, ClockTick) {
         let client_id = self.clients.get_or_insert(client);
         let clock = self.state.get(&client_id).unwrap_or(&0);
         (client_id, *clock)
@@ -224,7 +224,7 @@ impl Decode for ClientState {
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ClientIdState {
-    pub(crate) clients: BTreeMap<ClientId, Clock>,
+    pub(crate) clients: BTreeMap<ClientId, ClockTick>,
 }
 
 impl ClientIdState {
@@ -234,7 +234,7 @@ impl ClientIdState {
         }
     }
 
-    pub(crate) fn get(&self, client: &ClientId) -> Option<&Clock> {
+    pub(crate) fn get(&self, client: &ClientId) -> Option<&ClockTick> {
         self.clients.get(client)
     }
 
@@ -242,21 +242,21 @@ impl ClientIdState {
         self.clients.remove(client);
     }
 
-    pub(crate) fn update_max(&mut self, client: ClientId, clock: Clock) {
+    pub(crate) fn update_max(&mut self, client: ClientId, clock: ClockTick) {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.max(current));
     }
 
-    pub(crate) fn update_min(&mut self, client: ClientId, clock: Clock) {
+    pub(crate) fn update_min(&mut self, client: ClientId, clock: ClockTick) {
         let current = *self.clients.entry(client).or_default();
         self.clients.insert(client, clock.min(current));
     }
 
-    pub(crate) fn update(&mut self, client: ClientId, clock: Clock) {
+    pub(crate) fn update(&mut self, client: ClientId, clock: ClockTick) {
         self.clients.insert(client, clock);
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&ClientId, &Clock)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&ClientId, &ClockTick)> {
         self.clients.iter()
     }
 }

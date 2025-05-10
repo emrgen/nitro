@@ -14,7 +14,7 @@ use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{Clock, Id, IdRange, Split, WithId};
+use crate::id::{ClockTick, Id, IdRange, Split, WithId};
 use crate::id_store::ClientIdStore;
 use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
@@ -30,7 +30,7 @@ pub(crate) struct DocStore {
     pub(crate) created_by: Client,
 
     pub(crate) client: ClientId,
-    pub(crate) clock: Clock,
+    pub(crate) clock: ClockTick,
 
     pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
@@ -53,7 +53,7 @@ impl DocStore {
         self.state.clients.get_or_insert(client_id)
     }
 
-    pub(crate) fn update_client(&mut self, client: &Client, clock: Clock) -> ClientId {
+    pub(crate) fn update_client(&mut self, client: &Client, clock: ClockTick) -> ClientId {
         self.client = self.state.clients.get_or_insert(client);
         self.clock = clock.max(1);
 
@@ -67,7 +67,7 @@ impl DocStore {
         id
     }
 
-    pub(crate) fn next_id_range(&mut self, size: Clock) -> IdRange {
+    pub(crate) fn next_id_range(&mut self, size: ClockTick) -> IdRange {
         let id = IdRange::new(self.client, self.clock, self.clock + size - 1);
         self.clock += size;
 
@@ -679,13 +679,13 @@ impl<T: ItemStoreEntry> Decode for ItemStore<T> {
 
 pub(crate) trait IdClockDiff {
     type Target;
-    fn diff(&self, clock: Clock) -> Self::Target;
+    fn diff(&self, clock: ClockTick) -> Self::Target;
 }
 
 impl IdClockDiff for ItemStore<ItemRef> {
     type Target = ItemStore<ItemData>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: ClockTick) -> Self::Target {
         let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             let data = item.borrow().data.clone();
@@ -707,7 +707,7 @@ impl IdClockDiff for ItemStore<ItemRef> {
 impl IdClockDiff for ItemStore<Type> {
     type Target = ItemStore<ItemData>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: ClockTick) -> Self::Target {
         let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             let data = item.item_ref().borrow().data.clone();
@@ -729,7 +729,7 @@ impl IdClockDiff for ItemStore<Type> {
 impl IdClockDiff for ItemStore<ItemData> {
     type Target = ItemStore<ItemData>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: ClockTick) -> Self::Target {
         let mut items = ItemStore::default();
         for (id, data) in self.map.iter() {
             let ticks = data.ticks();
@@ -750,7 +750,7 @@ impl IdClockDiff for ItemStore<ItemData> {
 impl IdClockDiff for ItemStore<DeleteItem> {
     type Target = ItemStore<DeleteItem>;
 
-    fn diff(&self, clock: Clock) -> Self::Target {
+    fn diff(&self, clock: ClockTick) -> Self::Target {
         let mut items = ItemStore::default();
         for (id, item) in self.map.iter() {
             if id.clock > clock {

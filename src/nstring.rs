@@ -4,7 +4,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::id::{Clock, Id, IdRange, Split, WithId, WithIdRange};
+use crate::id::{ClockTick, Id, IdRange, Split, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::mark::{Mark, MarkContent};
 use crate::nmark::NMark;
@@ -58,7 +58,7 @@ impl NString {
             .upgrade()
             .unwrap()
             .borrow_mut()
-            .next_id_range(self.size() as Clock)
+            .next_id_range(self.size() as ClockTick)
             .id();
 
         let mark = NMark::new(id, Content::Mark(content), self.store.clone());

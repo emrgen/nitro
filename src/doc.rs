@@ -21,7 +21,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
-use crate::{Client, Clock};
+use crate::{Client, ClockTick};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocOpts {
@@ -242,7 +242,7 @@ impl Doc {
         let id = self
             .store
             .borrow_mut()
-            .next_id_range(content.len() as Clock)
+            .next_id_range(content.len() as ClockTick)
             .start_id();
         let string = NString::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(string.clone());

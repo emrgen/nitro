@@ -78,6 +78,7 @@ impl ChangeDag {
     }
 
     /// Find all changes done in the document
+    /// timeline excludes the first change (the document root create change)
     pub(crate) fn timeline(&self) -> Vec<Change> {
         self.after(ChangeFrontier::from(vec![self.root.clone().unwrap()]))
     }
@@ -266,8 +267,7 @@ mod tests {
         assert_eq!(after.len(), 1);
     }
 
-    #[test]
-    fn test_after_rollback() {
+    fn create_dag() -> ChangeDag {
         let mut dag = ChangeDag::default();
         let change = |c| Change::new(c, 0, 0);
         dag.insert(&change(1), vec![]);
@@ -283,6 +283,13 @@ mod tests {
         dag.insert(&change(11), changes!(8, 10));
         dag.insert(&change(12), changes!(8));
         dag.insert(&change(13), changes!(9, 11));
+
+        dag
+    }
+
+    #[test]
+    fn test_after_rollback() {
+        let mut dag = create_dag();
 
         let after = dag.after(frontier!(8));
         assert_eq!(after.len(), 4);
@@ -301,5 +308,13 @@ mod tests {
 
         let after = dag.after(frontier!(4));
         assert_eq!(after, changes!(6, 8));
+    }
+
+    #[test]
+    fn test_timeline() {
+        let dag = create_dag();
+        let timeline = dag.timeline();
+        assert_eq!(timeline.len(), 12);
+        assert_eq!(timeline, changes!(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
     }
 }

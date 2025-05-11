@@ -412,6 +412,34 @@ impl Type {
         }
     }
 
+    /// move the item to the given parent at the given offset
+    #[inline]
+    pub fn move_to(&self, parent: &Type, offset: u32, item: impl Into<Type>) {
+        let item = item.into();
+        match parent {
+            _ => panic!("move: not implemented"),
+        }
+    }
+
+    /// move the item after the given item
+    #[inline]
+    pub fn move_after(&self, before: &Type, item: impl Into<Type>) {
+        let item = item.into();
+        match self {
+            _ => panic!("move: not implemented"),
+        }
+    }
+
+    /// move the item before the given item
+    #[inline]
+    pub fn move_before(&self, after: &Type, item: impl Into<Type>) {
+        let item = item.into();
+        // NMove::new()
+        match self {
+            _ => panic!("move: not implemented"),
+        }
+    }
+
     #[inline]
     pub fn append(&self, item: impl Into<Type>) {
         match self {
@@ -434,7 +462,11 @@ impl Type {
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         match self {
             Type::List(n) => n.insert(offset, item),
-            Type::Text(n) => n.insert(offset, item),
+            Type::Text(n) => {
+                let item = item.into();
+                assert!(item.is_string());
+                n.insert(offset, item)
+            }
             _ => panic!("insert: not implemented"),
         }
     }
@@ -514,6 +546,62 @@ impl Type {
             Type::Mark(n) => n.to_json(),
             Type::Doc(n) => n.to_json(),
             Type::Identity => panic!("to_json: not implemented for identity"),
+        }
+    }
+
+    fn is_string(&self) -> bool {
+        match self {
+            Type::String(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_mark(&self) -> bool {
+        match self {
+            Type::Mark(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_list(&self) -> bool {
+        match self {
+            Type::List(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_map(&self) -> bool {
+        match self {
+            Type::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_text(&self) -> bool {
+        match self {
+            Type::Text(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_atom(&self) -> bool {
+        match self {
+            Type::Atom(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_proxy(&self) -> bool {
+        match self {
+            Type::Proxy(_) => true,
+            _ => false,
+        }
+    }
+
+    fn is_move(&self) -> bool {
+        match self {
+            Type::Move(_) => true,
+            _ => false,
         }
     }
 }

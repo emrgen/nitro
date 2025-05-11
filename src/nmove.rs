@@ -7,17 +7,18 @@ use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 
+/// NMove represents a move operation in the document.
 #[derive(Debug, Clone)]
 pub(crate) struct NMove {
     pub(crate) item: ItemRef,
 }
 
 impl NMove {
-    pub(crate) fn new(id: Id, mover_id: Id, store: WeakStoreRef) -> NMove {
+    pub(crate) fn new(id: Id, target_id: Id, store: WeakStoreRef) -> NMove {
         let data = ItemData {
             id,
             kind: ItemKind::Move,
-            mover_id: Some(mover_id),
+            target_id: Some(target_id),
             ..ItemData::default()
         };
 

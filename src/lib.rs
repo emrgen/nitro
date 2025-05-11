@@ -30,6 +30,7 @@ mod change;
 pub mod codec_v1;
 mod crdt_fugue;
 mod crdt_yata;
+mod cycle;
 mod dag;
 pub mod decoder;
 mod delete;

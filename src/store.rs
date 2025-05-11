@@ -1,13 +1,3 @@
-use bimap::BiMap;
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-use std::cell::RefCell;
-use std::collections::btree_map::IterMut;
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt::Debug;
-use std::ops::Add;
-use std::rc::{Rc, Weak};
-
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
 use crate::change::{Change, ChangeStore};
 use crate::dag::ChangeDag;
@@ -23,6 +13,16 @@ use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
 use crate::types::Type;
 use crate::{print_yaml, Client};
+use bimap::BiMap;
+use hashbrown::HashMap;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
+use std::cell::RefCell;
+use std::collections::btree_map::IterMut;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::fmt::Debug;
+use std::ops::Add;
+use std::rc::{Rc, Weak};
 
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
@@ -39,6 +39,9 @@ pub(crate) struct DocStore {
     pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
     pub(crate) state: ClientState,
+
+    pub(crate) moves: HashMap<Id, Type>,
+    pub(crate) proxies: HashMap<Id, Type>,
 
     pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,

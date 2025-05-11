@@ -1,8 +1,9 @@
+use crate::bimapid::{ClientId, ClientMap};
 use crate::change::Change;
 use crate::frontier::{ChangeFrontier, Frontier};
 use crate::persist::WeakStoreDataRef;
 use crate::store::{DocStore, WeakStoreRef};
-use crate::Id;
+use crate::{ClientFrontier, ClockTick, Id};
 use hashbrown::{HashMap, HashSet};
 use std::collections::VecDeque;
 
@@ -10,10 +11,13 @@ use std::collections::VecDeque;
 // Dag can be used to roll back the document to a previous state.
 #[derive(Default, Clone, Debug)]
 pub(crate) struct ChangeDag {
+    root: Option<Change>,
     changes: HashMap<Change, u64>,
     forward: HashMap<Change, Vec<Change>>,
     backward: HashMap<Change, Vec<Change>>,
-    tick: u64,
+    // local_tick is used to assign a unique index to each change
+    // used to sort the changes in topological order
+    local_tick: u64,
 }
 
 impl ChangeDag {
@@ -23,22 +27,27 @@ impl ChangeDag {
             return;
         }
 
+        // initial change is the document create, so it can't be rolled back
+        if self.changes.is_empty() {
+            self.root = Some(change.clone());
+        }
+
         // if self.tick reaches u64::MAX, recreate the dag
-        if self.tick == u64::MAX {
+        if self.local_tick == u64::MAX {
             let sorted = self.topological_sort();
             self.changes.clear();
-            self.tick = 0;
+            self.local_tick = 0;
 
             // insert all changes in the sorted order
             for change in sorted {
-                self.changes.insert(change.clone(), self.tick);
-                self.tick += 1;
+                self.changes.insert(change.clone(), self.local_tick);
+                self.local_tick += 1;
             }
         }
 
         // add the change to the change map
-        self.changes.insert(change.clone(), self.tick);
-        self.tick += 1;
+        self.changes.insert(change.clone(), self.local_tick);
+        self.local_tick += 1;
 
         // add the change to the graph
         self.forward.insert(change.clone(), vec![]);
@@ -59,6 +68,18 @@ impl ChangeDag {
                 self.backward.insert(change.clone(), vec![prev.clone()]);
             }
         }
+
+        // keep the forward and backward graph sorted
+        // so that all clients with same items will have same topological order with
+        for prev in &previous {
+            self.forward.get_mut(&prev).unwrap().sort();
+            self.backward.get_mut(&change).unwrap().sort();
+        }
+    }
+
+    /// Find all changes done in the document
+    pub(crate) fn timeline(&self) -> Vec<Change> {
+        self.after(ChangeFrontier::from(vec![self.root.clone().unwrap()]))
     }
 
     // use khan's algorithm to sort the changes in topological order
@@ -163,6 +184,31 @@ impl ChangeDag {
 
             self.changes.remove(change);
         }
+    }
+
+    /// find the client frontier for the given hash, if the hash is not found, return None
+    pub(crate) fn find_client_frontier(
+        &self,
+        commit_hash: String,
+        client_map: &ClientMap,
+    ) -> Option<ClientFrontier> {
+        let changes = self.timeline();
+        let mut client_frontier = ClientFrontier::default();
+
+        /// apply changes and check if the commit hash matches
+        for change in &changes {
+            if let Some(client) = client_map.get_client(&change.client) {
+                client_frontier.add(client.clone(), change.end);
+            }
+
+            if commit_hash.len() == 8 && client_frontier.short_hash() == commit_hash {
+                return Some(client_frontier.clone());
+            } else if client_frontier.short_hash() == commit_hash {
+                return Some(client_frontier.clone());
+            }
+        }
+
+        None
     }
 }
 

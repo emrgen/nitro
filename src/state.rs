@@ -24,6 +24,7 @@ pub struct ClientFrontier {
 
 impl ClientFrontier {
     pub(crate) fn add(&mut self, client: Client, clock: ClockTick) {
+        let clock = clock.max(*self.frontier.get(&client).unwrap_or(&0));
         self.frontier.insert(client, clock);
     }
 

@@ -3,7 +3,7 @@ use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::collections::btree_map::IterMut;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::Debug;
 use std::ops::Add;
 use std::rc::{Rc, Weak};
@@ -16,7 +16,8 @@ use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{ClockTick, Id, IdRange, Split, WithId};
+use crate::frontier::Frontier;
+use crate::id::{ClockTick, Id, IdRange, Split, WithId, WithIdRange};
 use crate::id_store::ClientIdStore;
 use crate::item::{ItemData, ItemKind, ItemRef};
 use crate::state::ClientState;
@@ -42,6 +43,8 @@ pub(crate) struct DocStore {
     pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,
     pub(crate) pending: PendingStore,
+    // ready store is used during time travel to past
+    pub(crate) ready: ReadyStore,
 
     pub(crate) changes: ChangeStore,
     pub(crate) dag: ChangeDag,
@@ -154,10 +157,10 @@ impl DocStore {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ReadyStore {
     pub(crate) id_range_map: IdRangeMap,
-    pub(crate) queue: Vec<ItemData>,
+    pub(crate) queue: VecDeque<ItemData>,
     pub(crate) items: ItemDataStore,
     pub(crate) items_exists: ClientIdStore,
     pub(crate) delete_items: DeleteItemStore,
@@ -166,7 +169,7 @@ pub(crate) struct ReadyStore {
 impl ReadyStore {
     pub(crate) fn insert(&mut self, item: ItemData) {
         self.items_exists.insert(item.id());
-        self.queue.push(item.clone());
+        self.queue.push_back(item.clone());
         self.items.insert(item);
     }
 
@@ -332,6 +335,19 @@ impl From<TypeStore> for ItemDataStore {
 
 pub type DeleteItemStore = ClientStore<DeleteItem>;
 pub type TypeStore = ClientStore<Type>;
+
+impl TypeStore {
+    pub(crate) fn frontier(&self) -> Frontier {
+        let mut frontier = Frontier::default();
+        for (_, store) in self.items.iter() {
+            if let Some((_, item)) = store.iter().last() {
+                frontier.add(item.range().end_id());
+            }
+        }
+
+        frontier
+    }
+}
 
 /// A map of client id to a set of id ranges
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -524,6 +540,10 @@ impl<T: ClientStoreEntry> ClientStore<T> {
             .unwrap_or_default()
     }
 
+    pub(crate) fn last(&self) -> Option<(ClientId, ItemStore<T>)> {
+        self.iter().last().map(|(k, v)| (*k, v.clone()))
+    }
+
     pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, ItemStore<T>> {
         self.items.keys()
     }
@@ -531,6 +551,8 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, ItemStore<T>> {
         self.items.iter()
     }
+
+    /// get the last item for the given client
 
     pub(crate) fn iter_mut(&mut self) -> IterMut<ClientId, ItemStore<T>> {
         self.items.iter_mut()

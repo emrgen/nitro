@@ -1,6 +1,7 @@
-use crate::change::Change;
+use crate::bimapid::ClientMap;
+use crate::change::{Change, ChangeStore};
 use crate::id::WithId;
-use crate::Id;
+use crate::{ClientFrontier, Id};
 use std::collections::HashSet;
 
 /// The Frontier struct represents the most recent operations in a document from all clients.
@@ -16,6 +17,23 @@ impl Frontier {
             .map(|c| Id::new(c.client, c.end))
             .collect();
         Self { changes }
+    }
+
+    pub(crate) fn add(&mut self, id: Id) {
+        /// FIXME: may contain duplicates
+        self.changes.push(id);
+    }
+
+    /// Turn the frontier into a ChangeFrontier
+    pub(crate) fn change_frontier(&self, store: &ChangeStore) -> ChangeFrontier {
+        let mut change_frontier = ChangeFrontier::default();
+        for id in &self.changes {
+            if let Some(change) = store.find(id) {
+                change_frontier.insert(change.clone());
+            }
+        }
+
+        change_frontier
     }
 }
 

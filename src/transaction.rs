@@ -191,15 +191,13 @@ impl Transaction {
 
         self.store.upgrade().unwrap().borrow_mut().fields = fields.as_per(&self.diff.fields);
 
-        self.ready.queue.reverse();
-
         let now = std::time::Instant::now();
         let mut times: Vec<Duration> = Vec::new();
         let client_map = self.store.upgrade().unwrap().borrow().state.clients.clone();
         let store = self.store.upgrade().unwrap();
         let mut store = store.borrow_mut();
 
-        while let Some(data) = self.ready.queue.pop() {
+        while let Some(data) = self.ready.queue.pop_front() {
             let parent = {
                 if let Some(parent_id) = &data.parent_id {
                     store.find(parent_id)

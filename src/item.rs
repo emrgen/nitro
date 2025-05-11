@@ -38,6 +38,7 @@ impl ItemRef {
         self.borrow_mut().content = content;
     }
 
+    /// Get the item depth in the document tree.
     pub(crate) fn depth(&self) -> u32 {
         if let Some(parent) = &self.item.borrow().parent {
             parent.depth() + 1

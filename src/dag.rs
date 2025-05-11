@@ -179,31 +179,6 @@ mod tests {
     use super::*;
     use crate::change::Change;
     use crate::Id;
-
-    #[test]
-    fn test_change_dag() {
-        let mut dag = ChangeDag::default();
-        dag.insert(&Change::new(0, 0, 0), vec![]);
-        dag.insert(&Change::new(2, 0, 0), vec![Change::new(1, 0, 0)]);
-        dag.insert(&Change::new(3, 0, 0), vec![Change::new(1, 0, 0)]);
-        dag.insert(
-            &Change::new(4, 0, 0),
-            vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
-        );
-
-        let frontier = ChangeFrontier {
-            changes: vec![Change::new(1, 0, 0)],
-        };
-        let after = dag.after(frontier);
-        assert_eq!(after.len(), 3);
-
-        let frontier = ChangeFrontier {
-            changes: vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
-        };
-        let after = dag.after(frontier);
-        assert_eq!(after.len(), 1);
-    }
-
     // macro to create a change
     macro_rules! change {
         ($c:expr) => {
@@ -224,7 +199,29 @@ mod tests {
     }
 
     #[test]
-    fn test_rollback() {
+    fn test_change_dag() {
+        let mut dag = ChangeDag::default();
+        dag.insert(&Change::new(0, 0, 0), vec![]);
+        dag.insert(&Change::new(2, 0, 0), vec![Change::new(1, 0, 0)]);
+        dag.insert(&Change::new(3, 0, 0), vec![Change::new(1, 0, 0)]);
+        dag.insert(
+            &Change::new(4, 0, 0),
+            vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
+        );
+
+        let frontier = ChangeFrontier {
+            changes: vec![Change::new(1, 0, 0)],
+        };
+        let after = dag.after(frontier);
+        assert_eq!(after.len(), 3);
+
+        let frontier = frontier!(2, 4);
+        let after = dag.after(frontier);
+        assert_eq!(after.len(), 1);
+    }
+
+    #[test]
+    fn test_after_rollback() {
         let mut dag = ChangeDag::default();
         let change = |c| Change::new(c, 0, 0);
         dag.insert(&change(1), vec![]);
@@ -248,5 +245,15 @@ mod tests {
         let after = dag.after(frontier!(4, 8));
         assert_eq!(after.len(), 6);
         assert_eq!(after, changes!(6, 8, 9, 11, 12, 13));
+
+        let after = dag.after(frontier!(2, 5, 10));
+        assert_eq!(after, changes!(4, 6, 8, 9, 11, 12, 13));
+
+        let after = dag.after(frontier!(8));
+        dag.rollback(&after);
+        assert_eq!(dag.changes.len(), 9); // [1-8,10]
+
+        let after = dag.after(frontier!(4));
+        assert_eq!(after, changes!(6, 8));
     }
 }

@@ -26,6 +26,10 @@ pub(crate) struct ChangeFrontier {
 }
 
 impl ChangeFrontier {
+    pub(crate) fn from(changes: Vec<Change>) -> Self {
+        Self { changes }
+    }
+
     pub(crate) fn insert(&mut self, change: Change) {
         self.changes.push(change);
     }

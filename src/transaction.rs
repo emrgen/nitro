@@ -5,7 +5,7 @@ use std::default::Default;
 use std::time::Duration;
 
 use crate::bimapid::ClientId;
-use crate::crdt_yata::integrate_yata;
+use crate::crdt_yata::{integrate_yata, remove_yata};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
 use crate::id::WithId;
@@ -23,6 +23,7 @@ pub(crate) struct Transaction {
     ready: ReadyStore,
     pending: PendingStore,
     pending_queue: ClientQueueStore<ItemData>,
+    progress: Vec<Type>,
 
     diff: Diff,
     ops: Vec<TxOp>,
@@ -44,6 +45,7 @@ impl Transaction {
             pending: PendingStore::default(),
             ops: Vec::default(),
             pending_queue: ClientQueueStore::default(),
+            progress: Vec::default(),
             elapsed: Duration::default(),
         }
     }
@@ -231,7 +233,10 @@ impl Transaction {
                 )?;
 
                 parent.on_insert(&item);
-                store.insert(item);
+                store.insert(item.clone());
+
+                // track integration progress
+                self.progress.push(item);
 
                 // println!("integrated with count: {}", count);
             }
@@ -276,6 +281,14 @@ impl Transaction {
         println!("-----------------------------------------------------");
         println!("|            Rolling back transaction                ");
         println!("-----------------------------------------------------");
+        let store = self.store.upgrade().unwrap();
+        let mut store = store.borrow_mut();
+        for item in self.progress.iter().rev() {
+            remove_yata(item);
+            store.remove(&item.id());
+        }
+
+        // keep the items in progress for debugging
     }
 
     pub(crate) fn is_ready(&self, data: &ItemData, store: &Ref<DocStore>) -> bool {

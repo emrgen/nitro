@@ -226,7 +226,7 @@ mod tests {
     use super::*;
     use crate::change::Change;
     use crate::Id;
-    // macro to create a change
+
     macro_rules! change {
         ($c:expr) => {
             Change::new($c, 0, 0)

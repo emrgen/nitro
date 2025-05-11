@@ -194,6 +194,7 @@ impl Diff {
         self.deletes = self.deletes.merge(&other.deletes);
     }
 
+    /// optimize the diff for storage
     pub(crate) fn optimize(&mut self) {
         for (_, store) in self.items.items.iter_mut() {
             for (_, item) in store.iter_mut() {

@@ -116,23 +116,21 @@ impl Default for DocMeta {
     }
 }
 
+/// Doc is a document that contains a tree of items.
+/// Everything in nitro is to manage this document change.
 #[derive(Debug, Clone, Eq)]
 pub struct Doc {
     pub(crate) meta: DocMeta,
+    /// The root is the root of the document.
+    /// It is a CRDT map that contains all the items in the document.
     pub(crate) root: NMap,
+    /// The store is a reference to the DocStore.
+    /// It is used to manage the state of the document.
     pub(crate) store: StoreRef,
 }
 
 impl Doc {
-    pub(crate) fn state(&self) -> ClientState {
-        let store = self.store.borrow();
-
-        let state = &store.state;
-        store.state.clone()
-    }
-}
-
-impl Doc {
+    /// Create a new document with the given options.
     pub(crate) fn new(opts: DocMeta) -> Self {
         let mut store = DocStore::default();
 
@@ -161,8 +159,16 @@ impl Doc {
         }
     }
 
+    /// Document ID
     pub fn id(&self) -> DocId {
         self.meta.id.clone()
+    }
+
+    pub(crate) fn state(&self) -> ClientState {
+        let store = self.store.borrow();
+
+        let state = &store.state;
+        store.state.clone()
     }
 
     // create a new doc from a diff
@@ -185,6 +191,7 @@ impl Doc {
         None
     }
 
+    /// Create a new document diff from the current document and the given ClientState
     #[inline]
     pub fn diff(&self, state: impl Into<ClientState>) -> Diff {
         let mut diff = self.store.borrow().diff(
@@ -202,10 +209,12 @@ impl Doc {
         tx.commit();
     }
 
+    /// Find an item by its ID
     pub fn find_by_id(&self, id: &Id) -> Option<Type> {
         self.store.borrow().find(id)
     }
 
+    /// Update the current client ID with a new one
     pub fn update_client(&self) -> Client {
         let client_id = Uuid::new_v4().into();
         self.store.borrow_mut().update_client(&client_id, 1);
@@ -213,6 +222,7 @@ impl Doc {
         client_id
     }
 
+    /// Create a new list type in the document
     pub fn list(&self) -> NList {
         let id = self.store.borrow_mut().next_id();
         let list = NList::new(id, Rc::downgrade(&self.store));
@@ -221,6 +231,7 @@ impl Doc {
         list
     }
 
+    /// Create a new map type in the document
     pub fn map(&self) -> NMap {
         let id = self.store.borrow_mut().next_id();
         let map = NMap::new(id, Rc::downgrade(&self.store));
@@ -229,6 +240,7 @@ impl Doc {
         map
     }
 
+    /// Create a new atom type in the document
     pub fn atom(&self, content: impl Into<Content>) -> NAtom {
         let id = self.store.borrow_mut().next_id();
         let atom = NAtom::new(id, content.into(), Rc::downgrade(&self.store));
@@ -237,6 +249,7 @@ impl Doc {
         atom
     }
 
+    /// Create a new text type in the document
     pub fn text(&self) -> NText {
         let id = self.store.borrow_mut().next_id();
         let text = NText::new(id, Rc::downgrade(&self.store));
@@ -245,6 +258,7 @@ impl Doc {
         text
     }
 
+    /// Create a new string type in the document
     pub fn string(&self, value: impl Into<String>) -> NString {
         let content = value.into();
         let id = self
@@ -310,7 +324,12 @@ impl Doc {
             "created_by".to_string(),
             serde_json::Value::String(self.meta.crated_by.to_string()),
         );
+        map.insert(
+            "created_at".to_string(),
+            serde_json::Value::Number(self.meta.created_at.into()),
+        );
 
+        // insert the props into the map
         match self.root.to_json() {
             Value::Object(root) => {
                 for (key, value) in root {
@@ -362,6 +381,7 @@ impl Serialize for Doc {
         let mut s = serializer.serialize_struct("Doc", size + 1)?;
         s.serialize_field("doc_id", &self.meta.id)?;
         s.serialize_field("created_by", &self.meta.crated_by)?;
+        s.serialize_field("created_at", &self.meta.created_at)?;
         s.serialize_field("root", &root)?;
 
         s.end()

@@ -178,3 +178,22 @@ fn integrate_after(prev: &Type, item: &Type) {
     item.set_parent_id(parent.as_ref().map(|p| p.id()));
     item.set_parent(parent);
 }
+
+/// remove the item from the connected list
+#[inline]
+pub(crate) fn remove_yata(item: &Type) {
+    let left = item.left();
+    let right = item.right();
+
+    if let Some(left) = &left {
+        left.set_right(right.clone());
+    }
+
+    if let Some(right) = &right {
+        right.set_left(left.clone());
+    }
+
+    item.set_left(None);
+    item.set_right(None);
+    item.set_parent(None);
+}

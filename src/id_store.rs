@@ -1,5 +1,6 @@
 use crate::id::Id;
 
+/// The ClientIdStore struct is used to store client IDs and their corresponding clocks.
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub(crate) struct ClientIdStore {
     pub(crate) items: Vec<Vec<u32>>,

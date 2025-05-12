@@ -19,6 +19,20 @@ pub struct NList {
 }
 
 impl NList {
+    pub(crate) fn move_to(&self, offset: u32) {
+        todo!()
+    }
+
+    pub(crate) fn move_after(&self, before: &Type) {
+        todo!()
+    }
+
+    pub(crate) fn move_before(&self, after: &Type) {
+        todo!()
+    }
+}
+
+impl NList {
     pub(crate) fn new(id: Id, store: WeakStoreRef) -> Self {
         let data = ItemData {
             id,

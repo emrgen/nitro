@@ -40,8 +40,8 @@ pub(crate) struct DocStore {
     pub(crate) id_map: IdRangeMap,
     pub(crate) state: ClientState,
 
-    pub(crate) moves: HashMap<Id, Type>,
-    pub(crate) proxies: HashMap<Id, Type>,
+    pub(crate) moves: HashMap<Id, Vec<Type>>,
+    pub(crate) proxies: HashMap<Id, Vec<Type>>,
 
     pub(crate) items: TypeStore,
     pub(crate) deleted_items: DeleteItemStore,
@@ -54,6 +54,42 @@ pub(crate) struct DocStore {
 }
 
 impl DocStore {
+    pub(crate) fn add_move(&mut self, target_id: Id, mover: Type) {
+        self.moves.entry(target_id).or_default().push(mover);
+    }
+
+    pub(crate) fn remove_move(&mut self, target_id: Id, mover: &Type) {
+        let mover_id = mover.id();
+        self.moves.entry(target_id).and_modify(|v| {
+            v.retain(|x| x.id() != mover_id);
+            if v.is_empty() {
+                self.moves.remove(&target_id);
+            }
+        });
+    }
+
+    pub(crate) fn get_move(&mut self, id: &Id) -> Option<Type> {
+        self.moves.get(id).and_then(|v| v.last()).cloned()
+    }
+
+    pub(crate) fn add_proxy(&mut self, target_id: Id, proxy: Type) {
+        self.proxies.entry(target_id).or_default().push(proxy);
+    }
+
+    pub(crate) fn remove_proxy(&mut self, id: &Id, proxy: &Type) {
+        let proxy_id = proxy.id();
+        self.proxies.entry(*id).and_modify(|v| {
+            v.retain(|x| x.id() != proxy_id);
+            if v.is_empty() {
+                self.proxies.remove(id);
+            }
+        });
+    }
+
+    pub(crate) fn get_proxies(&mut self, id: &Id) -> Option<Vec<Type>> {
+        self.proxies.get(id).cloned()
+    }
+
     pub(crate) fn get_field_id(&mut self, field: &Field) -> u32 {
         self.fields.get_or_insert(field)
     }

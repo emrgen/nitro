@@ -414,29 +414,42 @@ impl Type {
 
     /// move the item to the given parent at the given offset
     #[inline]
-    pub fn move_to(&self, parent: &Type, offset: u32, item: impl Into<Type>) {
-        let item = item.into();
+    pub fn move_to(&self, parent: &Type, offset: u32) {
         match parent {
-            _ => panic!("move: not implemented"),
+            Type::List(n) => n.move_to(offset),
+            _ => panic!(
+                "move: not implemented for {:?} to parent type: {:?}",
+                self.kind(),
+                parent.kind()
+            ),
         }
     }
 
     /// move the item after the given item
     #[inline]
-    pub fn move_after(&self, before: &Type, item: impl Into<Type>) {
-        let item = item.into();
-        match self {
-            _ => panic!("move: not implemented"),
+    pub fn move_after(&self, before: &Type) {
+        let parent = before.parent().unwrap();
+        match parent {
+            Type::List(n) => n.move_after(before),
+            _ => panic!(
+                "move: not implemented for {:?} to parent type: {:?}",
+                self.kind(),
+                parent.kind()
+            ),
         }
     }
 
     /// move the item before the given item
     #[inline]
-    pub fn move_before(&self, after: &Type, item: impl Into<Type>) {
-        let item = item.into();
-        // NMove::new()
+    pub fn move_before(&self, after: &Type) {
+        let parent = after.parent().unwrap();
         match self {
-            _ => panic!("move: not implemented"),
+            Type::List(n) => n.move_before(after),
+            _ => panic!(
+                "move: not implemented for {:?} to parent type: {:?}",
+                self.kind(),
+                parent.kind()
+            ),
         }
     }
 

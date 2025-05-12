@@ -137,7 +137,7 @@ impl ItemRef {
         let id = store.borrow_mut().next_id();
         let item = DeleteItem::new(id, self.id().range(size));
         store.borrow_mut().insert_delete(item);
-        self.borrow_mut().delete();
+        self.borrow_mut().make_deleted();
     }
 }
 
@@ -192,7 +192,7 @@ impl Linked for ItemRef {
 
     #[inline]
     fn is_visible(&self) -> bool {
-        !self.borrow().is_deleted() || self.borrow().is_moved()
+        !self.borrow().is_deleted() && !self.borrow().is_moved()
     }
 }
 
@@ -415,8 +415,22 @@ impl Item {
     }
 
     #[inline]
-    pub(crate) fn delete(&mut self) {
+    pub(crate) fn make_deleted(&mut self) {
         self.flags |= 0x01;
+    }
+
+    pub(crate) fn unmark_deleted(&mut self) {
+        self.flags &= !0x01;
+    }
+
+    #[inline]
+    pub(crate) fn mark_moved(&mut self) {
+        self.flags |= 0x02;
+    }
+
+    #[inline]
+    pub(crate) fn unmark_moved(&mut self) {
+        self.flags &= !0x02;
     }
 
     pub(crate) fn set(&mut self, _key: &ItemKey, _ref: ItemRef) {}
@@ -1051,6 +1065,7 @@ impl From<u32> for ItemKey {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Content {
     Doc(DocProps),
+    Id(Id),           // id of the item
     Types(Vec<Type>), // list of types, backbone for crdt types
     Mark(MarkContent),
     Binary(Vec<u8>),
@@ -1068,6 +1083,7 @@ bitflags! {
         const EMBED = 0x10;
         const DOC = 0x11;
         const NULL = 0x12;
+        const ID = 0x13;
     }
 }
 
@@ -1080,6 +1096,7 @@ impl Content {
             Self::Types(t) => Value::Array(t.iter().map(|t| t.to_json()).collect()),
             Self::Embed(a) => a.to_json(),
             Self::Doc(d) => Value::String(serde_json::to_string(&d.id).unwrap()),
+            Self::Id(id) => Value::String(id.to_string()),
             Self::Null => Value::Null,
         }
     }
@@ -1133,6 +1150,10 @@ impl Encode for Content {
                 e.u8(ContentFlags::DOC.bits());
                 d.encode(e, ctx)
             }
+            Self::Id(id) => {
+                e.u8(ContentFlags::ID.bits());
+                id.encode(e, ctx)
+            }
             Self::Null => {}
         }
     }
@@ -1167,6 +1188,7 @@ impl Decode for Content {
                 Ok(Self::Doc(doc))
             }
             0x12 => Ok(Self::Null),
+            0x13 => Ok(Self::Id(Id::decode(d, ctx)?)),
             _ => Err(format!("Invalid content flags: {}", flags)),
         }
     }

@@ -5,26 +5,35 @@ use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 
+/// NProxy represents a proxy for another item in the document.
+/// Multiple Proxy instances can point to the same target item.
+/// It is used to manage references to items in a way that allows for
+/// dynamic updates and changes.
 #[derive(Debug, Clone)]
 pub(crate) struct NProxy {
     pub(crate) item: ItemRef,
-    pub(crate) target: Box<Option<Type>>,
+    pub(crate) target: Option<Box<Type>>,
 }
 
 impl NProxy {
-    pub(crate) fn new(id: Id, mover_id: Id, target_id: Id, store: WeakStoreRef) -> NProxy {
+    pub(crate) fn new(id: Id, target: Option<Type>, store: WeakStoreRef) -> NProxy {
         let data = ItemData {
             id,
             kind: ItemKind::Proxy,
+            content: target
+                .clone()
+                .map_or(Content::Null, |t| Content::Id(t.id())),
             ..ItemData::default()
         };
 
-        let target = store.upgrade().unwrap().borrow().find(&target_id);
-
         Self {
             item: ItemRef::new(data.into(), store),
-            target: Box::new(target),
+            target: target.map(Box::new),
         }
+    }
+
+    pub(crate) fn item_ref(&self) -> ItemRef {
+        self.item.clone()
     }
 
     pub(crate) fn content(&self) -> Content {
@@ -35,12 +44,6 @@ impl NProxy {
         }
     }
 
-    pub(crate) fn item_ref(&self) -> ItemRef {
-        self.item.clone()
-    }
-}
-
-impl NProxy {
     pub(crate) fn size(&self) -> u32 {
         if let Some(target) = self.target.as_ref() {
             target.size()

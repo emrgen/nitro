@@ -162,14 +162,6 @@ impl ItemRef {
             s.serialize_field("right_id", &right.id().to_string())?;
         }
 
-        if let Some(target) = &data.target_id {
-            s.serialize_field("target_id", &target.id().to_string())?;
-        }
-
-        if let Some(mover) = &data.mover_id {
-            s.serialize_field("mover_id", &mover.id().to_string())?;
-        }
-
         let marks_map = self.borrow().get_marks();
         let mut map = serde_json::Map::new();
         for mark in marks_map.iter() {
@@ -358,9 +350,6 @@ pub struct Item {
     pub(crate) start: Option<Type>,    // linked children start
     pub(crate) end: Option<Type>,      // linked children end
     pub(crate) container: Option<Id>,  // container id
-    pub(crate) target: Option<Type>,   // indirect item ref (proxy, mover)
-    pub(crate) mover: Option<Type>,    // mover ref (proxy)
-    pub(crate) movers: Option<Type>,   // linked movers
     pub(crate) marks: Option<Type>,    // linked marks
     pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list
     pub(crate) flags: u8,
@@ -555,14 +544,6 @@ impl Item {
             map.insert("right_id".to_string(), right.id().to_string().into());
         }
 
-        if let Some(target) = &self.target_id {
-            map.insert("target".to_string(), target.id().to_string().into());
-        }
-
-        if let Some(mover) = &self.mover_id {
-            map.insert("mover".to_string(), mover.id().to_string().into());
-        }
-
         // map.insert("content".to_string(), self.data.content.to_json());
 
         map
@@ -702,10 +683,6 @@ pub struct ItemData {
     pub(crate) left_id: Option<Id>,
     pub(crate) right_id: Option<Id>,
     pub(crate) side: ItemSide,
-
-    pub(crate) target_id: Option<Id>, // for proxy & move
-    pub(crate) mover_id: Option<Id>,  // for proxy
-
     pub(crate) field: Option<FieldId>,
     pub(crate) content: Content,
 }
@@ -719,8 +696,6 @@ impl ItemData {
             left_id: None,
             right_id: None,
             side: ItemSide::None,
-            target_id: None,
-            mover_id: None,
             field: None,
             content: Content::Null,
         }
@@ -743,12 +718,6 @@ impl ItemData {
             .map(|id| id.adjust(before_clients, after_clients));
         data.right_id = data
             .right_id
-            .map(|id| id.adjust(before_clients, after_clients));
-        data.target_id = data
-            .target_id
-            .map(|id| id.adjust(before_clients, after_clients));
-        data.mover_id = data
-            .mover_id
             .map(|id| id.adjust(before_clients, after_clients));
 
         let field = data.field.and_then(|field_id| {
@@ -794,14 +763,6 @@ impl ItemData {
             s.serialize_field("right_id", &right.id().to_string())?;
         }
 
-        if let Some(target) = &self.target_id {
-            s.serialize_field("target_id", &target.id().to_string())?;
-        }
-
-        if let Some(mover) = &self.mover_id {
-            s.serialize_field("mover_id", &mover.id().to_string())?;
-        }
-
         if let Some(field) = &self.field {
             s.serialize_field("field", &field.to_string())?;
         }
@@ -823,14 +784,6 @@ impl ItemData {
         }
 
         if self.right_id.is_some() {
-            size += 1;
-        }
-
-        if self.target_id.is_some() {
-            size += 1;
-        }
-
-        if self.mover_id.is_some() {
             size += 1;
         }
 
@@ -915,14 +868,6 @@ impl PartialEq for ItemData {
         }
 
         if self.right_id != other.right_id {
-            return false;
-        }
-
-        if self.target_id != other.target_id {
-            return false;
-        }
-
-        if self.mover_id != other.mover_id {
             return false;
         }
 

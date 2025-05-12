@@ -16,8 +16,6 @@ impl NProxy {
         let data = ItemData {
             id,
             kind: ItemKind::Proxy,
-            mover_id: Some(mover_id),
-            target_id: Some(target_id),
             ..ItemData::default()
         };
 

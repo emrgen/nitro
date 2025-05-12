@@ -78,16 +78,6 @@ impl Table {
             data.right_id_clock = right_id.clock;
         }
 
-        if let Some(target_id) = item.target_id {
-            data.target_id = target_id.client;
-            data.target_id_clock = target_id.clock;
-        }
-
-        if let Some(mover_id) = item.mover_id {
-            data.mover_id = mover_id.client;
-            data.mover_id_clock = mover_id.clock;
-        }
-
         self.data.push(data);
     }
 

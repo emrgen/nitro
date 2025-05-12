@@ -294,14 +294,6 @@ fn encode_item(e: &mut EncoderV1, cx: &mut EncodeContext, value: &ItemData) {
         }
     }
 
-    if let Some(target_id) = value.target_id {
-        target_id.encode(e, cx);
-    }
-
-    if let Some(mover_id) = value.mover_id {
-        mover_id.encode(e, cx);
-    }
-
     // cx.table.add(value, kind_flags, flags);
 }
 
@@ -367,8 +359,6 @@ fn decode_item(d: &mut DecoderV1, ctx: &DecodeContext) -> Result<ItemData, Strin
         left_id,
         parent_id,
         right_id,
-        target_id,
-        mover_id,
     })
 }
 

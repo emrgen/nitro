@@ -18,7 +18,6 @@ impl NMove {
         let data = ItemData {
             id,
             kind: ItemKind::Move,
-            target_id: Some(target_id),
             ..ItemData::default()
         };
 

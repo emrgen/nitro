@@ -62,9 +62,7 @@ impl DocStore {
         let mover_id = mover.id();
         self.moves.entry(target_id).and_modify(|v| {
             v.retain(|x| x.id() != mover_id);
-            if v.is_empty() {
-                self.moves.remove(&target_id);
-            }
+            // TODO: empty vectors should be removed
         });
     }
 
@@ -80,9 +78,7 @@ impl DocStore {
         let proxy_id = proxy.id();
         self.proxies.entry(*id).and_modify(|v| {
             v.retain(|x| x.id() != proxy_id);
-            if v.is_empty() {
-                self.proxies.remove(id);
-            }
+            // TODO: empty vectors should be removed
         });
     }
 

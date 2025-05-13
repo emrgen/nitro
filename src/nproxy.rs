@@ -12,24 +12,21 @@ use crate::types::Type;
 #[derive(Debug, Clone)]
 pub(crate) struct NProxy {
     pub(crate) item: ItemRef,
-    pub(crate) target: Option<Box<Type>>,
 }
 
 impl NProxy {
-    pub(crate) fn new(id: Id, target: Option<Type>, store: WeakStoreRef) -> NProxy {
+    pub(crate) fn new(id: Id, target: Type, store: WeakStoreRef) -> NProxy {
         let data = ItemData {
             id,
             kind: ItemKind::Proxy,
-            content: target
-                .clone()
-                .map_or(Content::Null, |t| Content::Id(t.id())),
+            content: Content::Id(target.id()),
             ..ItemData::default()
         };
 
-        Self {
-            item: ItemRef::new(data.into(), store),
-            target: target.map(Box::new),
-        }
+        let mut item = ItemRef::new(data.into(), store);
+        item.set_target(target);
+
+        Self { item }
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -37,7 +34,7 @@ impl NProxy {
     }
 
     pub(crate) fn content(&self) -> Content {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.content()
         } else {
             Content::Null
@@ -45,7 +42,7 @@ impl NProxy {
     }
 
     pub(crate) fn size(&self) -> u32 {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.size()
         } else {
             0
@@ -53,7 +50,7 @@ impl NProxy {
     }
 
     fn get(&self, key: ItemKey) -> Option<Type> {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.get(key)
         } else {
             None
@@ -61,7 +58,7 @@ impl NProxy {
     }
 
     fn set(&self, key: String, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.set(key, item);
         }
     }
@@ -71,37 +68,37 @@ impl NProxy {
     }
 
     fn prepend(&self, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.prepend(item);
         }
     }
 
     fn append(&self, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.append(item);
         }
     }
 
     fn insert(&self, offset: u32, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.insert(offset, item);
         }
     }
 
     fn remove(&self, key: ItemKey) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.remove(key);
         }
     }
 
     fn clear(&self) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.clear();
         }
     }
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.to_json()
         } else {
             serde_json::Value::Null

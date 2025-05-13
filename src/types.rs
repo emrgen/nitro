@@ -413,10 +413,9 @@ impl Type {
     }
 
     /// move the item to the given parent at the given offset
-    #[inline]
     pub fn move_to(&self, parent: &Type, offset: u32) {
         match parent {
-            Type::List(n) => n.move_to(offset),
+            Type::List(n) => n.move_to(offset, self),
             _ => panic!(
                 "move: not implemented for {:?} to parent type: {:?}",
                 self.kind(),
@@ -426,11 +425,10 @@ impl Type {
     }
 
     /// move the item after the given item
-    #[inline]
     pub fn move_after(&self, before: &Type) {
         let parent = before.parent().unwrap();
         match parent {
-            Type::List(n) => n.move_after(before),
+            Type::List(n) => n.move_after(before, self),
             _ => panic!(
                 "move: not implemented for {:?} to parent type: {:?}",
                 self.kind(),
@@ -440,11 +438,10 @@ impl Type {
     }
 
     /// move the item before the given item
-    #[inline]
     pub fn move_before(&self, after: &Type) {
         let parent = after.parent().unwrap();
         match self {
-            Type::List(n) => n.move_before(after),
+            Type::List(n) => n.move_before(after, self),
             _ => panic!(
                 "move: not implemented for {:?} to parent type: {:?}",
                 self.kind(),

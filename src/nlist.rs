@@ -1,8 +1,9 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
 use crate::item::{
-    ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked,
+    ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked, WithIndex,
 };
+use crate::nmove::NMove;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
 use serde::ser::{Serialize, SerializeStruct};
@@ -19,16 +20,26 @@ pub struct NList {
 }
 
 impl NList {
-    pub(crate) fn move_to(&self, offset: u32) {
-        todo!()
+    /// move the item after the target item
+    pub(crate) fn move_after(&self, before: &Type, target: &Type) {
+        let index = self.list.borrow().index_of(before);
+        target.item_ref().mark_moved();
+        self.move_to(index + 1, target);
     }
 
-    pub(crate) fn move_after(&self, before: &Type) {
-        todo!()
+    /// move the item before the target item
+    pub(crate) fn move_before(&self, after: &Type, target: &Type) {
+        let index = self.list.borrow().index_of(after);
+        target.item_ref().mark_moved();
+        self.move_to(index, target);
     }
 
-    pub(crate) fn move_before(&self, after: &Type) {
-        todo!()
+    /// move the item to the offset position in the new parent list
+    pub(crate) fn move_to(&self, offset: u32, target: &Type) {
+        let id = self.store.upgrade().unwrap().borrow_mut().next_id();
+        let mover = NMove::new(id, target.clone(), self.store.clone());
+        target.item_ref().mark_moved();
+        self.insert(offset, mover);
     }
 }
 

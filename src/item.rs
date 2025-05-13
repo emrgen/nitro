@@ -34,6 +34,16 @@ pub struct ItemRef {
 }
 
 impl ItemRef {
+    pub(crate) fn set_target(&self, target: Type) {
+        self.borrow_mut().target = Some(target);
+    }
+
+    pub(crate) fn get_target(&self) -> Option<Type> {
+        self.borrow().target.clone()
+    }
+}
+
+impl ItemRef {
     pub(crate) fn set_content(&self, content: Content) {
         self.borrow_mut().content = content;
     }
@@ -130,6 +140,22 @@ impl ItemRef {
     #[inline]
     pub(crate) fn left_origin(&self) -> Option<Type> {
         self.borrow().left_origin(self.store.clone())
+    }
+
+    pub(crate) fn mark_moved(&self) {
+        self.borrow_mut().mark_moved();
+    }
+
+    pub(crate) fn unmark_moved(&self) {
+        self.borrow_mut().unmark_moved();
+    }
+
+    pub(crate) fn is_moved(&self) -> bool {
+        self.borrow().is_moved()
+    }
+
+    pub(crate) fn is_deleted(&self) -> bool {
+        self.borrow().is_deleted()
     }
 
     pub(crate) fn delete(&self, size: u32) {
@@ -345,6 +371,7 @@ impl Ord for ItemRef {
 pub struct Item {
     pub(crate) data: ItemData,         // data for the item
     pub(crate) parent: Option<Type>,   // parent link
+    pub(crate) target: Option<Type>,   // target link
     pub(crate) left: Option<Type>,     // left link
     pub(crate) right: Option<Type>,    // right link
     pub(crate) start: Option<Type>,    // linked children start
@@ -374,7 +401,21 @@ impl Item {
     }
 
     pub(crate) fn is_deleted(&self) -> bool {
-        self.flags & 0x01 == 0x01
+        if self.flags & 0x01 == 0x01 {
+            return true;
+        }
+
+        // proxy and move items are considered deleted if the target is deleted
+        match self.kind {
+            ItemKind::Proxy | ItemKind::Move => {
+                if let Some(ref target) = self.target {
+                    target.is_deleted()
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 
     pub(crate) fn field(&self, store: WeakStoreRef) -> Option<String> {

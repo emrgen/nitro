@@ -1,33 +1,34 @@
-use fake::Opt;
-use serde_json::Value;
-use std::ops::Deref;
-
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef};
+use crate::nlist::NList;
 use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 use crate::Type;
+use fake::Opt;
+use serde::ser::SerializeStruct;
+use serde::Serialize;
+use serde_json::Value;
+use std::ops::Deref;
 
 /// NMove represents a move operation in the document.
 /// It is similar to proxy but one instance is valid for multiple move operations.
 #[derive(Debug, Clone)]
 pub(crate) struct NMove {
     pub(crate) item: ItemRef,
-    pub(crate) target: Option<Box<Type>>,
 }
 
 impl NMove {
-    pub(crate) fn new(id: Id, target: Option<Type>, store: WeakStoreRef) -> NMove {
+    pub(crate) fn new(id: Id, target: Type, store: WeakStoreRef) -> NMove {
         let data = ItemData {
             id,
             kind: ItemKind::Move,
             ..ItemData::default()
         };
 
-        Self {
-            item: ItemRef::new(data.into(), store),
-            target: target.map(Box::new),
-        }
+        let mut item = ItemRef::new(data.into(), store);
+        item.set_target(target);
+
+        Self { item }
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -35,7 +36,7 @@ impl NMove {
     }
 
     pub(crate) fn content(&self) -> Content {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.content()
         } else {
             Content::Null
@@ -43,7 +44,7 @@ impl NMove {
     }
 
     pub(crate) fn size(&self) -> u32 {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.size()
         } else {
             0
@@ -51,7 +52,7 @@ impl NMove {
     }
 
     fn get(&self, key: ItemKey) -> Option<Type> {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.get(key)
         } else {
             None
@@ -59,7 +60,7 @@ impl NMove {
     }
 
     fn set(&self, key: String, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.set(key, item);
         }
     }
@@ -69,43 +70,52 @@ impl NMove {
     }
 
     fn prepend(&self, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.prepend(item);
         }
     }
 
     fn append(&self, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.append(item);
         }
     }
 
     fn insert(&self, offset: u32, item: Type) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.insert(offset, item);
         }
     }
 
     fn remove(&self, key: ItemKey) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.remove(key);
         }
     }
 
     fn clear(&self) {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.clear();
         }
     }
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
-        if let Some(target) = self.target.as_ref() {
+        if let Some(target) = self.get_target().as_ref() {
             target.to_json()
         } else {
             serde_json::Value::Null
         }
     }
 }
+
+// impl Serialize for NMove {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::ser::Serializer,
+//     {
+//         serde_json::to_value(self.get_target().unwrap()).map_err(serde::ser::Error::custom)
+//     }
+// }
 
 impl WithId for NMove {
     #[inline]
@@ -123,7 +133,6 @@ impl WithIdRange for NMove {
 impl From<ItemRef> for NMove {
     fn from(item: ItemRef) -> Self {
         unimplemented!("This function is not implemented yet.");
-        Self { item, target: None }
     }
 }
 

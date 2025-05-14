@@ -26,11 +26,9 @@ impl NList {
     pub(crate) fn move_after(&self, before: &Type, target: &Type) {
         let index = self.list.borrow().index_of(before);
         if index < 0 || index >= (self.size() as i32) {
-            warn!("move_after: {} not found", before.id());
+            println!("move_after: ref item {} not found", before.id());
             return;
         }
-
-        println!("move_after: {} -> {}", before.id(), target.id());
 
         self.move_to((index + 1) as u32, target);
     }
@@ -39,6 +37,7 @@ impl NList {
     pub(crate) fn move_before(&self, after: &Type, target: &Type) {
         let index = self.list.borrow().index_of(after);
         if index < 0 || index >= self.size() as i32 {
+            println!("move_before: ref item {} not found", after.id());
             return;
         }
 
@@ -51,6 +50,7 @@ impl NList {
         let mover: Type = NMove::new(id, target.clone(), self.store.clone()).into();
 
         target.item_ref().mark_moved();
+
         self.store
             .upgrade()
             .unwrap()
@@ -123,6 +123,7 @@ impl NList {
         }
         #[cfg(not(feature = "fugue"))]
         {
+            item.set_parent(Some(self.into()));
             self.item.prepend(item.clone());
             Type::add_frac_index(&item);
             self.on_insert(&item);
@@ -132,6 +133,7 @@ impl NList {
     /// append an item to the end of the list
     pub fn append(&self, item: impl Into<Type>) {
         let item = item.into();
+        item.set_parent(Some(self.into()));
         self.item.append(item.clone());
         Type::add_frac_index(&item);
         self.on_insert(&item);
@@ -147,10 +149,13 @@ impl NList {
         } else if offset >= size as u32 {
             self.append(item);
         } else {
-            let list = self.list.borrow();
+            let next = {
+                let list = self.list.borrow();
 
-            // quickly find the item at the offset index using the binary search
-            let next = list.at_index(offset);
+                // quickly find the item at the offset index using the binary search
+                list.at_index(offset).cloned()
+            };
+
             if let Some(next) = next {
                 next.insert_before(item);
             } else {

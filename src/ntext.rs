@@ -70,7 +70,9 @@ impl NText {
     }
 
     pub fn append(&self, item: impl Into<Type>) {
-        self.item.append(item.into());
+        let item = item.into();
+        self.item.append(item.clone());
+        item.set_parent(Some(self.into()));
     }
 
     pub fn prepend(&self, item: impl Into<Type>) {

@@ -256,7 +256,7 @@ impl Type {
         item.set_left_id(Some(self.id()));
         item.set_right_id(next.as_ref().map(|n| n.id()));
 
-        item.set_parent(parent.clone());
+        // item.set_parent(parent.clone());
         item.set_left(self.clone());
         item.set_right(next.clone());
 
@@ -449,7 +449,7 @@ impl Type {
     /// move the item before the given item
     pub fn move_before(&self, after: &Type) {
         let parent = after.parent().unwrap();
-        match self {
+        match parent {
             Type::List(n) => n.move_before(after, self),
             _ => panic!(
                 "move: not implemented for {:?} to parent type: {:?}",

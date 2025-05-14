@@ -162,8 +162,16 @@ mod tests {
         list.visible_item_iter().map(get_text).collect()
     }
 
+    macro_rules! append {
+        ($list:expr, $($item:expr),+) => {
+            $(
+                $list.append($item.clone());
+            )+
+        };
+
+    }
     #[test]
-    fn test_move_atom_in_a_list() {
+    fn test_move_within_list_to_position() {
         let doc = Doc::default();
         let list = doc.list();
         doc.set("list", list.clone());
@@ -171,11 +179,9 @@ mod tests {
         let b = doc.atom("b");
         let c = doc.atom("c");
 
-        list.append(a.clone());
-        list.append(b.clone());
-        list.append(c.clone());
+        append!(list, a, b, c);
 
-        print_yaml(&list);
+        // print_yaml(&list);
 
         let at: Type = a.into();
         at.move_to(&list, 3);
@@ -196,15 +202,11 @@ mod tests {
 
         let a = doc.atom("a");
         let b = doc.atom("b");
-
-        l1.append(a.clone());
-        l1.append(b.clone());
+        append!(l1, a, b);
 
         let c = doc.atom("c");
         let d = doc.atom("d");
-
-        l2.append(c.clone());
-        l2.append(d.clone());
+        append!(l2, c, d);
 
         let a1: Type = a.into();
         a1.move_to(&l2, 0);
@@ -217,5 +219,32 @@ mod tests {
 
         assert_eq!(get_list_text(&l1), vec![] as Vec<String>);
         assert_eq!(get_list_text(&l2), vec!["a", "c", "b", "d"]);
+    }
+
+    #[test]
+    fn test_move_within_list() {
+        let doc = Doc::default();
+        let list = doc.list();
+        doc.set("list", list.clone());
+
+        let a: Type = doc.atom("a").into();
+        let b: Type = doc.atom("b").into();
+        let c: Type = doc.atom("c").into();
+        let d: Type = doc.atom("d").into();
+
+        append!(list, a, b, c, d);
+        assert_eq!(get_list_text(&list), vec!["a", "b", "c", "d"]);
+
+        a.move_after(&b);
+        assert_eq!(get_list_text(&list), vec!["b", "a", "c", "d"]);
+
+        a.move_after(&d);
+        assert_eq!(get_list_text(&list), vec!["b", "c", "d", "a"]);
+
+        a.move_before(&b);
+        assert_eq!(get_list_text(&list), vec!["a", "b", "c", "d"]);
+
+        a.move_before(&c);
+        assert_eq!(get_list_text(&list), vec!["b", "a", "c", "d"]);
     }
 }

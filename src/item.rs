@@ -107,7 +107,7 @@ impl ItemRef {
         }
 
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
-        item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
+        // item.item_ref().borrow_mut().parent = Some(Type::from(self.clone()));
 
         // TODO: if item and prev are adjacent string items, merge them
     }
@@ -125,8 +125,8 @@ impl ItemRef {
             self.borrow_mut().end = Some(item.clone());
         }
 
-        item.item_ref().borrow_mut().parent = Some(self.into());
         item.item_ref().borrow_mut().data.parent_id = Some(self.id());
+        item.item_ref().borrow_mut().parent = Some(self.into());
     }
 
     #[inline]

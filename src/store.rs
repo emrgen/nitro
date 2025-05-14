@@ -56,11 +56,11 @@ pub(crate) struct DocStore {
 impl DocStore {
     pub(crate) fn add_mover(&mut self, target_id: Id, mover: Type) {
         let entry = self.moves.entry(target_id).or_default();
+        // mark the last mover as moved so that it will be treated as an invisible item
         if entry.len() > 0 {
             entry.last().unwrap().item_ref().mark_moved();
-        } else {
-            entry.push(mover);
         }
+        entry.push(mover);
     }
 
     /// remove the last mover for the given target id

@@ -89,12 +89,13 @@ impl NMap {
     }
 
     pub(crate) fn set(&self, field: impl Into<String>, item: impl Into<Type>) {
-        let typ = item.into();
-        let item_ref = typ.item_ref();
+        let item = item.into();
+        let item_ref = item.item_ref();
         let store = item_ref.store.upgrade().unwrap();
         let field_id = store.borrow_mut().get_field_id(&field.into());
+        item.set_parent(Some(self.into()));
         item_ref.borrow_mut().data.field = Some(field_id);
-        self.item_ref().append(typ);
+        self.item_ref().append(item);
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {

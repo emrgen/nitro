@@ -477,6 +477,7 @@ impl Item {
 
     pub(crate) fn set(&mut self, _key: &ItemKey, _ref: ItemRef) {}
 
+    /// add mark to the item, see PeriText paper for details
     pub(crate) fn add_mark(&mut self, mark: impl Into<Type>) {
         let mark = mark.into();
         if let Some(ref marks) = self.marks {
@@ -500,6 +501,7 @@ impl Item {
     }
 
     pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {
+        // TODO: use visible iterator for performance
         let items = self.items();
         let mut map = HashMap::new();
 

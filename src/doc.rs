@@ -12,6 +12,7 @@ use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
 use crate::item::{Content, DocProps, ItemKey};
+use crate::json::{Json, JsonDoc};
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -131,7 +132,7 @@ pub struct Doc {
 
 impl Doc {
     /// Create a new document with the given options.
-    pub(crate) fn new(opts: DocMeta) -> Self {
+    pub fn new(opts: DocMeta) -> Self {
         let mut store = DocStore::default();
 
         store.doc_id = opts.id.clone();
@@ -157,6 +158,11 @@ impl Doc {
             store: store_ref,
             root,
         }
+    }
+
+    /// Create a new document from JSON
+    pub fn from_json(json: Value) -> Self {
+        JsonDoc::new(json).to_doc()
     }
 
     /// Document ID
@@ -204,7 +210,7 @@ impl Doc {
         diff
     }
 
-    pub(crate) fn apply(&self, diff: Diff) {
+    pub fn apply(&self, diff: Diff) {
         let mut tx = Transaction::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }
@@ -369,6 +375,7 @@ impl PartialEq for Doc {
     }
 }
 
+//
 impl Serialize for Doc {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

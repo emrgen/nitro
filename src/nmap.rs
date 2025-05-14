@@ -28,12 +28,14 @@ impl NMap {
         Self { item: item_ref }
     }
 
+    /// size of the map
     pub(crate) fn size(&self) -> u32 {
         let item = self.borrow();
         let map = item.as_map(self.store.clone());
         map.len() as u32
     }
 
+    /// item field value used in kv entry as key
     fn field(&self) -> Option<String> {
         self.borrow().field(self.item_ref().store.clone())
     }

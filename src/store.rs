@@ -1,5 +1,5 @@
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
-use crate::change::{Change, ChangeStore};
+use crate::change::{ChangeId, ChangeStore};
 use crate::dag::ChangeDag;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
@@ -196,6 +196,11 @@ impl DocStore {
 
         let changes = self.changes.clone();
 
+        let mut moves = self
+            .items
+            .iter()
+            .any(|(_, store)| store.iter().any(|(_, item)| item.kind().is_move()));
+
         Diff::from(
             id,
             created_by,
@@ -204,6 +209,7 @@ impl DocStore {
             state,
             items,
             deletes,
+            moves,
         )
     }
 }

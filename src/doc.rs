@@ -211,9 +211,25 @@ impl Doc {
         diff
     }
 
+    /// Apply a diff to the document from remote client
     pub fn apply(&self, diff: Diff) {
+        // create a new transaction for each change
+        // serialize the changes from the diff
+        let diffs = self.prepare_changes(&diff);
         let mut tx = Transaction::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
+    }
+
+    pub(crate) fn prepare_changes(&self, diff: &Diff) -> Vec<Diff> {
+        let mut changes = Vec::new();
+        let mut store = self.store.borrow_mut();
+        let no_change = diff.changes.size() == 0;
+
+        if diff.moves { // if there is any move operation we need to rollback before applying them
+        } else {
+        }
+
+        changes
     }
 
     /// Find an item by its ID

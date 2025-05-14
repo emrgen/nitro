@@ -15,19 +15,15 @@ pub(crate) struct DeleteItem {
 }
 
 impl DeleteItem {
-    pub(crate) fn new(id: Id, range: IdRange) -> DeleteItem {
-        DeleteItem { id, range }
-    }
-
-    pub(crate) fn from(id: Id, range: IdRange) -> DeleteItem {
+    pub(crate) fn new(id: Id, range: impl Into<IdRange>) -> DeleteItem {
         DeleteItem {
             id,
-            range: IdRange::new(id.client, range.start, range.end),
+            range: range.into(),
         }
     }
 
-    pub(crate) fn range(&self) -> IdRange {
-        self.range
+    pub(crate) fn range(&self) -> &IdRange {
+        &self.range
     }
 
     pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> DeleteItem {

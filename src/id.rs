@@ -7,7 +7,7 @@ use serde::{Serialize, Serializer};
 use uuid::Uuid;
 
 use crate::bimapid::{ClientId, ClientMap};
-use crate::change::Change;
+use crate::change::ChangeId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
@@ -442,8 +442,8 @@ impl IdRange {
     }
 }
 
-impl From<Change> for IdRange {
-    fn from(change: Change) -> Self {
+impl From<ChangeId> for IdRange {
+    fn from(change: ChangeId) -> Self {
         IdRange {
             client: change.client,
             start: change.start,

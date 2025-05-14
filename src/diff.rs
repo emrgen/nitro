@@ -5,7 +5,7 @@ use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
 use crate::bimapid::FieldMap;
-use crate::change::{Change, ChangeStore};
+use crate::change::{Change, ChangeId, ChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -24,6 +24,7 @@ pub struct Diff {
     pub changes: ChangeStore,
     pub items: ItemDataStore,
     pub deletes: DeleteItemStore,
+    pub moves: bool,
 }
 
 impl Diff {
@@ -38,6 +39,7 @@ impl Diff {
 }
 
 impl Diff {
+    /// create a diff with the given doc_id and created_by
     pub(crate) fn new(doc_id: DocId, created_by: Client) -> Diff {
         Self {
             doc_id,
@@ -46,6 +48,7 @@ impl Diff {
         }
     }
 
+    /// create a diff from the given parameters
     pub(crate) fn from(
         doc_id: DocId,
         created_by: Client,
@@ -54,6 +57,7 @@ impl Diff {
         state: ClientState,
         items: ItemDataStore,
         deletes: DeleteItemStore,
+        moves: bool,
     ) -> Diff {
         Diff {
             created_by,
@@ -63,7 +67,15 @@ impl Diff {
             changes,
             items,
             deletes,
+            moves,
         }
+    }
+
+    /// get all the changes for this diff
+    pub(crate) fn changes(&self) -> Vec<Change> {
+        let mut changes = Vec::new();
+
+        changes
     }
 
     // create a diff from a diff
@@ -76,6 +88,7 @@ impl Diff {
             changes: self.changes.clone(),
             items: self.items.diff(state),
             deletes: self.deletes.diff(state),
+            moves: self.moves,
         }
     }
 
@@ -131,6 +144,7 @@ impl Diff {
             state.clone(),
             items,
             deletes,
+            self.moves,
         )
     }
 
@@ -176,6 +190,7 @@ impl Diff {
             state,
             items,
             deletes,
+            self.moves,
         )
     }
 
@@ -228,6 +243,8 @@ impl Encode for Diff {
         self.state.encode(e, cx);
         self.deletes.encode(e, cx);
         self.items.encode(e, cx);
+        let flag = if self.moves { 1 } else { 0 };
+        e.u8(flag);
     }
 }
 
@@ -240,6 +257,7 @@ impl Decode for Diff {
         let deletes = DeleteItemStore::decode(d, ctx)?;
         let items = ItemDataStore::decode(d, ctx)?;
         let changes = ChangeStore::default();
+        let moves = d.u8()?;
 
         Ok(Diff {
             doc_id,
@@ -249,6 +267,7 @@ impl Decode for Diff {
             state,
             deletes,
             items,
+            moves: moves != 0,
         })
     }
 }

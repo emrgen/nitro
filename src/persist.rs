@@ -8,7 +8,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::item::Content;
+use crate::item::{Content, ItemKind};
 use crate::state::ClientState;
 use crate::store::{
     DeleteItemStore, DocStore, IdDiff, IdRangeMap, ItemDataStore, PendingStore, ReadyStore,
@@ -59,6 +59,11 @@ impl DocStoreData {
             }
         }
 
+        let mut moves = self
+            .items
+            .iter()
+            .any(|(_, store)| store.iter().any(|(_, item)| item.kind == ItemKind::Move));
+
         Diff::from(
             self.doc_id.clone(),
             self.created_by.clone(),
@@ -67,6 +72,7 @@ impl DocStoreData {
             state.clone(),
             items,
             deletes,
+            moves,
         )
     }
 }

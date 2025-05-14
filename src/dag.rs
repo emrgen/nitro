@@ -1,5 +1,5 @@
 use crate::bimapid::{ClientId, ClientMap};
-use crate::change::Change;
+use crate::change::ChangeId;
 use crate::frontier::{ChangeFrontier, Frontier};
 use crate::persist::WeakStoreDataRef;
 use crate::store::{DocStore, WeakStoreRef};
@@ -11,10 +11,10 @@ use std::collections::VecDeque;
 // Dag can be used to roll back the document to a previous state.
 #[derive(Default, Clone, Debug)]
 pub(crate) struct ChangeDag {
-    root: Option<Change>,
-    changes: HashMap<Change, u64>,
-    forward: HashMap<Change, Vec<Change>>,
-    backward: HashMap<Change, Vec<Change>>,
+    root: Option<ChangeId>,
+    changes: HashMap<ChangeId, u64>,
+    forward: HashMap<ChangeId, Vec<ChangeId>>,
+    backward: HashMap<ChangeId, Vec<ChangeId>>,
     // local_tick is used to assign a unique index to each change
     // used to sort the changes in topological order
     local_tick: u64,
@@ -22,7 +22,7 @@ pub(crate) struct ChangeDag {
 
 impl ChangeDag {
     /// connect the new change to the existing changes
-    fn insert(&mut self, change: &Change, previous: Vec<Change>) {
+    fn insert(&mut self, change: &ChangeId, previous: Vec<ChangeId>) {
         if self.forward.contains_key(change) {
             return;
         }
@@ -79,14 +79,14 @@ impl ChangeDag {
 
     /// Find all changes done in the document
     /// timeline excludes the first change (the document root create change)
-    pub(crate) fn timeline(&self) -> Vec<Change> {
+    pub(crate) fn timeline(&self) -> Vec<ChangeId> {
         self.after(ChangeFrontier::from(vec![self.root.clone().unwrap()]))
     }
 
     // use khan's algorithm to sort the changes in topological order
-    fn topological_sort(&self) -> Vec<Change> {
+    fn topological_sort(&self) -> Vec<ChangeId> {
         let mut result = Vec::new();
-        let mut queue: VecDeque<Change> = VecDeque::new();
+        let mut queue: VecDeque<ChangeId> = VecDeque::new();
         let mut in_degree = HashMap::new();
 
         // calculate the in-degree of each change
@@ -121,7 +121,7 @@ impl ChangeDag {
     /// Find all changes that are after the given changes in integration order.
     /// The changes are sorted in the order they were added to the dag
     /// to restore the document to the frontier, the changes must be rolled back in the reverse order of integration.
-    pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<Change> {
+    pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<ChangeId> {
         let mut result = Vec::new();
 
         // sort the changes by their index in the change list, lower index first
@@ -130,7 +130,7 @@ impl ChangeDag {
 
         // use stack based dfs for finding topological order
         let mut stack = Vec::new();
-        let mut visited: HashSet<Change> = HashSet::new();
+        let mut visited: HashSet<ChangeId> = HashSet::new();
 
         for change in change_list {
             if visited.contains(&change) {
@@ -163,7 +163,7 @@ impl ChangeDag {
     }
 
     /// rollback removes the given changes from the dag and returns the changes in the order they were applied
-    pub(crate) fn rollback(&mut self, changes: &Vec<Change>) {
+    pub(crate) fn rollback(&mut self, changes: &Vec<ChangeId>) {
         // reverse iterate over the changes to remove them in the reverse order
         // of integration
         for change in changes.iter().rev() {
@@ -224,12 +224,12 @@ impl Eq for ChangeDag {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::change::Change;
+    use crate::change::ChangeId;
     use crate::Id;
 
     macro_rules! change {
         ($c:expr) => {
-            Change::new($c, 0, 0)
+            ChangeId::new($c, 0, 0)
         };
     }
 
@@ -248,16 +248,16 @@ mod tests {
     #[test]
     fn test_change_dag() {
         let mut dag = ChangeDag::default();
-        dag.insert(&Change::new(0, 0, 0), vec![]);
-        dag.insert(&Change::new(2, 0, 0), vec![Change::new(1, 0, 0)]);
-        dag.insert(&Change::new(3, 0, 0), vec![Change::new(1, 0, 0)]);
+        dag.insert(&ChangeId::new(0, 0, 0), vec![]);
+        dag.insert(&ChangeId::new(2, 0, 0), vec![ChangeId::new(1, 0, 0)]);
+        dag.insert(&ChangeId::new(3, 0, 0), vec![ChangeId::new(1, 0, 0)]);
         dag.insert(
-            &Change::new(4, 0, 0),
-            vec![Change::new(2, 0, 0), Change::new(3, 0, 0)],
+            &ChangeId::new(4, 0, 0),
+            vec![ChangeId::new(2, 0, 0), ChangeId::new(3, 0, 0)],
         );
 
         let frontier = ChangeFrontier {
-            changes: vec![Change::new(1, 0, 0)],
+            changes: vec![ChangeId::new(1, 0, 0)],
         };
         let after = dag.after(frontier);
         assert_eq!(after.len(), 3);
@@ -269,7 +269,7 @@ mod tests {
 
     fn create_dag() -> ChangeDag {
         let mut dag = ChangeDag::default();
-        let change = |c| Change::new(c, 0, 0);
+        let change = |c| ChangeId::new(c, 0, 0);
         dag.insert(&change(1), vec![]);
         dag.insert(&change(2), changes!(1));
         dag.insert(&change(3), changes!(1));

@@ -705,6 +705,12 @@ impl<T: ItemStoreEntry> ItemStore<T> {
         self.map.insert(value.id(), value);
     }
 
+    pub(crate) fn extend(&mut self, other: impl Iterator<Item = T>) {
+        for item in other {
+            self.insert(item);
+        }
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         self.map.is_empty()
     }

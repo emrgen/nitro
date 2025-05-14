@@ -3,13 +3,13 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{Id, Split, WithId, WithTarget};
+use crate::id::{Id, IdRange, Split, WithId, WithIdRange, WithTarget};
 use crate::item::Any::U32;
 use crate::mark::MarkContent;
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
-use crate::{print_yaml, Client};
+use crate::{print_yaml, Client, NString};
 use bitflags::bitflags;
 use fractional_index::FractionalIndex;
 use hashbrown::HashMap;
@@ -643,6 +643,17 @@ impl Item {
     }
 }
 
+impl WithIdRange for ItemData {
+    fn range(&self) -> IdRange {
+        let id = self.id.clone();
+        match self.kind {
+            ItemKind::String => IdRange::new(id.client, id.clock, id.clock + self.ticks()),
+            ItemKind::Mark => IdRange::new(id.client, id.clock, id.clock + self.ticks()),
+            _ => IdRange::new(id.client, id.clock, id.clock),
+        }
+    }
+}
+
 impl Serialize for ItemData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -791,6 +802,24 @@ impl ItemData {
         }
 
         data
+    }
+
+    #[inline]
+    pub(crate) fn deps(&self) -> Vec<IdRange> {
+        let mut deps = vec![];
+        if let Some(parent_id) = &self.parent_id {
+            deps.push(parent_id.clone().into());
+        }
+
+        if let Some(left_id) = &self.left_id {
+            deps.push(left_id.clone().into());
+        }
+
+        if let Some(right_id) = &self.right_id {
+            deps.push(right_id.clone().into());
+        }
+
+        deps
     }
 
     pub(crate) fn ticks(&self) -> u32 {

@@ -1,4 +1,4 @@
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
@@ -221,15 +221,14 @@ impl Doc {
     }
 
     pub(crate) fn prepare_changes(&self, diff: &Diff) -> Vec<Diff> {
-        let mut changes = Vec::new();
         let mut store = self.store.borrow_mut();
-        let no_change = diff.changes.size() == 0;
+        let (mut diff_changes, move_changes) = diff.changes();
 
-        if diff.moves { // if there is any move operation we need to rollback before applying them
+        if move_changes.is_empty() {
         } else {
         }
 
-        changes
+        vec![]
     }
 
     /// Find an item by its ID

@@ -1,14 +1,17 @@
 use crate::bimapid::ClientId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
+use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
-use crate::store::{ClientStore, ItemDataStore, ItemStore};
+use crate::store::{ClientStore, DeleteItemStore, ItemDataStore, ItemStore};
 use crate::{ClockTick, Content, Id, ItemData};
-use hashbrown::HashSet;
+use btree_slab::BTreeMap;
+use hashbrown::hash_map::Iter;
+use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::fmt::Debug;
 use std::hash::Hasher;
 use std::ops::Range;
@@ -16,8 +19,66 @@ use std::ops::Range;
 /// ChangeData represents a set of changes made to a document by one client in a single transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
-    pub(crate) change: ChangeId,
-    pub(crate) items: ItemStore<ItemData>,
+    pub(crate) id: ChangeId,
+    pub(crate) items: ItemDataStore,
+    pub(crate) delete: DeleteItemStore,
+    pub(crate) deps: Vec<IdRange>,
+}
+
+impl Change {
+    pub(crate) fn new(id: ChangeId, items: ItemDataStore, delete: DeleteItemStore) -> Change {
+        let mut deps = Vec::new();
+        for (_, store) in items.iter() {
+            for (_, item) in store.iter() {
+                deps.extend(item.deps());
+            }
+        }
+
+        for (_, store) in delete.iter() {
+            for (_, item) in store.iter() {
+                deps.extend(item.deps());
+            }
+        }
+
+        Change {
+            id,
+            items,
+            delete,
+            deps,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub(crate) struct PendingChangeStore {
+    pub(crate) pending: HashMap<ClientId, VecDeque<Change>>,
+    pub(crate) heads: HashMap<ClientId, Change>,
+}
+
+impl PendingChangeStore {
+    pub(crate) fn insert(&mut self, change: Change) {
+        self.pending
+            .entry(change.id.client)
+            .or_insert_with(VecDeque::new)
+            .push_back(change);
+    }
+
+    pub(crate) fn iter(&self) -> Iter<'_, ClientId, Change> {
+        self.heads.iter()
+    }
+
+    /// remove the change from the head and insert the first change from pending to the heads
+    pub(crate) fn progress(&mut self, client_id: ClientId) {
+        let change = self
+            .pending
+            .get_mut(&client_id)
+            .and_then(|queue| queue.pop_front());
+        if let Some(change) = change {
+            self.heads.insert(client_id, change.clone());
+        } else {
+            self.heads.remove(&client_id);
+        }
+    }
 }
 
 /// Change represents a set of consecutive items inserted (insert, delete, move etc.) into the document by a client.

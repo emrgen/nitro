@@ -1,18 +1,19 @@
-use std::cell::RefMut;
-use std::ops::Add;
-
+use hashbrown::HashSet;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
+use std::cell::RefMut;
+use std::cmp::max;
+use std::ops::Add;
 
 use crate::bimapid::FieldMap;
-use crate::change::{Change, ChangeId, ChangeStore};
+use crate::change::{Change, ChangeId, ChangeStore, PendingChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::Id;
+use crate::id::{Id, WithId, WithIdRange};
 use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
-use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore};
+use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore, ItemStore};
 use crate::Client;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -72,10 +73,77 @@ impl Diff {
     }
 
     /// get all the changes for this diff
-    pub(crate) fn changes(&self) -> Vec<Change> {
-        let mut changes = Vec::new();
+    pub(crate) fn changes(&self) -> (PendingChangeStore, Vec<Change>) {
+        let mut pcs = PendingChangeStore::default();
+        let mut mover_changes = Vec::new();
+        let mut clients = HashSet::new();
+        clients.extend(self.items.clients());
+        clients.extend(self.deletes.clients());
 
-        changes
+        if self.changes.size() == 0 {
+            for client in clients {
+                let mut items = ItemDataStore::default();
+                let mut delete_items = DeleteItemStore::default();
+                let mut moves = false;
+                let mut min_tick = u32::MAX;
+                let mut max_tick = u32::MIN;
+
+                if let Some(store) = self.items.id_store(&client) {
+                    for (_, item) in store.iter() {
+                        moves |= item.kind.is_move();
+                        items.insert(item.clone());
+                        let range = item.range();
+                        min_tick = min_tick.min(range.start);
+                        max_tick = max_tick.max(range.end);
+                    }
+                }
+
+                if let Some(store) = self.deletes.id_store(&client) {
+                    for (_, item) in store.iter() {
+                        let range = item.range();
+                        min_tick = min_tick.min(range.start);
+                        max_tick = max_tick.max(range.end);
+                    }
+                }
+
+                if min_tick != u32::MAX && max_tick != u32::MIN {
+                    let change = Change::new(
+                        ChangeId::new(client, min_tick, max_tick),
+                        items,
+                        delete_items,
+                    );
+                    mover_changes.push(change.clone());
+                    pcs.insert(change);
+                }
+            }
+        } else {
+            // if there are changes, we need to get the changes for each client
+            for (client_id, change_store) in self.changes.iter() {
+                for (_, change_id) in change_store.iter() {
+                    let mut items = ItemDataStore::default();
+                    let mut delete_items = DeleteItemStore::default();
+                    let mut moves = false;
+                    if let Some(item_store) = self.items.id_store(client_id) {
+                        for item in item_store.get_range(&change_id.clone().into()) {
+                            moves |= item.kind.is_move();
+                            items.insert(item.clone());
+                        }
+                    }
+
+                    if let Some(store) = self.deletes.id_store(client_id) {
+                        for (_, item) in store.iter() {
+                            delete_items.insert(item.clone());
+                        }
+                    }
+
+                    let change = Change::new(change_id.clone(), items, delete_items);
+                    mover_changes.push(change.clone());
+                    pcs.insert(change);
+                }
+            }
+        }
+
+        return (pcs, mover_changes);
     }
 
     // create a diff from a diff

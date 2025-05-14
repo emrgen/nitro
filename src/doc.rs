@@ -17,6 +17,7 @@ use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
+use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
@@ -248,9 +249,7 @@ impl Doc {
 
     /// Create a new atom type in the document
     pub fn atom(&self, content: impl Into<Content>) -> NAtom {
-        let id = self.store.borrow_mut().next_id();
-        let content = content.into();
-        let atom = NAtom::new(id, content, Rc::downgrade(&self.store));
+        let atom = NAtom::new(self.next_id(), content.into(), Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(atom.clone());
 
         atom
@@ -258,8 +257,7 @@ impl Doc {
 
     /// Create a new text type in the document
     pub fn text(&self) -> NText {
-        let id = self.store.borrow_mut().next_id();
-        let text = NText::new(id, Rc::downgrade(&self.store));
+        let text = NText::new(self.next_id(), Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(text.clone());
 
         text
@@ -277,6 +275,17 @@ impl Doc {
         self.store.borrow_mut().insert(string.clone());
 
         string
+    }
+
+    /// Create a new proxy type in the document
+    pub fn proxy(&self, item: impl Into<Type>) -> NProxy {
+        let proxy = NProxy::new(self.next_id(), item.into(), Rc::downgrade(&self.store));
+
+        proxy
+    }
+
+    fn next_id(&self) -> Id {
+        self.store.borrow_mut().next_id()
     }
 }
 

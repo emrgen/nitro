@@ -16,6 +16,8 @@ use std::ops::Range;
 /// Change represents a set of consecutive items inserted (insert, delete, move etc.) into the document by a client.
 /// One change includes a range of clock ticks associated with the items within a change.
 /// In context of an editor like carbon, a change is equivalent to a single editor transaction.
+/// The change clock ticks are inclusive, meaning that the start clock tick is included in the change and the end clock tick is not.
+/// Change{ client, [start, end] }
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
 pub(crate) struct Change {
     pub(crate) client: ClientId,

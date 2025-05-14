@@ -1,9 +1,10 @@
-use std::ops::Deref;
-
 use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
+use crate::nmove::NMove;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
+use serde::Serialize;
+use std::ops::Deref;
 
 /// NProxy represents a proxy for another item in the document.
 /// Multiple Proxy instances can point to the same target item.
@@ -106,6 +107,15 @@ impl NProxy {
     }
 }
 
+impl Serialize for NProxy {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.get_target().serialize(serializer).into()
+    }
+}
+
 impl WithId for NProxy {
     #[inline]
     fn id(&self) -> Id {
@@ -124,5 +134,41 @@ impl Deref for NProxy {
 
     fn deref(&self) -> &Self::Target {
         &self.item
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{print_yaml, Doc};
+
+    #[test]
+    fn test_proxy_within_list() {
+        let doc = Doc::default();
+        let list = doc.list();
+        let map = doc.map();
+        list.append(map.clone());
+        let p1 = doc.proxy(map.clone());
+        let p2 = doc.proxy(p1.clone());
+
+        let a = doc.atom("a");
+        map.set("a", a.clone());
+
+        assert_eq!(
+            serde_json::to_string(&p1).unwrap(),
+            serde_json::to_string(&map).unwrap()
+        );
+
+        assert_eq!(
+            serde_json::to_string(&p2).unwrap(),
+            serde_json::to_string(&map).unwrap()
+        );
+
+        map.set("b", doc.atom("b"));
+
+        assert_eq!(
+            serde_json::to_string(&p1).unwrap(),
+            serde_json::to_string(&map).unwrap()
+        );
     }
 }

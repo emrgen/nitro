@@ -715,7 +715,7 @@ impl Serialize for Type {
             Type::String(n) => n.serialize(serializer),
             Type::Atom(n) => n.serialize(serializer),
             Type::Mark(n) => n.serialize(serializer),
-            // Type::Proxy(n) => n.serialize(serializer),
+            Type::Proxy(n) => n.serialize(serializer),
             Type::Move(n) => n.serialize(serializer),
             _ => panic!("Type: serialize: not implemented for {:?}", self),
         }

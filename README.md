@@ -16,13 +16,14 @@ flamegraph -- cargo run --example huge_list
 - [x] string
 - [x] atom
 - [x] mark
+- [x] proxy
+- [x] move
 - [x] delete
 - [x] diff
 - [x] merge
 - [x] sync docs
-- [x] local move
 - [ ] sync move changes
-- [ ] proxy - same block visible in multiple places, change in one place updates all places
+- [ ] undo/redo manager
 
 ### TODO
 

@@ -162,7 +162,7 @@ impl ChangeDag {
         result
     }
 
-    /// rollback removes the given changes from the dag
+    /// rollback removes the given changes from the dag and returns the changes in the order they were applied
     pub(crate) fn rollback(&mut self, changes: &Vec<Change>) {
         // reverse iterate over the changes to remove them in the reverse order
         // of integration

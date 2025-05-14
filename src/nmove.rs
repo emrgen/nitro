@@ -1,4 +1,4 @@
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef};
 use crate::nlist::NList;
 use crate::nproxy::NProxy;
@@ -150,6 +150,18 @@ mod tests {
     use super::*;
     use crate::{print_yaml, Doc};
 
+    fn get_text(item: ItemRef) -> String {
+        if let Some(target) = item.get_target() {
+            target.text_content()
+        } else {
+            item.text_content()
+        }
+    }
+
+    fn get_list_text(list: &NList) -> Vec<String> {
+        list.visible_item_iter().map(get_text).collect()
+    }
+
     #[test]
     fn test_move_atom() {
         let doc = Doc::default();
@@ -166,12 +178,10 @@ mod tests {
         // print_yaml(&list);
 
         let at: Type = a.into();
-        at.move_to(&list, 2);
-
-        println!("size: {}", list.size());
-        print_yaml(&list);
+        at.move_to(&list, 3);
+        assert_eq!(get_list_text(&list), vec!["b", "c", "a"]);
 
         at.move_to(&list, 0);
-        print_yaml(&list);
+        assert_eq!(get_list_text(&list), vec!["a", "b", "c"]);
     }
 }

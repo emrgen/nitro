@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::item::{Content, ItemData, ItemKey, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 use crate::types::Type;

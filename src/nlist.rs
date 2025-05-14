@@ -1,4 +1,4 @@
-use crate::id::{Id, IdRange, WithId, WithIdRange};
+use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
 use crate::item::{
     ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked, StartEnd,

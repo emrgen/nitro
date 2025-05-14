@@ -12,7 +12,7 @@ use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::Id;
 use crate::item::{Content, DocProps, ItemKey};
-use crate::json::{Json, JsonDoc};
+use crate::json::JsonDoc;
 use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
@@ -249,7 +249,8 @@ impl Doc {
     /// Create a new atom type in the document
     pub fn atom(&self, content: impl Into<Content>) -> NAtom {
         let id = self.store.borrow_mut().next_id();
-        let atom = NAtom::new(id, content.into(), Rc::downgrade(&self.store));
+        let content = content.into();
+        let atom = NAtom::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(atom.clone());
 
         atom

@@ -3,7 +3,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{Id, Split, WithId};
+use crate::id::{Id, Split, WithId, WithTarget};
 use crate::item::Any::U32;
 use crate::mark::MarkContent;
 use crate::nmark::NMark;
@@ -34,16 +34,6 @@ pub struct ItemRef {
 }
 
 impl ItemRef {
-    pub(crate) fn set_target(&self, target: Type) {
-        self.borrow_mut().target = Some(target);
-    }
-
-    pub(crate) fn get_target(&self) -> Option<Type> {
-        self.borrow().target.clone()
-    }
-}
-
-impl ItemRef {
     pub(crate) fn set_content(&self, content: Content) {
         self.borrow_mut().content = content;
     }
@@ -64,7 +54,9 @@ impl ItemRef {
     pub(crate) fn text_content(&self) -> String {
         match self.borrow().content {
             Content::String(ref s) => s.clone(),
-            _ => panic!("NString has invalid content"),
+            _ => {
+                panic!("NString has invalid content")
+            }
         }
     }
 }
@@ -289,13 +281,14 @@ impl<T: Clone + StartEnd + Linked + WithId> Iterator for ItemIter<T> {
     }
 }
 
-impl<T: Clone + StartEnd + Linked + serde::Serialize> Iterator for VisibleItemIter<T> {
+impl<T: Clone + StartEnd + Linked> Iterator for VisibleItemIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut item = self.item.clone();
+        // move to right and return the first visible item
         while let Some(i) = item {
-            print_yaml(i.clone());
+            // skip invisible items while moving to the right
             if i.is_visible() {
                 self.item = i.right();
                 return Some(i);
@@ -341,6 +334,16 @@ impl WithId for ItemRef {
     #[inline]
     fn id(&self) -> Id {
         self.borrow().data.id
+    }
+}
+
+impl WithTarget for ItemRef {
+    fn set_target(&self, target: Type) {
+        self.borrow_mut().target = Some(target);
+    }
+
+    fn get_target(&self) -> Option<Type> {
+        self.borrow().target.clone()
     }
 }
 
@@ -975,8 +978,42 @@ pub(crate) enum ItemKind {
 }
 
 impl ItemKind {
+    #[inline]
     pub(crate) fn is_list(&self) -> bool {
         self == &Self::List
+    }
+
+    pub(crate) fn is_map(&self) -> bool {
+        self == &Self::Map
+    }
+
+    pub(crate) fn is_text(&self) -> bool {
+        self == &Self::Text
+    }
+
+    pub(crate) fn is_string(&self) -> bool {
+        self == &Self::String
+    }
+
+    pub(crate) fn is_atom(&self) -> bool {
+        self == &Self::Atom
+    }
+
+    pub(crate) fn is_proxy(&self) -> bool {
+        self == &Self::Proxy
+    }
+
+    #[inline]
+    pub(crate) fn is_move(&self) -> bool {
+        self == &Self::Move
+    }
+
+    pub(crate) fn is_mark(&self) -> bool {
+        self == &Self::Mark
+    }
+
+    pub(crate) fn is_plaintext(&self) -> bool {
+        self == &Self::PlaintText
     }
 }
 

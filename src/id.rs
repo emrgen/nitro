@@ -11,6 +11,7 @@ use crate::change::Change;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
+use crate::Type;
 
 /// 32 bits Lamport Clock tick
 pub type ClockTick = u32;
@@ -510,6 +511,11 @@ impl Add<IdRange> for IdRange {
 /// WithId trait is used to get the ID of an object
 pub(crate) trait WithId {
     fn id(&self) -> Id;
+}
+
+pub(crate) trait WithTarget {
+    fn set_target(&self, target: Type);
+    fn get_target(&self) -> Option<Type>;
 }
 
 /// WithIdRange trait is used to get the ID range of an object

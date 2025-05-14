@@ -491,9 +491,10 @@ impl Type {
     }
 
     #[inline]
-    pub fn set(&self, key: impl Into<String>, item: impl Into<Type>) {
+    pub fn set(&self, key: impl Into<ItemKey>, item: impl Into<Type>) {
+        let key = key.into();
         match self {
-            Type::Map(n) => n.set(key.into(), item.into()),
+            Type::Map(n) => n.set(key.as_string(), item.into()),
             _ => panic!("set: not implemented"),
         }
     }
@@ -533,7 +534,10 @@ impl Type {
     pub(crate) fn text_content(&self) -> String {
         match self {
             Type::Text(n) => n.text_content(),
-            _ => panic!("text_content: not implemented"),
+            Type::Atom(n) => n.text_content(),
+            _ => {
+                panic!("text_content: not implemented for {:?}", self.kind())
+            }
         }
     }
 

@@ -7,6 +7,7 @@ use crate::item::{
 use crate::nmove::NMove;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
+use log::warn;
 use serde::ser::{Serialize, SerializeStruct};
 use std::cell::RefCell;
 use std::fmt::Debug;
@@ -25,8 +26,11 @@ impl NList {
     pub(crate) fn move_after(&self, before: &Type, target: &Type) {
         let index = self.list.borrow().index_of(before);
         if index < 0 || index >= (self.size() as i32) {
+            warn!("move_after: {} not found", before.id());
             return;
         }
+
+        println!("move_after: {} -> {}", before.id(), target.id());
 
         self.move_to((index + 1) as u32, target);
     }
@@ -52,6 +56,7 @@ impl NList {
             .unwrap()
             .borrow_mut()
             .add_mover(target.id(), mover.clone());
+
         self.insert(offset, mover);
     }
 }
@@ -119,8 +124,8 @@ impl NList {
         #[cfg(not(feature = "fugue"))]
         {
             self.item.prepend(item.clone());
-            // Type::add_frac_index(&item);
-            // self.on_insert(&item);
+            Type::add_frac_index(&item);
+            self.on_insert(&item);
         }
     }
 
@@ -147,8 +152,6 @@ impl NList {
             // quickly find the item at the offset index using the binary search
             let next = list.at_index(offset);
             if let Some(next) = next {
-                println!("insert: {}", offset);
-                println!("id: {}", next.id());
                 next.insert_before(item);
             } else {
                 self.append(item);

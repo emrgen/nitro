@@ -163,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn test_move_atom() {
+    fn test_move_atom_in_a_list() {
         let doc = Doc::default();
         let list = doc.list();
         doc.set("list", list.clone());
@@ -175,7 +175,7 @@ mod tests {
         list.append(b.clone());
         list.append(c.clone());
 
-        // print_yaml(&list);
+        print_yaml(&list);
 
         let at: Type = a.into();
         at.move_to(&list, 3);
@@ -183,5 +183,39 @@ mod tests {
 
         at.move_to(&list, 0);
         assert_eq!(get_list_text(&list), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn test_move_atom_between_lists() {
+        let doc = Doc::default();
+        let l1 = doc.list();
+        let l2 = doc.list();
+
+        doc.set("l1", l1.clone());
+        doc.set("l2", l2.clone());
+
+        let a = doc.atom("a");
+        let b = doc.atom("b");
+
+        l1.append(a.clone());
+        l1.append(b.clone());
+
+        let c = doc.atom("c");
+        let d = doc.atom("d");
+
+        l2.append(c.clone());
+        l2.append(d.clone());
+
+        let a1: Type = a.into();
+        a1.move_to(&l2, 0);
+
+        assert_eq!(get_list_text(&l1), vec!["b"]);
+        assert_eq!(get_list_text(&l2), vec!["a", "c", "d"]);
+
+        let b1: Type = b.into();
+        b1.move_to(&l2, 2);
+
+        assert_eq!(get_list_text(&l1), vec![] as Vec<String>);
+        assert_eq!(get_list_text(&l2), vec!["a", "c", "b", "d"]);
     }
 }

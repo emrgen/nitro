@@ -65,13 +65,13 @@ impl Serialize for NAtom {
     where
         S: serde::ser::Serializer,
     {
-        let mut s = serializer.serialize_struct("Atom", self.borrow().serialize_size() + 1)?;
+        let mut atom = serializer.serialize_struct("Atom", self.borrow().serialize_size() + 1)?;
 
-        self.serialize_with(&mut s)?;
+        self.serialize_with(&mut atom)?;
 
-        s.serialize_field("content", &self.content())?;
+        atom.serialize_field("content", &self.content())?;
 
-        s.end()
+        atom.end()
     }
 }
 

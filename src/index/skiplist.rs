@@ -28,8 +28,11 @@ impl ItemIndexMap<Type> for SkipIndexMap {
         self.map.iter().nth(index as usize).map(|(_, v)| v)
     }
 
-    fn index_of(&self, item: &Type) -> u32 {
-        self.map.iter().position(|(_, v)| v == item).unwrap() as u32
+    fn index_of(&self, item: &Type) -> i32 {
+        self.map
+            .iter()
+            .position(|(_, v)| v == item)
+            .map_or(-1, |pos| pos as i32)
     }
 
     fn insert(&mut self, item: Type) {

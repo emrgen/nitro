@@ -347,6 +347,14 @@ impl Type {
     pub(crate) fn is_visible(&self) -> bool {
         !self.is_moved() && !self.is_deleted()
     }
+
+    #[inline]
+    pub(crate) fn index_of(&self, target: &Type) -> i32 {
+        match self {
+            Type::List(list) => list.index_of(target),
+            _ => -1,
+        }
+    }
 }
 
 impl Type {
@@ -413,7 +421,8 @@ impl Type {
     }
 
     /// move the item to the given parent at the given offset
-    pub fn move_to(&self, parent: &Type, offset: u32) {
+    pub fn move_to(&self, parent: impl Into<Type>, offset: u32) {
+        let parent = parent.into();
         match parent {
             Type::List(n) => n.move_to(offset, self),
             _ => panic!(
@@ -703,7 +712,7 @@ impl Serialize for Type {
             Type::Atom(n) => n.serialize(serializer),
             Type::Mark(n) => n.serialize(serializer),
             // Type::Proxy(n) => n.serialize(serializer),
-            // Type::Move(n) => n.serialize(serializer),
+            Type::Move(n) => n.serialize(serializer),
             _ => panic!("Type: serialize: not implemented for {:?}", self),
         }
     }
@@ -826,6 +835,9 @@ impl From<ItemRef> for Type {
             ItemKind::Text => Self::Text(item.into()),
             ItemKind::String => Self::String(item.into()),
             ItemKind::Atom => Self::Atom(item.into()),
+            // ItemKind::Proxy => Self::Proxy(item.into()),
+            ItemKind::Move => Self::Move(item.into()),
+            ItemKind::Mark => Self::Mark(item.into()),
             _ => panic!("Type::from(ItemRef): not implemented"),
         }
     }

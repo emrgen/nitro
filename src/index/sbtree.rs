@@ -38,8 +38,8 @@ impl ItemIndexMap<Type> for SlabBTree {
         self.btree.iter().nth(index as usize).map(|(_, v)| v)
     }
 
-    fn index_of(&self, index: &Type) -> u32 {
-        self.btree.range(..index.index()).count() as u32
+    fn index_of(&self, index: &Type) -> i32 {
+        self.btree.range(..index.index()).count() as i32
     }
 
     fn insert(&mut self, value: Type) {

@@ -9,7 +9,7 @@ use crate::mark::MarkContent;
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
 use crate::types::Type;
-use crate::Client;
+use crate::{print_yaml, Client};
 use bitflags::bitflags;
 use fractional_index::FractionalIndex;
 use hashbrown::HashMap;
@@ -277,7 +277,7 @@ pub(crate) struct VisibleItemIter<T: Linked> {
     pub(crate) item: Option<T>,
 }
 
-impl<T: Clone + StartEnd + Linked> Iterator for ItemIter<T> {
+impl<T: Clone + StartEnd + Linked + WithId> Iterator for ItemIter<T> {
     type Item = T;
 
     #[inline]
@@ -289,12 +289,13 @@ impl<T: Clone + StartEnd + Linked> Iterator for ItemIter<T> {
     }
 }
 
-impl<T: Clone + StartEnd + Linked> Iterator for VisibleItemIter<T> {
+impl<T: Clone + StartEnd + Linked + serde::Serialize> Iterator for VisibleItemIter<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut item = self.item.clone();
         while let Some(i) = item {
+            print_yaml(i.clone());
             if i.is_visible() {
                 self.item = i.right();
                 return Some(i);

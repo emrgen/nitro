@@ -54,16 +54,32 @@ pub(crate) struct DocStore {
 }
 
 impl DocStore {
-    pub(crate) fn add_move(&mut self, target_id: Id, mover: Type) {
-        self.moves.entry(target_id).or_default().push(mover);
+    pub(crate) fn add_mover(&mut self, target_id: Id, mover: Type) {
+        let entry = self.moves.entry(target_id).or_default();
+        if entry.len() > 0 {
+            entry.last().unwrap().item_ref().mark_moved();
+        } else {
+            entry.push(mover);
+        }
     }
 
-    pub(crate) fn remove_move(&mut self, target_id: Id, mover: &Type) {
+    /// remove the last mover for the given target id
+    /// the last mover after remove is marked as unmoved
+    pub(crate) fn remove_mover(&mut self, target_id: Id, mover: &Type) {
         let mover_id = mover.id();
         self.moves.entry(target_id).and_modify(|v| {
             v.retain(|x| x.id() != mover_id);
+            if v.len() > 0 {
+                v.last().unwrap().item_ref().unmark_moved();
+            }
             // TODO: empty vectors should be removed
         });
+
+        if self.moves.get(&target_id).map_or(false, |v| v.is_empty()) {
+            self.find(&target_id).map(|target| {
+                target.item_ref().unmark_moved();
+            });
+        }
     }
 
     pub(crate) fn get_move(&mut self, id: &Id) -> Option<Type> {

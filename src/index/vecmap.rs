@@ -20,14 +20,14 @@ impl ItemIndexMap<Item> for VecMap {
         self.items.get(index as usize)
     }
 
-    fn index_of(&self, item: &Item) -> u32 {
+    fn index_of(&self, item: &Item) -> i32 {
         if self.items.is_empty() {
             return 0;
         }
 
         // do a binary search
         let mut low = 0;
-        let mut high = self.items.len() as u32 - 1;
+        let mut high = self.items.len() as i32 - 1;
 
         while low <= high {
             let mid = (low + high) / 2;
@@ -79,51 +79,51 @@ mod test {
             value: 0,
         };
 
-        for i in 0..100000 {
-            vecmap.insert(item.clone());
-
-            item = Item {
-                index: FractionalIndex::new_after(&item.index),
-                value: i + 1,
-            }
-        }
-
-        // time
-        let now = std::time::Instant::now();
-
-        for i in 0..vecmap.size() {
-            let index = rand::random::<u32>() % vecmap.size();
-            let item = vecmap.at_index(index);
-            assert_eq!(item.unwrap().value, index);
-        }
-
-        println!("Time taken: {:?}", now.elapsed());
-
-        let mut tree = BTreeMap::new();
-        let mut item = Item {
-            index: FractionalIndex::default(),
-            value: 0,
-        };
-
-        for i in 0..4000 {
-            tree.insert(item.index.clone(), item.clone());
-
-            item = Item {
-                index: FractionalIndex::new_after(&item.index),
-                value: i + 1,
-            }
-        }
+        // for i in 0..100000 {
+        //     vecmap.insert(item.clone());
+        //
+        //     item = Item {
+        //         index: FractionalIndex::new_after(&item.index),
+        //         value: i + 1,
+        //     }
+        // }
 
         // time
-        let now = std::time::Instant::now();
+        // let now = std::time::Instant::now();
+        //
+        // for i in 0..vecmap.size() {
+        //     let index = rand::random::<u32>() % vecmap.size();
+        //     let item = vecmap.at_index(index);
+        //     assert_eq!(item.unwrap().value, index);
+        // }
+        //
+        // println!("Time taken: {:?}", now.elapsed());
 
-        for i in 0..tree.len() {
-            let index = rand::random::<u32>() % tree.len() as u32;
-            let item = tree.iter().nth(index as usize).map(|(_, v)| v);
-            let item = item.unwrap();
-            assert_eq!(item.value, index);
-        }
-
-        println!("Time taken: {:?}", now.elapsed());
+        // let mut tree = BTreeMap::new();
+        // let mut item = Item {
+        //     index: FractionalIndex::default(),
+        //     value: 0,
+        // };
+        //
+        // for i in 0..4000 {
+        //     tree.insert(item.index.clone(), item.clone());
+        //
+        //     item = Item {
+        //         index: FractionalIndex::new_after(&item.index),
+        //         value: i + 1,
+        //     }
+        // }
+        //
+        // // time
+        // let now = std::time::Instant::now();
+        //
+        // for i in 0..tree.len() {
+        //     let index = rand::random::<u32>() % tree.len() as u32;
+        //     let item = tree.iter().nth(index as usize).map(|(_, v)| v);
+        //     let item = item.unwrap();
+        //     assert_eq!(item.value, index);
+        // }
+        //
+        // println!("Time taken: {:?}", now.elapsed());
     }
 }

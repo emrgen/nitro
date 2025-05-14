@@ -1,7 +1,8 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
 use crate::item::{
-    ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked, WithIndex,
+    ContainerKind, Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked, StartEnd,
+    WithIndex,
 };
 use crate::nmove::NMove;
 use crate::store::WeakStoreRef;
@@ -23,22 +24,34 @@ impl NList {
     /// move the item after the target item
     pub(crate) fn move_after(&self, before: &Type, target: &Type) {
         let index = self.list.borrow().index_of(before);
-        target.item_ref().mark_moved();
-        self.move_to(index + 1, target);
+        if index < 0 || index >= (self.size() as i32) {
+            return;
+        }
+
+        self.move_to((index + 1) as u32, target);
     }
 
     /// move the item before the target item
     pub(crate) fn move_before(&self, after: &Type, target: &Type) {
         let index = self.list.borrow().index_of(after);
-        target.item_ref().mark_moved();
-        self.move_to(index, target);
+        if index < 0 || index >= self.size() as i32 {
+            return;
+        }
+
+        self.move_to(index as u32, target);
     }
 
     /// move the item to the offset position in the new parent list
     pub(crate) fn move_to(&self, offset: u32, target: &Type) {
         let id = self.store.upgrade().unwrap().borrow_mut().next_id();
-        let mover = NMove::new(id, target.clone(), self.store.clone());
+        let mover: Type = NMove::new(id, target.clone(), self.store.clone()).into();
+
         target.item_ref().mark_moved();
+        self.store
+            .upgrade()
+            .unwrap()
+            .borrow_mut()
+            .add_mover(target.id(), mover.clone());
         self.insert(offset, mover);
     }
 }
@@ -80,6 +93,10 @@ impl NList {
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
+
+    pub(crate) fn index_of(&self, target: &Type) -> i32 {
+        self.list.borrow().index_of(target)
+    }
 }
 
 impl Deref for NList {
@@ -98,6 +115,12 @@ impl NList {
             self.item.prepend(item.clone());
             Type::add_frac_index(&item);
             self.on_insert(&item);
+        }
+        #[cfg(not(feature = "fugue"))]
+        {
+            self.item.prepend(item.clone());
+            // Type::add_frac_index(&item);
+            // self.on_insert(&item);
         }
     }
 
@@ -124,6 +147,8 @@ impl NList {
             // quickly find the item at the offset index using the binary search
             let next = list.at_index(offset);
             if let Some(next) = next {
+                println!("insert: {}", offset);
+                println!("id: {}", next.id());
                 next.insert_before(item);
             } else {
                 self.append(item);

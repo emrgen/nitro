@@ -101,21 +101,22 @@ impl NMove {
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
         if let Some(target) = self.get_target().as_ref() {
-            target.to_json()
+            serde_json::Value::Null
+            // target.to_json()
         } else {
             serde_json::Value::Null
         }
     }
 }
 
-// impl Serialize for NMove {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::ser::Serializer,
-//     {
-//         serde_json::to_value(self.get_target().unwrap()).map_err(serde::ser::Error::custom)
-//     }
-// }
+impl Serialize for NMove {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.get_target().serialize(serializer).into()
+    }
+}
 
 impl WithId for NMove {
     #[inline]
@@ -132,7 +133,7 @@ impl WithIdRange for NMove {
 
 impl From<ItemRef> for NMove {
     fn from(item: ItemRef) -> Self {
-        unimplemented!("This function is not implemented yet.");
+        Self { item }
     }
 }
 
@@ -141,5 +142,36 @@ impl Deref for NMove {
 
     fn deref(&self) -> &Self::Target {
         &self.item
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{print_yaml, Doc};
+
+    #[test]
+    fn test_move_atom() {
+        let doc = Doc::default();
+        let list = doc.list();
+        doc.set("list", list.clone());
+        let a = doc.atom("a");
+        let b = doc.atom("b");
+        let c = doc.atom("c");
+
+        list.append(a.clone());
+        list.append(b.clone());
+        list.append(c.clone());
+
+        // print_yaml(&list);
+
+        let at: Type = a.into();
+        at.move_to(&list, 2);
+
+        println!("size: {}", list.size());
+        print_yaml(&list);
+
+        at.move_to(&list, 0);
+        print_yaml(&list);
     }
 }

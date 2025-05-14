@@ -28,8 +28,10 @@ impl ItemIndexMap<Type> for BTreeIndex {
         self.tree.at_index(index as usize)
     }
 
-    fn index_of(&self, item: &Type) -> u32 {
-        self.tree.index_of(&Index(item.index())).unwrap() as u32
+    fn index_of(&self, item: &Type) -> i32 {
+        self.tree
+            .index_of(&Index(item.index()))
+            .map_or(-1, |i| i as i32)
     }
 
     fn insert(&mut self, item: Type) {

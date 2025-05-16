@@ -22,7 +22,7 @@ pub(crate) struct ChangeDag {
 
 impl ChangeDag {
     /// connect the new change to the existing changes
-    fn insert(&mut self, change: &ChangeId, previous: Vec<ChangeId>) {
+    pub(crate) fn insert(&mut self, change: &ChangeId, previous: Vec<ChangeId>) {
         if self.forward.contains_key(change) {
             return;
         }
@@ -185,6 +185,10 @@ impl ChangeDag {
 
             self.changes.remove(change);
         }
+    }
+
+    pub(crate) fn contains(&self, target_id: &Id) -> bool {
+        self.changes.contains_key(&target_id.into())
     }
 
     /// find the client frontier for the given hash, if the hash is not found, return None

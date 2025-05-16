@@ -805,7 +805,7 @@ impl ItemData {
     }
 
     #[inline]
-    pub(crate) fn deps(&self) -> Vec<IdRange> {
+    pub(crate) fn deps(&self) -> Vec<Id> {
         let mut deps = vec![];
         if let Some(parent_id) = &self.parent_id {
             deps.push(parent_id.clone().into());

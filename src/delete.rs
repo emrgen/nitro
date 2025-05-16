@@ -26,8 +26,8 @@ impl DeleteItem {
         &self.range
     }
 
-    pub(crate) fn deps(&self) -> Vec<IdRange> {
-        vec![self.range.clone()]
+    pub(crate) fn target(&self) -> Id {
+        self.range.id()
     }
 
     pub(crate) fn adjust(&self, before: &ClientMap, after: &ClientMap) -> DeleteItem {

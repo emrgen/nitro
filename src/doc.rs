@@ -3,10 +3,12 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::Value;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
+use crate::change::ChangeId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -24,7 +26,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::transaction::Transaction;
 use crate::types::Type;
-use crate::{Client, ClockTick};
+use crate::{print_yaml, Client, ClockTick};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DocMeta {
@@ -213,19 +215,48 @@ impl Doc {
 
     /// Apply a diff to the document from remote client
     pub fn apply(&self, diff: Diff) {
-        // create a new transaction for each change
-        // serialize the changes from the diff
-        let diffs = self.prepare_changes(&diff);
+        // adjust the diff to the current state of the document
+        let diff = {
+            let diffs = self.prepare_changes(&diff);
+            let store_ref = self.store.borrow_mut();
+            diff.adjust(&store_ref)
+        };
+
         let mut tx = Transaction::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }
 
     pub(crate) fn prepare_changes(&self, diff: &Diff) -> Vec<Diff> {
         let mut store = self.store.borrow_mut();
+        let mut changes = Vec::new();
         let (mut diff_changes, move_changes) = diff.changes();
 
         if move_changes.is_empty() {
+            while !diff_changes.is_empty() {
+                if let Some(change) = diff_changes.find_ready(&store.dag) {
+                    diff_changes.progress(&change.id.client);
+                    let deps = change
+                        .deps
+                        .clone()
+                        .iter()
+                        .map(|id| id.clone().into())
+                        .collect();
+                    store.dag.insert(&change.id, deps);
+                    changes.push(change);
+                } else {
+                    unreachable!("should not happen");
+                }
+            }
         } else {
+            // move changes are present in the diff
+            let deps: Vec<ChangeId> = move_changes
+                .iter()
+                .map(|change| change.deps.clone())
+                .flatten()
+                .map(|id| id.clone().into())
+                .collect();
+
+            // need to undo-redo the changes
         }
 
         vec![]

@@ -1,4 +1,5 @@
 use crate::bimapid::ClientId;
+use crate::dag::ChangeDag;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -11,9 +12,11 @@ use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
 use serde::Serialize;
+use serde_columnar::Itertools;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt::Debug;
 use std::hash::Hasher;
+use std::mem::swap;
 use std::ops::Range;
 
 /// ChangeData represents a set of changes made to a document by one client in a single transaction.
@@ -22,7 +25,7 @@ pub(crate) struct Change {
     pub(crate) id: ChangeId,
     pub(crate) items: ItemDataStore,
     pub(crate) delete: DeleteItemStore,
-    pub(crate) deps: Vec<IdRange>,
+    pub(crate) deps: Vec<Id>,
 }
 
 impl Change {
@@ -36,7 +39,7 @@ impl Change {
 
         for (_, store) in delete.iter() {
             for (_, item) in store.iter() {
-                deps.extend(item.deps());
+                deps.push(item.target());
             }
         }
 
@@ -51,16 +54,40 @@ impl Change {
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct PendingChangeStore {
+    // the pending changes for each client
     pub(crate) pending: HashMap<ClientId, VecDeque<Change>>,
+    // the first change for each client
     pub(crate) heads: HashMap<ClientId, Change>,
 }
 
 impl PendingChangeStore {
-    pub(crate) fn insert(&mut self, change: Change) {
+    /// find the first ready change for a client
+    pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<Change> {
+        let found = self
+            .heads
+            .iter()
+            .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
+
+        found.map(|(_, change)| change.clone())
+    }
+}
+
+impl PendingChangeStore {
+    pub(crate) fn add(&mut self, change: Change) {
+        // if the head is empty for this client, insert the change
+        if self.heads.get(&change.id.client).is_none() {
+            self.heads.insert(change.id.client, change.clone());
+        }
+
         self.pending
             .entry(change.id.client)
             .or_insert_with(VecDeque::new)
             .push_back(change);
+    }
+
+    // return all header change ids
+    pub(crate) fn change_heads(&mut self) -> &mut HashMap<ClientId, Change> {
+        &mut self.heads
     }
 
     pub(crate) fn iter(&self) -> Iter<'_, ClientId, Change> {
@@ -68,16 +95,34 @@ impl PendingChangeStore {
     }
 
     /// remove the change from the head and insert the first change from pending to the heads
-    pub(crate) fn progress(&mut self, client_id: ClientId) {
+    pub(crate) fn progress(&mut self, client_id: &ClientId) -> Option<Change> {
         let change = self
             .pending
             .get_mut(&client_id)
             .and_then(|queue| queue.pop_front());
-        if let Some(change) = change {
-            self.heads.insert(client_id, change.clone());
+
+        let head = self
+            .pending
+            .get(&client_id)
+            .and_then(|queue| queue.front())
+            .cloned();
+        if let Some(head) = head {
+            self.heads.insert(client_id.clone(), head.clone());
         } else {
             self.heads.remove(&client_id);
         }
+
+        change
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        // get sum all the pending changes
+        let mut sum = 0;
+        for queue in self.pending.values() {
+            sum += queue.len();
+        }
+
+        sum == 0
     }
 }
 
@@ -86,7 +131,7 @@ impl PendingChangeStore {
 /// In context of an editor like carbon, a change is equivalent to a single editor transaction.
 /// The change clock ticks are inclusive, meaning that the start clock tick is included in the change and the end clock tick is not.
 /// Change{ client, [start, end] }
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Hash)]
 pub(crate) struct ChangeId {
     pub(crate) client: ClientId,
     pub(crate) start: ClockTick,
@@ -120,6 +165,12 @@ impl ChangeId {
 
 impl From<Id> for ChangeId {
     fn from(id: Id) -> Self {
+        ChangeId::new(id.client, id.clock, id.clock)
+    }
+}
+
+impl From<&Id> for ChangeId {
+    fn from(id: &Id) -> Self {
         ChangeId::new(id.client, id.clock, id.clock)
     }
 }

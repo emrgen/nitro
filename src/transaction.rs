@@ -20,24 +20,23 @@ use crate::types::Type;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Transaction {
     store: WeakStoreRef,
+    // TODO: ready, pending, pending_queue will be removed as
+    // the Transactions are already serialized as per dependencies
     ready: ReadyStore,
     pending: PendingStore,
     pending_queue: ClientQueueStore<ItemData>,
+    // track which types are integrated before commit failure
     progress: Vec<Type>,
 
     diff: Diff,
     ops: Vec<TxOp>,
 
     elapsed: Duration,
+    rollback: bool,
 }
 
 impl Transaction {
     pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Transaction {
-        let mut_store = store.upgrade().unwrap();
-        let store_ref = mut_store.borrow_mut();
-
-        let diff = diff.adjust(&store_ref);
-
         Transaction {
             store,
             diff,
@@ -47,6 +46,7 @@ impl Transaction {
             pending_queue: ClientQueueStore::default(),
             progress: Vec::default(),
             elapsed: Duration::default(),
+            rollback: false,
         }
     }
 
@@ -279,7 +279,7 @@ impl Transaction {
 
     pub(crate) fn rollback(&mut self) {
         println!("-----------------------------------------------------");
-        println!("|            Rolling back transaction                ");
+        println!("|            Rolling back transaction               |");
         println!("-----------------------------------------------------");
         let store = self.store.upgrade().unwrap();
         let mut store = store.borrow_mut();

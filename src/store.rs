@@ -559,19 +559,6 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
-    pub(crate) fn contains(&self, id: &Id) -> bool {
-        self.items
-            .get(&id.client)
-            .map(|store| store.contains(id))
-            .unwrap_or(false)
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.items.clear();
-    }
-}
-
-impl<T: ClientStoreEntry> ClientStore<T> {
     /// get the number of items for the given client
     pub(crate) fn client_size(&self, id: &ClientId) -> usize {
         self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
@@ -588,6 +575,13 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
 
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.items
+            .get(&id.client)
+            .map(|store| store.contains(id))
+            .unwrap_or(false)
+    }
+
     /// get items in the inclusive clock range [start, end] for the given client
     pub(crate) fn find_by_range(&self, range: impl Into<IdRange>) -> Vec<T> {
         let range = range.into();
@@ -595,6 +589,10 @@ impl<T: ClientStoreEntry> ClientStore<T> {
             .get(&range.client)
             .map(|store| store.get_range(&range))
             .unwrap_or_default()
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.items.clear();
     }
 
     pub(crate) fn last(&self) -> Option<(ClientId, ItemStore<T>)> {

@@ -113,7 +113,7 @@ impl Diff {
                         delete_items,
                     );
                     mover_changes.push(change.clone());
-                    pcs.insert(change);
+                    pcs.add(change);
                 }
             }
         } else {
@@ -138,7 +138,7 @@ impl Diff {
 
                     let change = Change::new(change_id.clone(), items, delete_items);
                     mover_changes.push(change.clone());
-                    pcs.insert(change);
+                    pcs.add(change);
                 }
             }
         }

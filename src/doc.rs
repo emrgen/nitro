@@ -131,10 +131,37 @@ impl Doc {
             diff.adjust(&store_ref)
         };
 
-        let diffs = self.prepare_changes(&diff);
+        let (undo, mut changes) = self.prepare_changes(&diff);
         let new_changes = diff.changes.hash_set();
 
-        // println!("diffs: {:?}", diffs);
+        // the changes are missing the items and deletes
+        // materialize the changes
+        {
+            let store = self.store.borrow_mut();
+            for change in &mut changes {
+                if new_changes.contains(&change.id) {
+                    change.items = diff.items.find_by_range(change.id.clone());
+                    change.deletes = diff.deletes.find_by_range(change.id.clone());
+                } else {
+                    change.items = store
+                        .items
+                        .find_by_range(change.id.clone())
+                        .iter()
+                        .map(|item| item.data())
+                        .collect();
+                    change.deletes = store
+                        .deletes
+                        .find_by_range(change.id.clone())
+                        .iter()
+                        .map(|item| item.clone())
+                        .collect();
+                }
+            }
+        }
+
+        // undo the applied changes
+
+        // apply the changes
 
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();

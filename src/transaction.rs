@@ -46,3 +46,22 @@ impl Transaction {
         store.borrow_mut().changes.insert(self.change.id.clone());
     }
 }
+
+pub(crate) struct ChangeTx {
+    pub(crate) store: WeakStoreRef,
+    pub(crate) change: Change,
+}
+
+impl ChangeTx {
+    fn new(store: WeakStoreRef, change: Change) -> Self {
+        Self { store, change }
+    }
+
+    // apply the change items to the document store
+    // the items should be applied in the tick order
+    fn commit(&mut self) {
+        let store = self.store.upgrade().unwrap().borrow_mut();
+    }
+
+    fn rollback(&mut self) {}
+}

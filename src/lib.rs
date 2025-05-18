@@ -25,7 +25,6 @@ pub use crate::utils::*;
 
 use crate::index::*;
 
-mod Transaction;
 mod bimapid;
 mod change;
 pub mod codec_v1;
@@ -64,6 +63,7 @@ mod state;
 mod store;
 mod sync;
 mod table;
+mod transaction;
 mod tx;
 mod types;
 mod undo_redo;

@@ -1,6 +1,7 @@
 use crate::bimapid::{ClientId, ClientMap};
-use crate::change::ChangeId;
+use crate::change::{Change, ChangeId};
 use crate::frontier::{ChangeFrontier, Frontier};
+use crate::id::WithId;
 use crate::persist::WeakStoreDataRef;
 use crate::store::{DocStore, WeakStoreRef};
 use crate::{ClientFrontier, ClockTick, Id};
@@ -79,7 +80,7 @@ impl ChangeDag {
 
     /// Find all changes done in the document
     /// timeline excludes the first change (the document root create change)
-    pub(crate) fn timeline(&self) -> Vec<ChangeId> {
+    pub(crate) fn timeline(&self) -> Vec<Change> {
         self.after(ChangeFrontier::from(vec![self.root.clone().unwrap()]))
     }
 
@@ -121,7 +122,7 @@ impl ChangeDag {
     /// Find all changes that are after the given changes in integration order.
     /// The changes are sorted in the order they were added to the dag
     /// to restore the document to the frontier, the changes must be rolled back in the reverse order of integration.
-    pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<ChangeId> {
+    pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<Change> {
         let mut result = Vec::new();
 
         // sort the changes by their index in the change list, lower index first
@@ -149,7 +150,12 @@ impl ChangeDag {
                             continue;
                         }
                         visited.insert(dep.clone());
-                        result.push(dep.clone());
+                        result.push(Change::with_deps(
+                            dep.clone(),
+                            self.backward
+                                .get(&change)
+                                .map_or(vec![], |deps| deps.clone()),
+                        ));
                         stack.push(dep.clone());
                     }
                 }
@@ -157,7 +163,7 @@ impl ChangeDag {
         }
 
         // TODO: optimize later, for now extra overhead is not a problem
-        result.sort_by_key(|c| self.changes.get(c).unwrap());
+        result.sort_by_key(|c| self.changes.get(&c.id).unwrap());
 
         result
     }
@@ -202,8 +208,8 @@ impl ChangeDag {
 
         /// apply changes and check if the commit hash matches
         for change in &changes {
-            if let Some(client) = client_map.get_client(&change.client) {
-                client_frontier.add(client.clone(), change.end);
+            if let Some(client) = client_map.get_client(&change.id.client) {
+                client_frontier.add(client.clone(), change.id.end);
             }
 
             if commit_hash.len() == 8 && client_frontier.short_hash() == commit_hash {
@@ -247,6 +253,10 @@ mod tests {
         ($($c:expr),*) => {
             ChangeFrontier::from(vec![$(change!($c)),*])
         };
+    }
+
+    fn change_ids(changes: Vec<Change>) -> Vec<ChangeId> {
+        changes.into_iter().map(|c| c.id).collect()
     }
 
     #[test]
@@ -297,27 +307,31 @@ mod tests {
 
         let after = dag.after(frontier!(8));
         assert_eq!(after.len(), 4);
-        assert_eq!(after, changes!(9, 11, 12, 13));
+        assert_eq!(change_ids(after), changes!(9, 11, 12, 13));
 
         let after = dag.after(frontier!(4, 8));
         assert_eq!(after.len(), 6);
-        assert_eq!(after, changes!(6, 8, 9, 11, 12, 13));
+        assert_eq!(change_ids(after), changes!(6, 8, 9, 11, 12, 13));
 
         let after = dag.after(frontier!(2, 5, 10));
-        assert_eq!(after, changes!(4, 6, 8, 9, 11, 12, 13));
+        assert_eq!(change_ids(after), changes!(4, 6, 8, 9, 11, 12, 13));
 
         let after = dag.after(frontier!(8));
-        dag.rollback(&after);
+        dag.rollback(&change_ids(after));
         assert_eq!(dag.changes.len(), 9); // [1-8,10]
 
         let after = dag.after(frontier!(4));
-        assert_eq!(after, changes!(6, 8));
+        assert_eq!(change_ids(after), changes!(6, 8));
     }
 
     #[test]
     fn test_timeline() {
         let dag = create_dag();
-        let timeline = dag.timeline();
+        let timeline = dag
+            .timeline()
+            .iter()
+            .map(|c| c.id.clone())
+            .collect::<Vec<_>>();
         assert_eq!(timeline.len(), 12);
         assert_eq!(timeline, changes!(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13));
     }

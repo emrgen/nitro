@@ -74,7 +74,7 @@ impl Diff {
 
     /// get all the changes for this diff
     pub(crate) fn changes(&self) -> (PendingChangeStore, Vec<ChangeData>) {
-        let mut pcs = PendingChangeStore::default();
+        let mut changes = PendingChangeStore::default();
         let mut mover_changes = Vec::new();
         let mut clients = HashSet::new();
         clients.extend(self.items.clients());
@@ -82,7 +82,7 @@ impl Diff {
 
         if self.changes.size() == 0 {
             for client in clients {
-                let mut items = ItemDataStore::default();
+                let mut items = ItemStore::default();
                 let mut delete_items = DeleteItemStore::default();
                 let mut moves = false;
                 let mut min_tick = u32::MAX;
@@ -107,20 +107,20 @@ impl Diff {
                 }
 
                 if min_tick != u32::MAX && max_tick != u32::MIN {
-                    let change = ChangeData::new(
-                        ChangeId::new(client, min_tick, max_tick),
-                        items,
-                        delete_items,
-                    );
-                    mover_changes.push(change.clone());
-                    pcs.add(change);
+                    // let change = ChangeData::new(
+                    //     ChangeId::new(client, min_tick, max_tick),
+                    //     items.into(),
+                    //     delete_items.into(),
+                    // );
+                    // mover_changes.push(change.clone());
+                    // changes.add(change);
                 }
             }
         } else {
             // if there are changes, we need to get the changes for each client
             for (client_id, change_store) in self.changes.iter() {
                 for (_, change_id) in change_store.iter() {
-                    let mut items = ItemDataStore::default();
+                    let mut items = ItemStore::default();
                     let mut delete_items = DeleteItemStore::default();
                     let mut moves = false;
                     if let Some(item_store) = self.items.id_store(client_id) {
@@ -136,14 +136,14 @@ impl Diff {
                         }
                     }
 
-                    let change = ChangeData::new(change_id.clone(), items, delete_items);
-                    mover_changes.push(change.clone());
-                    pcs.add(change);
+                    // let change = ChangeData::new(change_id.clone(), items, delete_items);
+                    // mover_changes.push(change.clone());
+                    // changes.add(change);
                 }
             }
         }
 
-        return (pcs, mover_changes);
+        (changes, mover_changes)
     }
 
     // create a diff from a diff

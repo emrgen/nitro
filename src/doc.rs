@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
-use crate::change::ChangeId;
+use crate::change::{Change, ChangeData, ChangeId};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -227,39 +227,45 @@ impl Doc {
         tx.commit();
     }
 
-    pub(crate) fn prepare_changes(&self, diff: &Diff) -> Vec<Diff> {
+    pub(crate) fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
         let mut store = self.store.borrow_mut();
-        // let mut undo = Vec::new();
-        let mut changes = Vec::new();
+        let frontier = ChangeFrontier::default();
+        let mut undo = Vec::new();
         let (mut diff_changes, move_changes) = diff.changes();
 
-        // if move_changes.is_empty() {
-        //     // move changes are present in the diff
-        //     let deps: Vec<ChangeId> = move_changes
-        //         .iter()
-        //         .map(|change| change.deps.clone())
-        //         .flatten()
-        //         .map(|id| id.clone().into())
-        //         .collect();
-        //
-        //     // need to undo-redo the changes
-        //     undo = store.dag.after(ChangeFrontier::from(deps));
-        // }
+        if move_changes.is_empty() {
+            // move changes are present in the diff
+            let deps: Vec<ChangeId> = move_changes
+                .iter()
+                .map(|change| change.deps.clone())
+                .flatten()
+                .map(|id| id.clone().into())
+                .collect();
+
+            // need to undo-redo the changes
+            let change_ids = store.dag.after(ChangeFrontier::from(deps));
+            for id in change_ids {
+                // let items = store.items.find_by_range(id.into());
+                // let deleted_items = store.deleted_items.find_by_range(id.into());
+                // Change::new(id.clone(), items, deleted_items)
+            }
+        }
 
         while !diff_changes.is_empty() {
             if let Some(change) = diff_changes.find_ready(&store.dag) {
                 diff_changes.progress(&change.id.client);
                 let deps = change.deps.iter().map(|id| id.clone().into()).collect();
                 store.dag.insert(&change.id, deps);
-                changes.push(change);
             } else {
-                println!("diff changes: {:?}", diff_changes);
+                // println!("diff changes: {:?}", diff_changes);
                 // break;
                 unreachable!("should not happen");
             }
         }
 
-        vec![]
+        let changes = store.dag.after(frontier);
+
+        (undo, changes)
     }
 
     /// Find an item by its ID

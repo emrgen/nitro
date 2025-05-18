@@ -746,6 +746,10 @@ impl<T: ItemStoreEntry> ItemStore<T> {
     pub(crate) fn first(&self) -> Option<&T> {
         self.map.first_key_value().map(|(_, v)| v)
     }
+
+    pub(crate) fn into_vec(self) -> Vec<T> {
+        self.map.into_iter().map(|(_, v)| v).collect()
+    }
 }
 
 impl<T: ItemStoreEntry> ItemStore<T> {

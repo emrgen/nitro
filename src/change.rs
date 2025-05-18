@@ -6,7 +6,7 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
 use crate::store::{ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore};
-use crate::{ClockTick, Content, Id, ItemData};
+use crate::{ClockTick, Content, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
@@ -14,6 +14,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_columnar::Itertools;
 use std::collections::{BTreeSet, VecDeque};
+use std::default::Default;
 use std::fmt::Debug;
 use std::hash::Hasher;
 use std::mem::swap;
@@ -23,14 +24,40 @@ use std::ops::Range;
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
     pub(crate) id: ChangeId,
-    pub(crate) items: TypeStore,
-    pub(crate) delete: DeleteItemStore,
-    pub(crate) deps: Vec<Id>,
+    pub(crate) items: Vec<ItemData>,
+    pub(crate) delete: Vec<DeleteItem>,
+    pub(crate) deps: Vec<ChangeId>,
 }
 
-impl From<Change>  for ChangeData{
-    fn from(value: Change) -> Self {
-        todo!()
+impl Change {
+    pub(crate) fn new(
+        id: ChangeId,
+        items: Vec<ItemData>,
+        delete: Vec<DeleteItem>,
+        deps: Vec<ChangeId>,
+    ) -> Change {
+        Change {
+            id,
+            items,
+            delete,
+            deps,
+        }
+    }
+
+    pub(crate) fn with_deps(id: ChangeId, deps: Vec<ChangeId>) -> Change {
+        Change {
+            id,
+            deps,
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn add_item(&mut self, item: ItemData) {
+        self.items.push(item);
+    }
+
+    pub(crate) fn add_delete(&mut self, item: DeleteItem) {
+        self.delete.push(item);
     }
 }
 
@@ -38,24 +65,20 @@ impl From<Change>  for ChangeData{
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ChangeData {
     pub(crate) id: ChangeId,
-    pub(crate) items: ItemDataStore,
-    pub(crate) delete: DeleteItemStore,
+    pub(crate) items: Vec<ItemData>,
+    pub(crate) delete: Vec<DeleteItem>,
     pub(crate) deps: Vec<Id>,
 }
 
 impl ChangeData {
-    pub(crate) fn new(id: ChangeId, items: ItemDataStore, delete: DeleteItemStore) -> ChangeData {
+    pub(crate) fn new(id: ChangeId, items: Vec<ItemData>, delete: Vec<DeleteItem>) -> ChangeData {
         let mut deps = Vec::new();
-        for (_, store) in items.iter() {
-            for (_, item) in store.iter() {
-                deps.extend(item.deps());
-            }
+        for item in items.iter() {
+            deps.extend(item.deps());
         }
 
-        for (_, store) in delete.iter() {
-            for (_, item) in store.iter() {
-                deps.push(item.target());
-            }
+        for item in delete.iter() {
+            deps.push(item.target());
         }
 
         ChangeData {
@@ -67,6 +90,20 @@ impl ChangeData {
     }
 }
 
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub(crate) struct ChangeDeps {
+    pub(crate) id: ChangeId,
+    pub(crate) deps: Vec<Id>,
+}
+
+impl From<ChangeData> for ChangeDeps {
+    fn from(change: ChangeData) -> Self {
+        ChangeDeps {
+            id: change.id,
+            deps: change.deps,
+        }
+    }
+}
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct PendingChangeStore {
     // the pending changes for each client
@@ -83,14 +120,14 @@ impl PendingChangeStore {
             .iter()
             .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
 
-        println!("dag changes {:?}", dag.changes);
-        println!(
-            "deps {:?}",
-            self.heads
-                .iter()
-                .map(|(_, change)| change.deps.clone())
-                .collect::<Vec<_>>()
-        );
+        // println!("dag changes {:?}", dag.changes);
+        // println!(
+        //     "deps {:?}",
+        //     self.heads
+        //         .iter()
+        //         .map(|(_, change)| change.deps.clone())
+        //         .collect::<Vec<_>>()
+        // );
 
         found.map(|(_, change)| change.clone())
     }
@@ -264,7 +301,7 @@ impl ChangeStore {
         let mut result = HashSet::new();
         for id in change {
             if let Some(c) = self.find(id) {
-                result.insert(c);
+                result.insert(c.clone());
             }
         }
 

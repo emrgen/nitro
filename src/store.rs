@@ -177,6 +177,14 @@ impl DocStore {
         self.state.get_or_insert(client_id).0
     }
 
+    pub(crate) fn insert_change(&mut self, change_id: ChangeId) {
+        self.changes.insert(change_id);
+    }
+
+    pub(crate) fn remove_change(&mut self, change_id: &ChangeId) {
+        self.changes.remove(&change_id.id());
+    }
+
     pub(crate) fn diff(&self, id: DocId, created_by: Client, state: ClientState) -> Diff {
         let state = state.as_per(&self.state);
 

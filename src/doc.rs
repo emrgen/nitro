@@ -13,7 +13,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
-use crate::id::Id;
+use crate::id::{Id, WithId};
 use crate::item::{Content, DocProps, ItemKey};
 use crate::json::JsonDoc;
 use crate::mark::Mark;
@@ -27,99 +27,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::tx::Tx;
 use crate::types::Type;
-use crate::{print_yaml, Client, ClockTick};
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DocMeta {
-    pub id: DocId,
-    pub created_at: u64,
-    pub crated_by: Client,
-    pub props: HashMap<String, String>,
-}
-
-#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct DocId(Uuid);
-
-impl From<&DocId> for DocId {
-    fn from(value: &DocId) -> Self {
-        value.clone()
-    }
-}
-
-impl DocId {
-    pub fn new() -> Self {
-        Self(Uuid::new_v4())
-    }
-
-    pub fn from_uuid(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
-
-    pub fn from_bytes(bytes: &[u8; 16]) -> Self {
-        let uuid = Uuid::from_slice(bytes).unwrap();
-        Self(uuid)
-    }
-
-    pub fn from_str(s: &str) -> Result<Self, String> {
-        Uuid::parse_str(s)
-            .map(|uuid| Self(uuid))
-            .map_err(|e| e.to_string())
-    }
-
-    pub fn to_string(&self) -> String {
-        self.0.to_string()
-    }
-
-    pub fn as_bytes(&self) -> [u8; 16] {
-        self.0.as_bytes().to_owned().try_into().unwrap()
-    }
-
-    pub fn as_uuid(&self) -> Uuid {
-        self.0
-    }
-}
-
-impl Encode for DocId {
-    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
-        e.uuid(self.0.as_bytes().as_slice());
-    }
-}
-
-impl Decode for DocId {
-    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
-    where
-        Self: Sized,
-    {
-        let bytes = d.uuid()?;
-        let uuid = Uuid::from_slice(&bytes).map_err(|e| e.to_string())?;
-
-        Ok(Self(uuid))
-    }
-}
-
-impl Serialize for DocId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        serializer.serialize_str(&self.0.to_string())
-    }
-}
-
-impl Default for DocMeta {
-    fn default() -> Self {
-        let client_id = Uuid::new_v4().into();
-        Self {
-            id: DocId(Uuid::new_v4()),
-            created_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            crated_by: client_id,
-            props: HashMap::new(),
-        }
-    }
-}
+use crate::{print_yaml, Client, ClientFrontier, ClockTick};
 
 /// Doc is a document that contains a tree of items.
 /// Everything in nitro is to manage this document change.
@@ -156,6 +64,7 @@ impl Doc {
         root.set_content(DocProps::new(opts.id.clone(), opts.crated_by.clone()));
 
         store_ref.borrow_mut().insert(root.clone());
+        store_ref.borrow_mut().insert_change(root.id().into());
 
         Self {
             meta: opts,
@@ -218,18 +127,25 @@ impl Doc {
     pub fn apply(&self, diff: Diff) {
         // adjust the diff to the current state of the document
         let diff = {
-            let diffs = self.prepare_changes(&diff);
             let store_ref = self.store.borrow_mut();
             diff.adjust(&store_ref)
         };
+
+        let diffs = self.prepare_changes(&diff);
+        let new_changes = diff.changes.hash_set();
+
+        // println!("diffs: {:?}", diffs);
 
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }
 
-    pub(crate) fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
+    // prepare the changes for the document
+    // calculate the changes that need to be rolled back and the changes that need to be applied
+    // the changes are not fully materialized yet
+    fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
         let mut store = self.store.borrow_mut();
-        let frontier = ChangeFrontier::default();
+        let frontier = store.changes.change_frontier();
         let mut undo = Vec::new();
         let (mut diff_changes, move_changes) = diff.changes();
 
@@ -243,12 +159,12 @@ impl Doc {
                 .collect();
 
             // need to undo-redo the changes
-            let change_ids = store.dag.after(ChangeFrontier::from(deps));
-            for id in change_ids {
-                // let items = store.items.find_by_range(id.into());
-                // let deleted_items = store.deleted_items.find_by_range(id.into());
-                // Change::new(id.clone(), items, deleted_items)
-            }
+            // let change_ids = store.dag.after(ChangeFrontier::new(deps));
+            // for id in change_ids {
+            // let items = store.items.find_by_range(id.into());
+            // let deleted_items = store.deleted_items.find_by_range(id.into());
+            // Change::new(id.clone(), items, deleted_items)
+            // }
         }
 
         while !diff_changes.is_empty() {
@@ -258,14 +174,16 @@ impl Doc {
                 store.dag.insert(&change.id, deps);
             } else {
                 // println!("diff changes: {:?}", diff_changes);
-                // break;
-                unreachable!("should not happen");
+                break;
+                // unreachable!("should not happen");
             }
         }
 
+        // println!("frontier: {:?}", frontier);
         let changes = store.dag.after(frontier);
+        // println!("diff changes: {:?}", changes);
 
-        (undo, changes)
+        (undo, vec![])
     }
 
     /// Find an item by its ID
@@ -416,6 +334,7 @@ impl Default for Doc {
         Doc::new(Default::default())
     }
 }
+
 impl From<Doc> for ClientState {
     fn from(value: Doc) -> Self {
         value.state()
@@ -476,6 +395,98 @@ impl CloneDeep for Doc {
         doc.apply(diff);
 
         doc
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocMeta {
+    pub id: DocId,
+    pub created_at: u64,
+    pub crated_by: Client,
+    pub props: HashMap<String, String>,
+}
+
+#[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct DocId(Uuid);
+
+impl From<&DocId> for DocId {
+    fn from(value: &DocId) -> Self {
+        value.clone()
+    }
+}
+
+impl DocId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    pub fn from_bytes(bytes: &[u8; 16]) -> Self {
+        let uuid = Uuid::from_slice(bytes).unwrap();
+        Self(uuid)
+    }
+
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        Uuid::parse_str(s)
+            .map(|uuid| Self(uuid))
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn as_bytes(&self) -> [u8; 16] {
+        self.0.as_bytes().to_owned().try_into().unwrap()
+    }
+
+    pub fn as_uuid(&self) -> Uuid {
+        self.0
+    }
+}
+
+impl Encode for DocId {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
+        e.uuid(self.0.as_bytes().as_slice());
+    }
+}
+
+impl Decode for DocId {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let bytes = d.uuid()?;
+        let uuid = Uuid::from_slice(&bytes).map_err(|e| e.to_string())?;
+
+        Ok(Self(uuid))
+    }
+}
+
+impl Serialize for DocId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+
+impl Default for DocMeta {
+    fn default() -> Self {
+        let client_id = Uuid::new_v4().into();
+        Self {
+            id: DocId(Uuid::new_v4()),
+            created_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            crated_by: client_id,
+            props: HashMap::new(),
+        }
     }
 }
 

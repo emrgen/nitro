@@ -309,13 +309,25 @@ impl ChangeStore {
     }
 
     /// The most recent change for all clients
-    pub(crate) fn change_frontier(&self) {
+    pub(crate) fn change_frontier(&self) -> ChangeFrontier {
         let mut frontier = ChangeFrontier::default();
         for (_, store) in self.iter() {
             if let Some((_, change)) = store.iter().last() {
                 frontier.insert(change.clone());
             }
         }
+
+        frontier
+    }
+
+    pub(crate) fn hash_set(&self) -> HashSet<ChangeId> {
+        let mut set = HashSet::new();
+        for (_, store) in self.iter() {
+            for (_, change_id) in store.iter() {
+                set.insert(change_id.clone());
+            }
+        }
+        set
     }
 }
 

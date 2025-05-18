@@ -81,7 +81,7 @@ impl ChangeDag {
     /// Find all changes done in the document
     /// timeline excludes the first change (the document root create change)
     pub(crate) fn timeline(&self) -> Vec<Change> {
-        self.after(ChangeFrontier::from(vec![self.root.clone().unwrap()]))
+        self.after(ChangeFrontier::new(vec![self.root.clone().unwrap()]))
     }
 
     // use khan's algorithm to sort the changes in topological order
@@ -251,7 +251,7 @@ mod tests {
 
     macro_rules! frontier {
         ($($c:expr),*) => {
-            ChangeFrontier::from(vec![$(change!($c)),*])
+            ChangeFrontier::new(vec![$(change!($c)),*])
         };
     }
 

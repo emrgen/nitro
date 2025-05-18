@@ -1,8 +1,8 @@
 use crate::bimapid::ClientMap;
 use crate::change::{ChangeId, ChangeStore};
 use crate::id::WithId;
-use crate::{ClientFrontier, Id};
-use std::collections::HashSet;
+use crate::{ClientFrontier, ClientState, Id};
+use std::collections::{HashMap, HashSet};
 
 /// The Frontier struct represents the most recent operations in a document from all clients.
 #[derive(Default, Clone, Debug)]
@@ -44,8 +44,18 @@ pub(crate) struct ChangeFrontier {
 }
 
 impl ChangeFrontier {
-    pub(crate) fn from(changes: Vec<ChangeId>) -> Self {
+    pub(crate) fn new(changes: Vec<ChangeId>) -> Self {
         Self { changes }
+    }
+
+    pub(crate) fn from(state: &ClientState) -> ChangeFrontier {
+        let mut frontier = Vec::new();
+        for (client_id, clock) in state.state.clients.iter() {
+            let change = ChangeId::new(client_id.clone(), *clock, *clock);
+            frontier.push(change);
+        }
+
+        Self::new(frontier)
     }
 
     pub(crate) fn insert(&mut self, change: ChangeId) {

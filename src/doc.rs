@@ -131,10 +131,37 @@ impl Doc {
             diff.adjust(&store_ref)
         };
 
-        let diffs = self.prepare_changes(&diff);
+        let (undo, mut changes) = self.prepare_changes(&diff);
         let new_changes = diff.changes.hash_set();
 
-        // println!("diffs: {:?}", diffs);
+        // the changes are missing the items and deletes
+        // materialize the changes
+        {
+            let store = self.store.borrow_mut();
+            for change in &mut changes {
+                if new_changes.contains(&change.id) {
+                    change.items = diff.items.find_by_range(change.id.clone());
+                    change.deletes = diff.deletes.find_by_range(change.id.clone());
+                } else {
+                    change.items = store
+                        .items
+                        .find_by_range(change.id.clone())
+                        .iter()
+                        .map(|item| item.data())
+                        .collect();
+                    change.deletes = store
+                        .deletes
+                        .find_by_range(change.id.clone())
+                        .iter()
+                        .map(|item| item.clone())
+                        .collect();
+                }
+            }
+        }
+
+        // undo the applied changes
+
+        // apply the changes
 
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
@@ -186,19 +213,6 @@ impl Doc {
         (undo, vec![])
     }
 
-    /// Find an item by its ID
-    pub fn find_by_id(&self, id: &Id) -> Option<Type> {
-        self.store.borrow().find(id)
-    }
-
-    /// Update the current client ID with a new one
-    pub fn update_client(&self) -> Client {
-        let client_id = Uuid::new_v4().into();
-        self.store.borrow_mut().update_client(&client_id, 1);
-
-        client_id
-    }
-
     /// Create a new list type in the document
     pub fn list(&self) -> NList {
         let id = self.store.borrow_mut().next_id();
@@ -236,11 +250,7 @@ impl Doc {
     /// Create a new string type in the document
     pub fn string(&self, value: impl Into<String>) -> NString {
         let content = value.into();
-        let id = self
-            .store
-            .borrow_mut()
-            .next_id_range(content.len() as ClockTick)
-            .start_id();
+        let id = self.next_id();
         let string = NString::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(string.clone());
 
@@ -252,6 +262,19 @@ impl Doc {
         let proxy = NProxy::new(self.next_id(), item.into(), Rc::downgrade(&self.store));
 
         proxy
+    }
+
+    /// Find an item by its ID
+    pub fn find_by_id(&self, id: &Id) -> Option<Type> {
+        self.store.borrow().find(id)
+    }
+
+    /// Update the current client ID with a new one
+    pub fn update_client(&self) -> Client {
+        let client_id = Uuid::new_v4().into();
+        self.store.borrow_mut().update_client(&client_id, 1);
+
+        client_id
     }
 
     fn next_id(&self) -> Id {

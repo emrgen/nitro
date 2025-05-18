@@ -72,7 +72,6 @@ impl DocStoreData {
             state.clone(),
             items,
             deletes,
-            moves,
         )
     }
 }
@@ -85,7 +84,7 @@ impl From<DocStore> for DocStoreData {
         let id_map = store.id_map.clone();
         let state = store.state.clone();
         let items = store.items.into();
-        let deleted_items = store.deleted_items.clone();
+        let deleted_items = store.deletes.clone();
         let pending = store.pending.clone();
         let changes = store.changes.clone();
 

@@ -5,7 +5,9 @@ use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
-use crate::store::{ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore};
+use crate::store::{
+    ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
+};
 use crate::{ClockTick, Content, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
@@ -25,7 +27,7 @@ use std::ops::Range;
 pub(crate) struct Change {
     pub(crate) id: ChangeId,
     pub(crate) items: Vec<ItemData>,
-    pub(crate) delete: Vec<DeleteItem>,
+    pub(crate) deletes: Vec<DeleteItem>,
     pub(crate) deps: Vec<ChangeId>,
 }
 
@@ -39,8 +41,17 @@ impl Change {
         Change {
             id,
             items,
-            delete,
+            deletes: delete,
             deps,
+        }
+    }
+
+    pub(crate) fn from_id(id: ChangeId) -> Change {
+        Change {
+            id,
+            items: Vec::new(),
+            deletes: Vec::new(),
+            deps: Vec::new(),
         }
     }
 
@@ -57,7 +68,12 @@ impl Change {
     }
 
     pub(crate) fn add_delete(&mut self, item: DeleteItem) {
-        self.delete.push(item);
+        self.deletes.push(item);
+    }
+
+    // apply the changes to the document through the store
+    pub(crate) fn try_apply(&mut self, store: WeakStoreRef) -> Result<(), String> {
+        Ok(())
     }
 }
 

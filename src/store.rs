@@ -44,7 +44,7 @@ pub(crate) struct DocStore {
     pub(crate) proxies: HashMap<Id, Vec<Type>>,
 
     pub(crate) items: TypeStore,
-    pub(crate) deleted_items: DeleteItemStore,
+    pub(crate) deletes: DeleteItemStore,
     pub(crate) pending: PendingStore,
     // ready store is used during time travel to past
     pub(crate) ready: ReadyStore,
@@ -120,6 +120,10 @@ impl DocStore {
         self.client
     }
 
+    pub(crate) fn current_tick(&self) -> ClockTick {
+        self.clock
+    }
+
     pub(crate) fn next_id(&mut self) -> Id {
         let id = Id::new(self.client, self.clock);
         self.clock += 1;
@@ -162,7 +166,7 @@ impl DocStore {
     }
 
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) -> &mut DocStore {
-        self.deleted_items.insert(item);
+        self.deletes.insert(item);
 
         self
     }
@@ -190,7 +194,7 @@ impl DocStore {
 
         let items = self.items.diff(&state);
 
-        let deletes = self.deleted_items.diff(&state);
+        let deletes = self.deletes.diff(&state);
 
         let mut clients = self.state.clients.clone();
 
@@ -217,7 +221,6 @@ impl DocStore {
             state,
             items,
             deletes,
-            moves,
         )
     }
 }

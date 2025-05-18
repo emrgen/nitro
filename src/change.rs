@@ -5,7 +5,7 @@ use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
-use crate::store::{ClientStore, DeleteItemStore, ItemDataStore, ItemStore};
+use crate::store::{ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore};
 use crate::{ClockTick, Content, Id, ItemData};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
@@ -19,17 +19,32 @@ use std::hash::Hasher;
 use std::mem::swap;
 use std::ops::Range;
 
-/// ChangeData represents a set of changes made to a document by one client in a single transaction.
+/// Change represents a set of changes made to a document by one client in a single transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
+    pub(crate) id: ChangeId,
+    pub(crate) items: TypeStore,
+    pub(crate) delete: DeleteItemStore,
+    pub(crate) deps: Vec<Id>,
+}
+
+impl From<Change>  for ChangeData{
+    fn from(value: Change) -> Self {
+        todo!()
+    }
+}
+
+/// ChangeData represents a set of changes made to a document by one client in a single transaction.
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub(crate) struct ChangeData {
     pub(crate) id: ChangeId,
     pub(crate) items: ItemDataStore,
     pub(crate) delete: DeleteItemStore,
     pub(crate) deps: Vec<Id>,
 }
 
-impl Change {
-    pub(crate) fn new(id: ChangeId, items: ItemDataStore, delete: DeleteItemStore) -> Change {
+impl ChangeData {
+    pub(crate) fn new(id: ChangeId, items: ItemDataStore, delete: DeleteItemStore) -> ChangeData {
         let mut deps = Vec::new();
         for (_, store) in items.iter() {
             for (_, item) in store.iter() {
@@ -43,7 +58,7 @@ impl Change {
             }
         }
 
-        Change {
+        ChangeData {
             id,
             items,
             delete,
@@ -55,25 +70,34 @@ impl Change {
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct PendingChangeStore {
     // the pending changes for each client
-    pub(crate) pending: HashMap<ClientId, VecDeque<Change>>,
+    pub(crate) pending: HashMap<ClientId, VecDeque<ChangeData>>,
     // the first change for each client
-    pub(crate) heads: HashMap<ClientId, Change>,
+    pub(crate) heads: HashMap<ClientId, ChangeData>,
 }
 
 impl PendingChangeStore {
     /// find the first ready change for a client
-    pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<Change> {
+    pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<ChangeData> {
         let found = self
             .heads
             .iter()
             .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
+
+        println!("dag changes {:?}", dag.changes);
+        println!(
+            "deps {:?}",
+            self.heads
+                .iter()
+                .map(|(_, change)| change.deps.clone())
+                .collect::<Vec<_>>()
+        );
 
         found.map(|(_, change)| change.clone())
     }
 }
 
 impl PendingChangeStore {
-    pub(crate) fn add(&mut self, change: Change) {
+    pub(crate) fn add(&mut self, change: ChangeData) {
         // if the head is empty for this client, insert the change
         if self.heads.get(&change.id.client).is_none() {
             self.heads.insert(change.id.client, change.clone());
@@ -86,16 +110,16 @@ impl PendingChangeStore {
     }
 
     // return all header change ids
-    pub(crate) fn change_heads(&mut self) -> &mut HashMap<ClientId, Change> {
+    pub(crate) fn change_heads(&mut self) -> &mut HashMap<ClientId, ChangeData> {
         &mut self.heads
     }
 
-    pub(crate) fn iter(&self) -> Iter<'_, ClientId, Change> {
+    pub(crate) fn iter(&self) -> Iter<'_, ClientId, ChangeData> {
         self.heads.iter()
     }
 
     /// remove the change from the head and insert the first change from pending to the heads
-    pub(crate) fn progress(&mut self, client_id: &ClientId) -> Option<Change> {
+    pub(crate) fn progress(&mut self, client_id: &ClientId) -> Option<ChangeData> {
         let change = self
             .pending
             .get_mut(&client_id)

@@ -18,7 +18,7 @@ use crate::store::{
 use crate::types::Type;
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct Transaction {
+pub(crate) struct Tx {
     store: WeakStoreRef,
     // TODO: ready, pending, pending_queue will be removed as
     // the Transactions are already serialized as per dependencies
@@ -35,9 +35,9 @@ pub(crate) struct Transaction {
     rollback: bool,
 }
 
-impl Transaction {
-    pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Transaction {
-        Transaction {
+impl Tx {
+    pub(crate) fn new(store: WeakStoreRef, diff: Diff) -> Tx {
+        Tx {
             store,
             diff,
             ready: ReadyStore::default(),

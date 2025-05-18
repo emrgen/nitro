@@ -12,6 +12,7 @@ use crate::change::ChangeId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
+use crate::frontier::ChangeFrontier;
 use crate::id::Id;
 use crate::item::{Content, DocProps, ItemKey};
 use crate::json::JsonDoc;
@@ -24,7 +25,7 @@ use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
-use crate::transaction::Transaction;
+use crate::tx::Tx;
 use crate::types::Type;
 use crate::{print_yaml, Client, ClockTick};
 
@@ -222,41 +223,40 @@ impl Doc {
             diff.adjust(&store_ref)
         };
 
-        let mut tx = Transaction::new(Rc::downgrade(&self.store.clone()), diff);
+        let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }
 
     pub(crate) fn prepare_changes(&self, diff: &Diff) -> Vec<Diff> {
         let mut store = self.store.borrow_mut();
+        // let mut undo = Vec::new();
         let mut changes = Vec::new();
         let (mut diff_changes, move_changes) = diff.changes();
 
-        if move_changes.is_empty() {
-            while !diff_changes.is_empty() {
-                if let Some(change) = diff_changes.find_ready(&store.dag) {
-                    diff_changes.progress(&change.id.client);
-                    let deps = change
-                        .deps
-                        .clone()
-                        .iter()
-                        .map(|id| id.clone().into())
-                        .collect();
-                    store.dag.insert(&change.id, deps);
-                    changes.push(change);
-                } else {
-                    unreachable!("should not happen");
-                }
-            }
-        } else {
-            // move changes are present in the diff
-            let deps: Vec<ChangeId> = move_changes
-                .iter()
-                .map(|change| change.deps.clone())
-                .flatten()
-                .map(|id| id.clone().into())
-                .collect();
+        // if move_changes.is_empty() {
+        //     // move changes are present in the diff
+        //     let deps: Vec<ChangeId> = move_changes
+        //         .iter()
+        //         .map(|change| change.deps.clone())
+        //         .flatten()
+        //         .map(|id| id.clone().into())
+        //         .collect();
+        //
+        //     // need to undo-redo the changes
+        //     undo = store.dag.after(ChangeFrontier::from(deps));
+        // }
 
-            // need to undo-redo the changes
+        while !diff_changes.is_empty() {
+            if let Some(change) = diff_changes.find_ready(&store.dag) {
+                diff_changes.progress(&change.id.client);
+                let deps = change.deps.iter().map(|id| id.clone().into()).collect();
+                store.dag.insert(&change.id, deps);
+                changes.push(change);
+            } else {
+                println!("diff changes: {:?}", diff_changes);
+                // break;
+                unreachable!("should not happen");
+            }
         }
 
         vec![]

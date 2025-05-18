@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 #[derive(Default, Clone, Debug)]
 pub(crate) struct ChangeDag {
     root: Option<ChangeId>,
-    changes: HashMap<ChangeId, u64>,
+    pub(crate) changes: HashMap<ChangeId, u64>,
     forward: HashMap<ChangeId, Vec<ChangeId>>,
     backward: HashMap<ChangeId, Vec<ChangeId>>,
     // local_tick is used to assign a unique index to each change

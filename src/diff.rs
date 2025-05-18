@@ -6,7 +6,7 @@ use std::cmp::max;
 use std::ops::Add;
 
 use crate::bimapid::FieldMap;
-use crate::change::{Change, ChangeId, ChangeStore, PendingChangeStore};
+use crate::change::{ChangeData, ChangeId, ChangeStore, PendingChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -73,7 +73,7 @@ impl Diff {
     }
 
     /// get all the changes for this diff
-    pub(crate) fn changes(&self) -> (PendingChangeStore, Vec<Change>) {
+    pub(crate) fn changes(&self) -> (PendingChangeStore, Vec<ChangeData>) {
         let mut pcs = PendingChangeStore::default();
         let mut mover_changes = Vec::new();
         let mut clients = HashSet::new();
@@ -107,7 +107,7 @@ impl Diff {
                 }
 
                 if min_tick != u32::MAX && max_tick != u32::MIN {
-                    let change = Change::new(
+                    let change = ChangeData::new(
                         ChangeId::new(client, min_tick, max_tick),
                         items,
                         delete_items,
@@ -136,7 +136,7 @@ impl Diff {
                         }
                     }
 
-                    let change = Change::new(change_id.clone(), items, delete_items);
+                    let change = ChangeData::new(change_id.clone(), items, delete_items);
                     mover_changes.push(change.clone());
                     pcs.add(change);
                 }

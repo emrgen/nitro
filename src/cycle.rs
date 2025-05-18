@@ -3,9 +3,8 @@ use crate::Type;
 
 /// check if the current operation will create a cycle in the document tree
 pub(crate) fn creates_cycle(parent: Type, child: Type) -> bool {
-    let parent_depth = parent.depth();
-    let child_depth = child.depth();
-    if child_depth >= parent_depth {
+    // moving child to higher level in the tree does not create a cycle
+    if child.depth() >= parent.depth() {
         return false;
     }
 

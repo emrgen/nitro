@@ -182,7 +182,7 @@ impl ClientState {
         ClientState { state, clients }
     }
 
-    // get modified view of self as per other state. the final client ids should match with other state.
+    // get modified view of self as per other's client state. the final client ids should match with other state.
     pub(crate) fn as_per(&self, other: &ClientState) -> ClientState {
         let clients = self.clients.as_per(&other.clients);
 
@@ -201,12 +201,12 @@ impl ClientState {
                 (Some(self_clock), Some(other_clock)) => {
                     state.update(*client_id, *self_clock);
                 }
-                (None, Some(other_clock)) => {
-                    // client id does not exists in self
-                    state.update(*client_id, 0);
-                }
                 (Some(self_clock), None) => {
                     state.update(*client_id, *self_clock);
+                }
+                (None, Some(other_clock)) => {
+                    // client id does not exist in self
+                    state.update(*client_id, 0);
                 }
                 _ => {}
             }

@@ -64,13 +64,16 @@ impl Doc {
         root.set_content(DocProps::new(opts.id.clone(), opts.crated_by.clone()));
 
         store_ref.borrow_mut().insert(root.clone());
-        store_ref.borrow_mut().insert_change(root.id().into());
 
-        Self {
+        let mut doc = Self {
             meta: opts,
             store: store_ref,
             root,
-        }
+        };
+
+        doc.commit();
+
+        doc
     }
 
     /// Create a new document from JSON
@@ -161,7 +164,12 @@ impl Doc {
 
         // undo the applied changes
 
+        println!("changes: {:?}", changes);
         // apply the changes
+        for change in &changes {
+            let mut store = self.store.borrow_mut();
+            store.insert_change(change.id);
+        }
 
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
@@ -197,8 +205,8 @@ impl Doc {
         while !diff_changes.is_empty() {
             if let Some(change) = diff_changes.find_ready(&store.dag) {
                 diff_changes.progress(&change.id.client);
-                let deps = change.deps.iter().map(|id| id.clone().into()).collect();
-                store.dag.insert(&change.id, deps);
+                // let deps = change.deps.iter().map(|id| id.clone().into()).collect();
+                // store.dag.insert(&change.id, deps);
             } else {
                 // println!("diff changes: {:?}", diff_changes);
                 break;
@@ -250,7 +258,11 @@ impl Doc {
     /// Create a new string type in the document
     pub fn string(&self, value: impl Into<String>) -> NString {
         let content = value.into();
-        let id = self.next_id();
+        let id = self
+            .store
+            .borrow_mut()
+            .next_id_range(content.len() as ClockTick)
+            .start_id();
         let string = NString::new(id, content, Rc::downgrade(&self.store));
         self.store.borrow_mut().insert(string.clone());
 
@@ -262,6 +274,52 @@ impl Doc {
         let proxy = NProxy::new(self.next_id(), item.into(), Rc::downgrade(&self.store));
 
         proxy
+    }
+
+    /// Create a new change in the document
+    pub fn commit(&self) {
+        let mut store = self.store.borrow_mut();
+        let client_id = store.client;
+        let change_store = store.changes.id_store(&client_id);
+        let change_id = if let Some(change) = change_store {
+            let new_change = if let Some(change) = change.last() {
+                ChangeId::new(client_id, change.end + 1, store.current_tick() - 1)
+            } else {
+                ChangeId::new(client_id, 1, store.current_tick() - 1)
+            };
+
+            new_change
+        } else {
+            ChangeId::new(client_id, 1, store.current_tick() - 1)
+        };
+
+        // println!("change_id: {:?}", change_id);
+
+        store.insert_change(change_id);
+
+        let mut deps = HashSet::new();
+        store
+            .items
+            .find_by_range(change_id)
+            .iter()
+            .map(|item| deps.extend(item.data().deps()));
+
+        store
+            .deletes
+            .find_by_range(change_id)
+            .iter()
+            .map(|item| deps.insert(item.target()));
+
+        let mut change_ids = HashSet::new();
+        for dep in deps {
+            if let Some(change) = store.changes.find(&dep) {
+                change_ids.insert(change.clone());
+            }
+        }
+
+        store
+            .dag
+            .insert(&change_id, change_ids.into_iter().collect());
     }
 
     /// Find an item by its ID

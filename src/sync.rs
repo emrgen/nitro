@@ -1,4 +1,5 @@
 use crate::doc::Doc;
+use crate::print_yaml;
 
 pub fn equal_docs(d1: &Doc, d2: &Doc) -> bool {
     let left = serde_json::to_string(d1).unwrap();
@@ -52,6 +53,7 @@ mod test {
     use rand::Rng;
 
     use crate::doc::{CloneDeep, Doc};
+    use crate::print_yaml;
     use crate::sync::{equal_docs, sync_docs, SyncDirection};
 
     #[test]
@@ -74,7 +76,10 @@ mod test {
         doc2.update_client();
 
         doc1.set("a", doc1.string("hello"));
+        doc1.commit();
+
         doc2.set("a", doc2.string("world"));
+        doc2.commit();
 
         sync_docs(&doc1, &doc2, SyncDirection::default());
 

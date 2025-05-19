@@ -91,7 +91,7 @@ impl Transaction {
     /// Commit the transaction to the store.
     pub fn commit(&mut self) {
         let store = self.store.upgrade().unwrap();
-        store.borrow_mut().changes.insert(self.change.id.clone());
+        store.borrow_mut().insert_change(self.change.id);
     }
 }
 

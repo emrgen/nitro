@@ -155,10 +155,10 @@ impl DocStore {
             self.id_map.insert(item.id().range(item.size()));
         }
 
-        let id = item.id();
+        let id_range = item.range();
         self.items.insert(item);
 
-        self.state.update(id.client, id.clock);
+        self.state.update(id_range.client, id_range.end);
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
@@ -204,9 +204,9 @@ impl DocStore {
             }
         }
 
-        let state = state.merge(&self.state);
+        let changes = self.changes.diff(&state);
 
-        let changes = self.changes.clone();
+        let state = state.merge(&self.state);
 
         let mut moves = self
             .items
@@ -756,6 +756,10 @@ impl<T: ItemStoreEntry> ItemStore<T> {
 
     pub(crate) fn first(&self) -> Option<&T> {
         self.map.first_key_value().map(|(_, v)| v)
+    }
+
+    pub(crate) fn last(&self) -> Option<&T> {
+        self.map.last_key_value().map(|(_, v)| v)
     }
 
     pub(crate) fn into_vec(self) -> Vec<T> {

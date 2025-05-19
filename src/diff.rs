@@ -286,11 +286,12 @@ impl Serialize for Diff {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_struct("Diff", 6)?;
+        let mut s = serializer.serialize_struct("Diff", 7)?;
         s.serialize_field("doc_id", &self.doc_id)?;
         s.serialize_field("created_by", &self.created_by)?;
         s.serialize_field("fields", &self.fields)?;
         s.serialize_field("state", &self.state)?;
+        s.serialize_field("changes", &self.changes)?;
         s.serialize_field("deletes", &self.deletes)?;
         s.serialize_field("items", &self.items)?;
         s.end()
@@ -305,6 +306,7 @@ impl Encode for Diff {
         self.state.encode(e, cx);
         self.deletes.encode(e, cx);
         self.items.encode(e, cx);
+        self.changes.encode(e, cx);
     }
 }
 
@@ -316,7 +318,7 @@ impl Decode for Diff {
         let state = ClientState::decode(d, ctx)?;
         let deletes = DeleteItemStore::decode(d, ctx)?;
         let items = ItemDataStore::decode(d, ctx)?;
-        let changes = ChangeStore::default();
+        let changes = ChangeStore::decode(d, ctx)?;
 
         Ok(Diff {
             doc_id,

@@ -24,7 +24,7 @@ pub(crate) struct ChangeDag {
 impl ChangeDag {
     /// connect the new change to the existing changes
     pub(crate) fn insert(&mut self, change: &ChangeId, previous: Vec<ChangeId>) {
-        if self.forward.contains_key(change) {
+        if self.changes.contains_key(change) {
             return;
         }
 
@@ -125,8 +125,13 @@ impl ChangeDag {
     pub(crate) fn after(&self, frontier: ChangeFrontier) -> Vec<Change> {
         let mut result = Vec::new();
 
+        // println!("after: {:?}", frontier);
+
         // sort the changes by their index in the change list, lower index first
         let mut change_list = frontier.changes.clone();
+        // println!("change_list: {:?}", change_list);
+        // println!("change_list: {:?}", self.changes.len());
+
         change_list.sort_by_key(|c| self.changes.get(c).unwrap());
 
         // use stack based dfs for finding topological order

@@ -8,7 +8,7 @@ use crate::id::{IdRange, WithId};
 use crate::store::{
     ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
 };
-use crate::{ClockTick, Content, Id, ItemData, Type};
+use crate::{ClientState, ClockTick, Content, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
@@ -300,11 +300,10 @@ impl Serialize for ChangeId {
     where
         S: serde::ser::Serializer,
     {
-        let mut state = serializer.serialize_struct("Change", 3)?;
-        state.serialize_field("client", &self.client)?;
-        state.serialize_field("start", &self.start)?;
-        state.serialize_field("end", &self.end)?;
-        state.end()
+        serializer.serialize_str(&format!(
+            "ChangeId({}, {}, {})",
+            self.client, self.start, self.end
+        ))
     }
 }
 
@@ -344,6 +343,21 @@ impl ChangeStore {
             }
         }
         set
+    }
+
+    pub(crate) fn diff(&self, state: &ClientState) -> ChangeStore {
+        let mut diff = ChangeStore::default();
+
+        for (client, store) in self.items.iter() {
+            let client_tick = state.get(client).unwrap_or_else(|| &0);
+            store.iter().for_each(|(id, change_id)| {
+                if change_id.start > *client_tick {
+                    diff.insert(change_id.clone());
+                }
+            })
+        }
+
+        diff
     }
 }
 

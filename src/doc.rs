@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
-use crate::change::{Change, ChangeData, ChangeId};
+use crate::change::{Change, ChangeData, ChangeId, ChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -337,6 +337,10 @@ impl Doc {
 
     fn next_id(&self) -> Id {
         self.store.borrow_mut().next_id()
+    }
+
+    pub fn changes(&self) -> ChangeStore {
+        self.store.borrow().changes.clone()
     }
 }
 

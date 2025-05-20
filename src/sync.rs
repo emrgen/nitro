@@ -84,6 +84,9 @@ mod test {
         sync_docs(&doc1, &doc2, SyncDirection::default());
 
         assert!(equal_docs(&doc1, &doc2));
+
+        print_yaml(doc1.changes());
+        print_yaml(doc2.changes());
     }
 
     #[test]
@@ -115,6 +118,7 @@ mod test {
         // print_yaml(&doc2);
 
         assert!(equal_docs(&doc1, &doc2));
+
     }
 
     #[test]

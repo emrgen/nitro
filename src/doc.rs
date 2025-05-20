@@ -491,6 +491,45 @@ pub struct DocMeta {
     pub props: HashMap<String, String>,
 }
 
+impl DocMeta {
+    pub fn new(id: DocId, created_by: Client) -> Self {
+        Self {
+            id,
+            created_at: Self::now(),
+            crated_by: created_by,
+            props: HashMap::new(),
+        }
+    }
+
+    pub fn from_client(created_by: Client) -> Self {
+        let id = DocId(Uuid::new_v4());
+        Self {
+            id,
+            created_at: Self::now(),
+            crated_by: created_by,
+            props: HashMap::new(),
+        }
+    }
+
+    fn now() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+}
+
+impl Default for DocMeta {
+    fn default() -> Self {
+        let client_id = Client::default();
+        Self {
+            id: DocId(Uuid::new_v4()),
+            created_at: Self::now(),
+            crated_by: client_id,
+            props: HashMap::new(),
+        }
+    }
+}
 #[derive(Default, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DocId(Uuid);
 
@@ -557,21 +596,6 @@ impl Serialize for DocId {
         S: serde::ser::Serializer,
     {
         serializer.serialize_str(&self.0.to_string())
-    }
-}
-
-impl Default for DocMeta {
-    fn default() -> Self {
-        let client_id = Uuid::new_v4().into();
-        Self {
-            id: DocId(Uuid::new_v4()),
-            created_at: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
-            crated_by: client_id,
-            props: HashMap::new(),
-        }
     }
 }
 

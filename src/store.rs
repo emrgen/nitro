@@ -51,6 +51,8 @@ pub(crate) struct DocStore {
 
     pub(crate) changes: ChangeStore,
     pub(crate) dag: ChangeDag,
+
+    pub(crate) dirty: bool,
 }
 
 impl DocStore {
@@ -127,6 +129,8 @@ impl DocStore {
     pub(crate) fn next_id(&mut self) -> Id {
         let id = Id::new(self.client, self.clock);
         self.clock += 1;
+
+        self.dirty = true;
 
         id
     }

@@ -7,6 +7,8 @@ use crate::store::WeakStoreRef;
 use crate::{ClockTick, Content, Id, NString, NText, Type};
 use std::rc::Rc;
 
+// Transaction represents a transaction with the changes made to the Nitro document
+// Change represents the changes made to the Nitro document at local/remote client site
 pub(crate) struct Transaction {
     store: WeakStoreRef,
     change: Change,

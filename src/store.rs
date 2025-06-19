@@ -45,10 +45,11 @@ pub(crate) struct DocStore {
 
     pub(crate) items: TypeStore,
     pub(crate) deletes: DeleteItemStore,
+    
     pub(crate) pending: PendingStore,
+    
     // ready store is used during time travel to past
     pub(crate) ready: ReadyStore,
-
     pub(crate) changes: ChangeStore,
     pub(crate) dag: ChangeDag,
 

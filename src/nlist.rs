@@ -75,10 +75,12 @@ impl NList {
         }
     }
 
+    #[inline]
     pub fn size(&self) -> u32 {
         self.list.borrow().size() as u32
     }
 
+    #[inline]
     pub fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {
         if let ItemKey::Number(offset) = key.into() {
             return self.list.borrow().at_index(offset).map(|v| v.clone());
@@ -86,19 +88,23 @@ impl NList {
         None
     }
 
+    #[inline]
     pub(crate) fn field(&self) -> Option<String> {
         self.borrow().field(self.item_ref().store.clone())
     }
 
+    #[inline]
     pub fn content(&self) -> Content {
         let types = self.borrow().as_list();
         Content::Types(types)
     }
 
+    #[inline]
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
 
+    #[inline]
     pub(crate) fn index_of(&self, target: &Type) -> i32 {
         self.list.borrow().index_of(target)
     }
@@ -107,6 +113,7 @@ impl NList {
 impl Deref for NList {
     type Target = ItemRef;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.item
     }
@@ -178,10 +185,12 @@ impl NList {
         }
     }
 
+    #[inline]
     pub(crate) fn delete(&self) {
         self.item.delete(1);
     }
 
+    #[inline]
     pub(crate) fn clear(&self) {
         let items = self.borrow().as_list();
         for item in items {
@@ -200,6 +209,7 @@ impl NList {
 }
 
 impl NList {
+    #[inline]
     pub(crate) fn on_insert(&self, child: &Type) {
         self.list.borrow_mut().insert(child.clone());
     }
@@ -232,12 +242,14 @@ impl WithId for NList {
 }
 
 impl WithIdRange for NList {
+    #[inline]
     fn range(&self) -> IdRange {
         self.borrow().id().range(1)
     }
 }
 
 impl From<ItemRef> for NList {
+    #[inline]
     fn from(item: ItemRef) -> Self {
         Self {
             item,

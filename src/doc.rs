@@ -277,60 +277,12 @@ impl Doc {
 
     /// Create a new change in the document
     pub fn commit(&self) {
-        let mut store = self.store.borrow_mut();
-        if !store.dirty {
-            return;
-        }
+        self.store.borrow_mut().commit();
+    }
 
-        let client_id = store.client;
-        let change_store = store.changes.id_store(&client_id);
-
-        // change id encapsulates the (client_id, start, end) for the change
-        let change_id = if let Some(change) = change_store {
-            let new_change = if let Some(change) = change.last() {
-                ChangeId::new(client_id, change.end + 1, store.current_tick() - 1)
-            } else {
-                ChangeId::new(client_id, 1, store.current_tick() - 1)
-            };
-
-            new_change
-        } else {
-            ChangeId::new(client_id, 1, store.current_tick() - 1)
-        };
-
-        // println!("change_id: {:?}", change_id);
-
-        store.insert_change(change_id);
-
-        let mut deps = HashSet::new();
-
-        // update the deps for the inserted items
-        store
-            .items
-            .find_by_range(change_id)
-            .iter()
-            .map(|item| deps.extend(item.data().deps()));
-
-        // update the deps for the change deletes
-        store
-            .deletes
-            .find_by_range(change_id)
-            .iter()
-            .map(|item| deps.insert(item.target()));
-
-        // connect the new change with the change dependencies
-        // this will create the change DAG
-        let mut change_ids = HashSet::new();
-        for dep in deps {
-            if let Some(change) = store.changes.find(&dep) {
-                change_ids.insert(change.clone());
-            }
-        }
-
-        store
-            .dag
-            .insert(&change_id, change_ids.into_iter().collect());
-        store.dirty = false;
+    /// Remove the uncommited change from the document
+    pub fn rollback(&self) {
+        self.store.borrow_mut().rollback()
     }
 
     /// Find an item by its ID

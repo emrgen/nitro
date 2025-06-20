@@ -14,7 +14,7 @@ use crate::state::ClientState;
 use crate::types::Type;
 use crate::{print_yaml, Client};
 use bimap::BiMap;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::cell::RefCell;
@@ -34,6 +34,7 @@ pub(crate) struct DocStore {
     pub(crate) created_by: Client,
 
     pub(crate) client: ClientId,
+    pub(crate) commited_clock: ClockTick,
     pub(crate) clock: ClockTick,
 
     pub(crate) fields: FieldMap,
@@ -45,18 +46,74 @@ pub(crate) struct DocStore {
 
     pub(crate) items: TypeStore,
     pub(crate) deletes: DeleteItemStore,
-    
+
     pub(crate) pending: PendingStore,
-    
+
     // ready store is used during time travel to past
     pub(crate) ready: ReadyStore,
+
     pub(crate) changes: ChangeStore,
     pub(crate) dag: ChangeDag,
-
-    pub(crate) dirty: bool,
 }
 
 impl DocStore {
+    pub(crate) fn commit(&mut self) {
+        if self.commited_clock == self.clock {
+            return;
+        }
+
+        let client_id = self.client;
+        let change_store = self.changes.id_store(&client_id);
+
+        // change id encapsulates the (client_id, start, end) for the change
+        let change_id = if let Some(change) = change_store {
+            let new_change = if let Some(change) = change.last() {
+                ChangeId::new(client_id, change.end + 1, self.current_tick() - 1)
+            } else {
+                ChangeId::new(client_id, 1, self.current_tick() - 1)
+            };
+
+            new_change
+        } else {
+            ChangeId::new(client_id, 1, self.current_tick() - 1)
+        };
+
+        // println!("change_id: {:?}", change_id);
+
+        self.insert_change(change_id);
+
+        let mut deps = HashSet::new();
+
+        // update the deps for the inserted items
+        self.items
+            .find_by_range(change_id)
+            .iter()
+            .map(|item| deps.extend(item.data().deps()));
+
+        // update the deps for the change deletes
+        self.deletes
+            .find_by_range(change_id)
+            .iter()
+            .map(|item| deps.insert(item.target()));
+
+        // connect the new change with the change dependencies
+        // this will create the change DAG
+        let mut change_ids = HashSet::new();
+        for dep in deps {
+            if let Some(change) = self.changes.find(&dep) {
+                change_ids.insert(change.clone());
+            }
+        }
+
+        self.dag
+            .insert(&change_id, change_ids.into_iter().collect());
+
+        self.commited_clock = self.clock
+    }
+
+    // rollback the uncommited items from the store
+    pub(crate) fn rollback(&mut self) {}
+
     pub(crate) fn add_mover(&mut self, target_id: Id, mover: Type) {
         let entry = self.moves.entry(target_id).or_default();
         // mark the last mover as moved so that it will be treated as an invisible item
@@ -130,8 +187,6 @@ impl DocStore {
     pub(crate) fn next_id(&mut self) -> Id {
         let id = Id::new(self.client, self.clock);
         self.clock += 1;
-
-        self.dirty = true;
 
         id
     }

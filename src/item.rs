@@ -34,11 +34,13 @@ pub struct ItemRef {
 }
 
 impl ItemRef {
+    #[inline]
     pub(crate) fn set_content(&self, content: Content) {
         self.borrow_mut().content = content;
     }
 
     /// Get the item depth in the document tree.
+    #[inline]
     pub(crate) fn depth(&self) -> u32 {
         if let Some(parent) = &self.item.borrow().parent {
             parent.depth() + 1
@@ -47,6 +49,7 @@ impl ItemRef {
         }
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         self.item.borrow().size()
     }
@@ -66,6 +69,7 @@ pub(crate) trait WithIndex {
 }
 
 impl WithIndex for ItemRef {
+    #[inline]
     fn index(&self) -> FractionalIndex {
         self.item.borrow().index.clone()
     }
@@ -134,18 +138,22 @@ impl ItemRef {
         self.borrow().left_origin(self.store.clone())
     }
 
+    #[inline]
     pub(crate) fn mark_moved(&self) {
         self.borrow_mut().mark_moved();
     }
 
+    #[inline]
     pub(crate) fn unmark_moved(&self) {
         self.borrow_mut().unmark_moved();
     }
 
+    #[inline]
     pub(crate) fn is_moved(&self) -> bool {
         self.borrow().is_moved()
     }
 
+    #[inline]
     pub(crate) fn is_deleted(&self) -> bool {
         self.borrow().is_deleted()
     }
@@ -304,12 +312,14 @@ impl<T: Clone + StartEnd + Linked> Iterator for VisibleItemIter<T> {
 impl Deref for ItemRef {
     type Target = ItemRefInner;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         &self.item
     }
 }
 
 impl Serialize for ItemRef {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -319,12 +329,14 @@ impl Serialize for ItemRef {
 }
 
 impl Encode for ItemRef {
+    #[inline]
     fn encode<E: Encoder>(&self, e: &mut E, ctx: &mut EncodeContext) {
         self.borrow().data.encode(e, ctx);
     }
 }
 
 impl Decode for ItemRef {
+    #[inline]
     fn decode<D: Decoder>(d: &mut D, _ctx: &DecodeContext) -> Result<Self, String> {
         Err("ItemRef::decode not implemented".to_string())
     }
@@ -338,10 +350,12 @@ impl WithId for ItemRef {
 }
 
 impl WithTarget for ItemRef {
+    #[inline]
     fn set_target(&self, target: Type) {
         self.borrow_mut().target = Some(target);
     }
 
+    #[inline]
     fn get_target(&self) -> Option<Type> {
         self.borrow().target.clone()
     }
@@ -350,6 +364,7 @@ impl WithTarget for ItemRef {
 impl Eq for ItemRef {}
 
 impl PartialEq<Self> for ItemRef {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.item
             .borrow()
@@ -360,12 +375,14 @@ impl PartialEq<Self> for ItemRef {
 }
 
 impl PartialOrd<Self> for ItemRef {
+    #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for ItemRef {
+    #[inline]
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.item.borrow().data.id.cmp(&other.item.borrow().data.id)
     }
@@ -387,12 +404,14 @@ pub struct Item {
 }
 
 impl PartialEq<Content> for &Content {
+    #[inline]
     fn eq(&self, other: &Content) -> bool {
         self.to_json().as_str() == other.to_json().as_str()
     }
 }
 
 impl Item {
+    #[inline]
     pub(crate) fn new(data: ItemData) -> Self {
         Self {
             data,
@@ -400,6 +419,7 @@ impl Item {
         }
     }
 
+    #[inline]
     pub(crate) fn is_moved(&self) -> bool {
         self.flags & 0x02 == 0x02
     }
@@ -437,22 +457,26 @@ impl Item {
         }
     }
 
+    #[inline]
     pub(crate) fn container_id(&self) -> Option<Id> {
         self.container
     }
 
+    #[inline]
     pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {
         self.data
             .parent_id
             .and_then(|id| store.upgrade()?.borrow().find(&id))
     }
 
+    #[inline]
     pub(crate) fn left_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .left_id
             .and_then(|id| store.upgrade()?.borrow().find(&id))
     }
 
+    #[inline]
     pub(crate) fn right_origin(&self, store: WeakStoreRef) -> Option<Type> {
         self.data
             .right_id
@@ -495,10 +519,12 @@ impl Item {
         }
     }
 
+    #[inline]
     pub(crate) fn content(&self) -> Content {
         self.data.content.clone()
     }
 
+    #[inline]
     pub(crate) fn content_mut(&mut self) -> &mut Content {
         &mut self.data.content
     }

@@ -76,6 +76,7 @@ impl Type {
 }
 
 impl Type {
+    #[inline]
     pub(crate) fn as_list(&self) -> Option<NList> {
         match self {
             Type::List(n) => Some(n.clone()),
@@ -83,6 +84,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_map(&self) -> Option<NMap> {
         match self {
             Type::Map(n) => Some(n.clone()),
@@ -90,13 +92,14 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_text(&self) -> Option<NText> {
         match self {
             Type::Text(n) => Some(n.clone()),
             _ => None,
         }
     }
-
+    #[inline]
     pub(crate) fn as_string(&self) -> Option<NString> {
         match self {
             Type::String(n) => Some(n.clone()),
@@ -104,6 +107,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_atom(&self) -> Option<NAtom> {
         match self {
             Type::Atom(n) => Some(n.clone()),
@@ -111,13 +115,14 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_proxy(&self) -> Option<NProxy> {
         match self {
             Type::Proxy(n) => Some(n.clone()),
             _ => None,
         }
     }
-
+    #[inline]
     pub(crate) fn as_move(&self) -> Option<NMove> {
         match self {
             Type::Move(n) => Some(n.clone()),
@@ -125,6 +130,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_mark(&self) -> Option<NMark> {
         match self {
             Type::Mark(n) => Some(n.clone()),
@@ -132,6 +138,7 @@ impl Type {
         }
     }
 
+    #[inline]
     pub(crate) fn as_doc(&self) -> Option<Doc> {
         match self {
             Type::Doc(n) => Some(n.clone()),
@@ -141,10 +148,12 @@ impl Type {
 }
 
 impl Type {
+    #[inline]
     pub(crate) fn store(&self) -> WeakStoreRef {
         self.item_ref().store.clone()
     }
 
+    #[inline]
     pub(crate) fn depth(&self) -> u32 {
         self.item_ref().depth()
     }

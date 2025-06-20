@@ -5,6 +5,8 @@ use crate::item::WithIndex;
 use crate::Type;
 use fractional_index::FractionalIndex;
 
+/// The IBTree struct is a wrapper around a BTreeMap that allows for efficient
+/// indexing of items based on their fractional index.
 #[derive(Debug, Default)]
 pub(crate) struct IBTree {
     pub(crate) btree: BTreeMap<FractionalIndex, Type>,

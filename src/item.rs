@@ -54,6 +54,7 @@ impl ItemRef {
         self.item.borrow().size()
     }
 
+    #[inline]
     pub(crate) fn text_content(&self) -> String {
         match self.borrow().content {
             Content::String(ref s) => s.clone(),

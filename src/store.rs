@@ -159,14 +159,17 @@ impl DocStore {
         }
     }
 
+    #[inline]
     pub(crate) fn get_move(&mut self, id: &Id) -> Option<Type> {
         self.moves.get(id).and_then(|v| v.last()).cloned()
     }
 
+    #[inline]
     pub(crate) fn add_proxy(&mut self, target_id: Id, proxy: Type) {
         self.proxies.entry(target_id).or_default().push(proxy);
     }
 
+    #[inline]
     pub(crate) fn remove_proxy(&mut self, id: &Id, proxy: &Type) {
         let proxy_id = proxy.id();
         self.proxies.entry(*id).and_modify(|v| {
@@ -175,19 +178,25 @@ impl DocStore {
         });
     }
 
+    #[inline]
     pub(crate) fn get_proxies(&mut self, id: &Id) -> Option<Vec<Type>> {
         self.proxies.get(id).cloned()
     }
 
+    #[inline]
     pub(crate) fn remove_deleter(&mut self, id: &Id) {}
 
+    #[inline]
     pub(crate) fn get_field_id(&mut self, field: &Field) -> u32 {
         self.fields.get_or_insert(field)
     }
+
+    #[inline]
     pub(crate) fn get_field(&self, field_id: &FieldId) -> Option<&Field> {
         self.fields.get_field(field_id)
     }
 
+    #[inline]
     pub(crate) fn get_client(&mut self, client_id: &Client) -> ClientId {
         self.state.clients.get_or_insert(client_id)
     }
@@ -199,10 +208,12 @@ impl DocStore {
         self.client
     }
 
+    #[inline]
     pub(crate) fn current_tick(&self) -> ClockTick {
         self.clock
     }
 
+    #[inline]
     pub(crate) fn next_id(&mut self) -> Id {
         let id = Id::new(self.client, self.clock);
         self.clock += 1;
@@ -210,6 +221,7 @@ impl DocStore {
         id
     }
 
+    #[inline]
     pub(crate) fn next_id_range(&mut self, size: ClockTick) -> IdRange {
         let id = IdRange::new(self.client, self.clock, self.clock + size - 1);
         self.clock += size;
@@ -256,26 +268,31 @@ impl DocStore {
         }
     }
 
+    #[inline]
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) -> &mut DocStore {
         self.deletes.insert(item);
 
         self
     }
 
+    #[inline]
     pub(crate) fn replace(&mut self, item: &Type, items: (Type, Type)) -> &mut DocStore {
         self.items.replace(item, items);
 
         self
     }
 
+    #[inline]
     pub(crate) fn client(&mut self, client_id: &Client) -> ClientId {
         self.state.get_or_insert(client_id).0
     }
 
+    #[inline]
     pub(crate) fn insert_change(&mut self, change_id: ChangeId) {
         self.changes.insert(change_id);
     }
 
+    #[inline]
     pub(crate) fn remove_change(&mut self, change_id: &ChangeId) {
         self.changes.remove(&change_id.id());
     }
@@ -332,34 +349,41 @@ impl ReadyStore {
         self.items.insert(item);
     }
 
+    #[inline]
     pub(crate) fn contains(&self, id: &Id) -> bool {
         // self.items_exists.contains(id)
         self.find_item(id).is_some()
     }
 
+    #[inline]
     pub(crate) fn find_item(&self, id: &Id) -> Option<ItemData> {
         let id = self.id_range_map.find(id);
         self.items.find(&id)
     }
 
+    #[inline]
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
         self.delete_items.insert(item);
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, id: &Id) {
         self.items.remove(id);
     }
 
+    #[inline]
     pub(crate) fn remove_delete(&mut self, id: &Id) {
         self.delete_items.remove(id);
     }
 
+    #[inline]
     pub(crate) fn iter_items(
         &self,
     ) -> std::collections::btree_map::Iter<ClientId, ItemStore<ItemData>> {
         self.items.iter()
     }
 
+    #[inline]
     pub(crate) fn iter_delete_items(
         &self,
     ) -> std::collections::btree_map::Iter<ClientId, ItemStore<DeleteItem>> {
@@ -374,40 +398,48 @@ pub(crate) struct PendingStore {
 }
 
 impl PendingStore {
+    #[inline]
     pub(crate) fn insert(&mut self, item: ItemData) {
         self.items.insert(item);
     }
 
+    #[inline]
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) {
         self.delete_items.insert(item);
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, id: &Id) {
         self.items.remove(id);
     }
 
+    #[inline]
     /// pop the first pending item for the given client
     pub(crate) fn pop_first(&mut self, client_id: &ClientId) -> Option<ItemData> {
         let store = self.items.id_store_mut(client_id)?;
         store.pop_first()
     }
 
+    #[inline]
     pub(crate) fn remove_delete(&mut self, id: &Id) {
         self.delete_items.remove(id);
     }
 
+    #[inline]
     pub(crate) fn iter_items(
         &self,
     ) -> std::collections::btree_map::Iter<ClientId, ItemStore<ItemData>> {
         self.items.iter()
     }
 
+    #[inline]
     pub(crate) fn iter_mut_items(
         &mut self,
     ) -> std::collections::btree_map::IterMut<ClientId, ItemStore<ItemData>> {
         self.items.iter_mut()
     }
 
+    #[inline]
     pub(crate) fn iter_delete_items(
         &self,
     ) -> std::collections::btree_map::Iter<ClientId, ItemStore<DeleteItem>> {
@@ -430,6 +462,7 @@ impl PendingStore {
 }
 
 impl Encode for PendingStore {
+    #[inline]
     fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
         self.items.encode(e, ctx);
         self.delete_items.encode(e, ctx);
@@ -533,6 +566,7 @@ impl IdRangeMap {
 }
 
 impl IdRangeMap {
+    #[inline]
     pub(crate) fn insert(&mut self, id: IdRange) {
         let set = self.map.entry(id.client).or_default();
         set.insert(id);
@@ -545,18 +579,21 @@ impl IdRangeMap {
             .unwrap_or(false)
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, id: &Id) {
         if let Some(set) = self.map.get_mut(&id.client) {
             set.remove(&id.range(1));
         }
     }
 
+    #[inline]
     pub(crate) fn get(&self, id: &Id) -> Option<&IdRange> {
         self.map
             .get(&id.client)
             .and_then(|set| set.get(&id.range(1)))
     }
 
+    #[inline]
     pub(crate) fn replace(&mut self, id: IdRange, with: (IdRange, IdRange)) {
         let set = self.map.entry(id.client).or_default();
         set.remove(&id);
@@ -641,22 +678,27 @@ pub struct ClientStore<T: ClientStoreEntry> {
 }
 
 impl<T: ClientStoreEntry> ClientStore<T> {
+    #[inline]
     pub(crate) fn clients(&self) -> Vec<ClientId> {
         self.items.keys().cloned().collect()
     }
 
+    #[inline]
     pub(crate) fn id_store(&self, client: &ClientId) -> Option<&ItemStore<T>> {
         self.items.get(client)
     }
 
+    #[inline]
     pub(crate) fn id_store_mut(&mut self, client: &ClientId) -> Option<&mut ItemStore<T>> {
         self.items.get_mut(client)
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         self.iter().map(|(_, store)| store.size() as u32).sum()
     }
 
+    #[inline]
     pub(crate) fn is_empty(&self) -> bool {
         self.items.is_empty() || self.items.iter().all(|(_, store)| store.is_empty())
     }
@@ -664,16 +706,19 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 
 impl<T: ClientStoreEntry> ClientStore<T> {
     /// get the number of items for the given client
+    #[inline]
     pub(crate) fn client_size(&self, id: &ClientId) -> usize {
         self.items.get(id).map(|p1| p1.size()).unwrap_or(0)
     }
 
+    #[inline]
     pub(crate) fn insert(&mut self, item: T) {
         let id = item.id();
         let store = self.items.entry(id.client).or_default();
         store.insert(item);
     }
 
+    #[inline]
     /// get the item for the given id
     pub(crate) fn find(&self, id: &Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
@@ -686,7 +731,15 @@ impl<T: ClientStoreEntry> ClientStore<T> {
             .unwrap_or(false)
     }
 
+    // get the mutable store for the given client
+    // if the store does not exist, it will be created
+    #[inline]
+    pub(crate) fn store(&mut self, client_id: &ClientId) -> &mut ItemStore<T> {
+        self.items.entry(*client_id).or_default()
+    }
+
     /// get items in the inclusive clock range [start, end] for the given client
+    #[inline]
     pub(crate) fn find_by_range(&self, range: impl Into<IdRange>) -> Vec<T> {
         let range = range.into();
         self.items
@@ -695,28 +748,34 @@ impl<T: ClientStoreEntry> ClientStore<T> {
             .unwrap_or_default()
     }
 
+    #[inline]
     pub(crate) fn clear(&mut self) {
         self.items.clear();
     }
 
+    #[inline]
     pub(crate) fn last(&self) -> Option<(ClientId, ItemStore<T>)> {
         self.iter().last().map(|(k, v)| (*k, v.clone()))
     }
 
+    #[inline]
     pub(crate) fn keys(&self) -> std::collections::btree_map::Keys<ClientId, ItemStore<T>> {
         self.items.keys()
     }
 
+    #[inline]
     pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<ClientId, ItemStore<T>> {
         self.items.iter()
     }
 
     /// get the last item for the given client
 
+    #[inline]
     pub(crate) fn iter_mut(&mut self) -> IterMut<ClientId, ItemStore<T>> {
         self.items.iter_mut()
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, id: &Id) {
         if let Some(store) = self.items.get_mut(&id.client) {
             store.remove(id);
@@ -750,12 +809,14 @@ impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
     type Item = (ClientId, ItemStore<T>);
     type IntoIter = std::collections::btree_map::IntoIter<ClientId, ItemStore<T>>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.items.into_iter()
     }
 }
 
 impl<T: ClientStoreEntry> Serialize for ClientStore<T> {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -765,6 +826,7 @@ impl<T: ClientStoreEntry> Serialize for ClientStore<T> {
 }
 
 impl<T: ClientStoreEntry> Encode for ClientStore<T> {
+    #[inline]
     fn encode<E: Encoder>(&self, e: &mut E, cx: &mut EncodeContext) {
         e.u32(self.items.len() as u32);
         for (client, store) in self.items.iter() {
@@ -803,20 +865,24 @@ pub struct ItemStore<T: ItemStoreEntry> {
 }
 
 impl<T: ItemStoreEntry> ItemStore<T> {
+    #[inline]
     pub(crate) fn insert(&mut self, value: T) {
         self.map.insert(value.id(), value);
     }
 
+    #[inline]
     pub(crate) fn extend(&mut self, other: impl Iterator<Item = T>) {
         for item in other {
             self.insert(item);
         }
     }
 
+    #[inline]
     pub(crate) fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
+    #[inline]
     pub(crate) fn get(&self, value: &Id) -> Option<T> {
         self.map.get(value).cloned()
     }
@@ -831,40 +897,49 @@ impl<T: ItemStoreEntry> ItemStore<T> {
             .collect()
     }
 
+    #[inline]
     pub(crate) fn remove(&mut self, value: &Id) -> Option<T> {
         self.map.remove(value)
     }
 
+    #[inline]
     pub(crate) fn contains(&self, value: &Id) -> bool {
         self.map.contains_key(value)
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> usize {
         self.map.len()
     }
 
+    #[inline]
     pub(crate) fn pop_first(&mut self) -> Option<T> {
         self.map.pop_first().map(|(_, v)| v)
     }
 
+    #[inline]
     pub(crate) fn first(&self) -> Option<&T> {
         self.map.first_key_value().map(|(_, v)| v)
     }
 
+    #[inline]
     pub(crate) fn last(&self) -> Option<&T> {
         self.map.last_key_value().map(|(_, v)| v)
     }
 
+    #[inline]
     pub(crate) fn into_vec(self) -> Vec<T> {
         self.map.into_iter().map(|(_, v)| v).collect()
     }
 }
 
 impl<T: ItemStoreEntry> ItemStore<T> {
+    #[inline]
     pub(crate) fn iter_mut(&mut self) -> std::collections::btree_map::IterMut<Id, T> {
         self.map.iter_mut()
     }
 
+    #[inline]
     pub(crate) fn iter(&self) -> std::collections::btree_map::Iter<Id, T> {
         self.map.iter()
     }
@@ -874,12 +949,14 @@ impl<T: ItemStoreEntry> IntoIterator for ItemStore<T> {
     type Item = (Id, T);
     type IntoIter = std::collections::btree_map::IntoIter<Id, T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.map.into_iter()
     }
 }
 
 impl<T: ItemStoreEntry> Serialize for ItemStore<T> {
+    #[inline]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -889,6 +966,7 @@ impl<T: ItemStoreEntry> Serialize for ItemStore<T> {
 }
 
 impl<T: ItemStoreEntry> Encode for ItemStore<T> {
+    #[inline]
     fn encode<E: Encoder>(&self, e: &mut E, cx: &mut EncodeContext) {
         e.u32(self.map.len() as u32);
         for (_, value) in self.map.iter() {

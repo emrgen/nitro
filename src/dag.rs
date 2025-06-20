@@ -23,7 +23,7 @@ pub(crate) struct ChangeDag {
 
 impl ChangeDag {
     /// connect the new change to the existing changes
-    pub(crate) fn insert(&mut self, change: &ChangeId, previous: Vec<ChangeId>) {
+    pub(crate) fn insert(&mut self, change: &ChangeId, deps: Vec<ChangeId>) {
         if self.changes.contains_key(change) {
             return;
         }
@@ -54,25 +54,25 @@ impl ChangeDag {
         self.forward.insert(change.clone(), vec![]);
         self.backward.insert(change.clone(), vec![]);
 
-        for prev in &previous {
+        for dep in &deps {
             // add the change to the forward graph
-            if let Some(deps) = self.forward.get_mut(&prev) {
+            if let Some(deps) = self.forward.get_mut(&dep) {
                 deps.push(change.clone());
             } else {
-                self.forward.insert(prev.clone(), vec![change.clone()]);
+                self.forward.insert(dep.clone(), vec![change.clone()]);
             }
 
             // add the change to the backward graph
             if let Some(deps) = self.backward.get_mut(change) {
-                deps.push(prev.clone());
+                deps.push(dep.clone());
             } else {
-                self.backward.insert(change.clone(), vec![prev.clone()]);
+                self.backward.insert(change.clone(), vec![dep.clone()]);
             }
         }
 
         // keep the forward and backward graph sorted
         // so that all clients with same items will have same topological order with
-        for prev in &previous {
+        for prev in &deps {
             self.forward.get_mut(&prev).unwrap().sort();
             self.backward.get_mut(&change).unwrap().sort();
         }

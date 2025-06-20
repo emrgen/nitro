@@ -17,7 +17,7 @@ use std::rc::Rc;
 #[derive(Clone, Debug, Default)]
 pub struct NList {
     item: ItemRef,
-    // TODO: dynamically create/destroy the list when the nlist is too big/small
+    // TODO: dynamically upgrade/downgrade the list to binary-tree/btree when the nlist is too large
     list: Rc<RefCell<IBTree>>,
 }
 

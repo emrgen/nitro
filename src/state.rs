@@ -32,8 +32,8 @@ impl ClientFrontier {
         let items = self.frontier.iter().sorted().collect::<Vec<_>>();
         let mut hasher = Sha1::new();
         for (client, clock) in items {
-            hasher.write(client.as_bytes().as_slice());
-            hasher.write(&clock.to_be_bytes());
+            _ = hasher.write(client.as_bytes().as_slice());
+            _ = hasher.write(&clock.to_be_bytes());
         }
 
         let result = hasher.finalize();

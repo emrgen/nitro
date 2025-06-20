@@ -133,6 +133,8 @@ impl Doc {
             diff.adjust(&store_ref)
         };
 
+        // insert the changes to the dag
+
         let (undo, mut changes) = self.prepare_changes(&diff);
         let new_changes = diff.changes.hash_set();
 
@@ -170,6 +172,7 @@ impl Doc {
             store.insert_change(change.id);
         }
 
+        // TODO: for now we just apply the changes using a transaction, the changes are not used yet
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
         tx.commit();
     }

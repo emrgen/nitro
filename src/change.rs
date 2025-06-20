@@ -307,20 +307,21 @@ impl Serialize for ChangeId {
     }
 }
 
+// TODO: use bitmap based change id store for smaller memory footprint in disk
 /// ChangeStore is a store for changes made to a document.
 pub(crate) type ChangeStore = ClientStore<ChangeId>;
 
 impl ChangeStore {
     /// find all previous changes for a given dependencies
-    pub(crate) fn previous(&self, change: &Vec<Id>) -> HashSet<ChangeId> {
-        let mut result = HashSet::new();
+    pub(crate) fn deps(&self, change: &Vec<Id>) -> HashSet<ChangeId> {
+        let mut deps = HashSet::new();
         for id in change {
             if let Some(c) = self.find(id) {
-                result.insert(c.clone());
+                deps.insert(c.clone());
             }
         }
 
-        result
+        deps
     }
 
     /// The most recent change for all clients
@@ -350,9 +351,10 @@ impl ChangeStore {
 
         for (client, store) in self.items.iter() {
             let client_tick = state.get(client).unwrap_or_else(|| &0);
+            let change_store = diff.store(client);
             store.iter().for_each(|(id, change_id)| {
                 if change_id.start > *client_tick {
-                    diff.insert(change_id.clone());
+                    change_store.insert(change_id.clone());
                 }
             })
         }
@@ -384,13 +386,13 @@ mod tests {
     }
 
     #[test]
-    fn test_find_previous_changes_by_item_ids() {
+    fn test_find_dependency_changes_by_item_ids() {
         let mut cs = ChangeStore::default();
         cs.insert(ChangeId::new(1, 0, 1)); // [0,1]
         cs.insert(ChangeId::new(1, 2, 3)); // [1,2]
         cs.insert(ChangeId::new(1, 4, 4)); // [1,2]
 
-        let changes = cs.previous(&vec![Id::new(1, 0), Id::new(1, 2), Id::new(1, 4)]);
+        let changes = cs.deps(&vec![Id::new(1, 0), Id::new(1, 2), Id::new(1, 4)]);
         assert_eq!(changes.len(), 3);
         assert!(changes.contains(&ChangeId::new(1, 0, 1)));
         assert!(changes.contains(&ChangeId::new(1, 2, 3)));

@@ -8,6 +8,7 @@
 #![allow(unused_mut)]
 #![allow(unused_assignments)]
 #![allow(unused_must_use)]
+#![allow(clippy::derived_hash_with_manual_eq)]
 
 pub use crate::change::*;
 pub use crate::diff::*;

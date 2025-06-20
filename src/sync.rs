@@ -125,8 +125,6 @@ mod test {
             list.append(doc.string(i.to_string()));
         }
 
-        print_yaml(&list);
-
         assert_eq!(list.size(), 15);
         doc.rollback();
         assert_eq!(list.size(), 5);

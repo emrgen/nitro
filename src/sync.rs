@@ -49,12 +49,12 @@ pub fn sync_first_doc(d1: &Doc, d2: &Doc) {
 
 #[cfg(test)]
 mod test {
-    use rand::prelude::SliceRandom;
-    use rand::Rng;
-
     use crate::doc::{CloneDeep, Doc};
     use crate::print_yaml;
     use crate::sync::{equal_docs, sync_docs, SyncDirection};
+    use rand::prelude::SliceRandom;
+    use rand::Rng;
+    use serde_json::json;
 
     #[test]
     fn test_sync1() {
@@ -84,6 +84,23 @@ mod test {
         sync_docs(&doc1, &doc2, SyncDirection::default());
 
         assert!(equal_docs(&doc1, &doc2));
+    }
+
+    #[test]
+    fn test_doc_commit_rollback() {
+        let doc = Doc::default();
+
+        doc.set("a", doc.string("hello"));
+        doc.commit();
+
+        assert_eq!(doc.get("a").unwrap().to_json(), json!({"text": "hello"}));
+
+        doc.set("b", doc.string("world"));
+        assert_eq!(doc.get("b").unwrap().to_json(), json!({"text": "world"}));
+
+        doc.rollback();
+
+        assert_eq!(doc.get("b").is_some(), false)
     }
 
     #[test]

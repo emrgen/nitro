@@ -112,7 +112,24 @@ impl DocStore {
     }
 
     // rollback the uncommited items from the store
-    pub(crate) fn rollback(&mut self) {}
+    pub(crate) fn rollback(&mut self) {
+        // if not uncommited clock ticks are there
+        if self.commited_clock == self.clock {
+            return;
+        }
+
+        let range = IdRange::new(self.client, self.commited_clock, self.clock + 1);
+
+        // find all items within the clock tick
+        let items = self.items.find_by_range(range);
+        items.iter().rev().for_each(|item| self.remove(&item.id()));
+
+        let deleted = self.deletes.find_by_range(range);
+        items
+            .iter()
+            .rev()
+            .for_each(|item| self.remove_deleter(&item.id()));
+    }
 
     pub(crate) fn add_mover(&mut self, target_id: Id, mover: Type) {
         let entry = self.moves.entry(target_id).or_default();
@@ -161,6 +178,8 @@ impl DocStore {
     pub(crate) fn get_proxies(&mut self, id: &Id) -> Option<Vec<Type>> {
         self.proxies.get(id).cloned()
     }
+
+    pub(crate) fn remove_deleter(&mut self, id: &Id) {}
 
     pub(crate) fn get_field_id(&mut self, field: &Field) -> u32 {
         self.fields.get_or_insert(field)
@@ -222,7 +241,19 @@ impl DocStore {
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
-        self.items.remove(id);
+        if let Some(item) = self.items.find(id) {
+            if item.id().eq(id) {
+                item.disconnect();
+                self.items.remove(id);
+                // retract the clock
+                if self.client == id.client && self.clock == item.range().end {
+                    self.clock = id.clock - 1
+                }
+            } else {
+                // TODO: check if the item is merged with adjacent ticks, then we need to split and then remove
+                unimplemented!()
+            }
+        }
     }
 
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) -> &mut DocStore {
@@ -461,7 +492,9 @@ impl From<TypeStore> for ItemDataStore {
     }
 }
 
+// DeleteItem for clients
 pub type DeleteItemStore = ClientStore<DeleteItem>;
+// Types for clients
 pub type TypeStore = ClientStore<Type>;
 
 impl TypeStore {

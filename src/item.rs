@@ -220,6 +220,16 @@ impl Linked for ItemRef {
     fn is_visible(&self) -> bool {
         !self.borrow().is_deleted() && !self.borrow().is_moved()
     }
+
+    fn disconnect(&mut self) {
+        if let Some(left) = self.left() {
+            left.borrow_mut().right = self.right().map(|r| r.into());
+        }
+
+        if let Some(right) = self.right() {
+            right.borrow_mut().left = self.left().map(|r| r.into());
+        }
+    }
 }
 
 pub(crate) trait StartEnd
@@ -238,6 +248,7 @@ where
     fn right(&self) -> Option<Self>;
 
     fn is_visible(&self) -> bool;
+    fn disconnect(&mut self) {}
 }
 
 impl StartEnd for ItemRef {

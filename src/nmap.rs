@@ -106,6 +106,10 @@ impl NMap {
         }
     }
 
+    pub(crate) fn remove_child(&self, child: &Type) {
+        child.item_ref().disconnect();
+    }
+
     pub(crate) fn keys(&self) -> Vec<String> {
         let item = self.borrow();
         let map = item.as_map(self.store.clone());

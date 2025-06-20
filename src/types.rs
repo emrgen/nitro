@@ -1,8 +1,8 @@
-use std::cmp::Ordering;
-
+use fake::Opt;
 use fractional_index::FractionalIndex;
 use serde::Serialize;
 use serde_json::Value;
+use std::cmp::Ordering;
 
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
@@ -375,6 +375,23 @@ impl Type {
     #[inline]
     pub fn field(&self) -> Option<String> {
         self.item_ref().field()
+    }
+
+    // disconnect from the document tree
+    pub(crate) fn disconnect(&self) {
+        let parent = self.parent();
+        match self.parent() {
+            // Type::List(n) => n.add_mark(mark),
+            Some(Type::Map(n)) => n.remove_child(self),
+            // Type::Text(n) => n.add_mark(mark),
+            // Type::String(n) => n.remove_child()
+            // Type::Atom(n) => n.add_mark(mark),
+            // Type::Proxy(n) => n.add_mark(mark),
+            // Type::Move(n) => n.add_mark(mark),
+            // Type::Mark(n) => n.add_mark(mark),
+            // Type::Identity => panic!("add_mark: not implemented"),
+            _ => panic!("add_mark: not implemented"),
+        }
     }
 
     pub(crate) fn add_mark(&self, mark: Mark) {

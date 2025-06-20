@@ -20,7 +20,7 @@ use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::store::{StoreRef, WeakStoreRef};
-use crate::Client;
+use crate::{print_yaml, Client};
 
 /// Type is a wrapper around the different item types in the store.
 #[derive(Debug, Clone, Default)]
@@ -380,17 +380,13 @@ impl Type {
     // disconnect from the document tree
     pub(crate) fn disconnect(&self) {
         let parent = self.parent();
+        // print_yaml(&self);
         match self.parent() {
-            // Type::List(n) => n.add_mark(mark),
+            Some(Type::List(n)) => n.remove_child(self),
             Some(Type::Map(n)) => n.remove_child(self),
             // Type::Text(n) => n.add_mark(mark),
-            // Type::String(n) => n.remove_child()
-            // Type::Atom(n) => n.add_mark(mark),
-            // Type::Proxy(n) => n.add_mark(mark),
-            // Type::Move(n) => n.add_mark(mark),
-            // Type::Mark(n) => n.add_mark(mark),
-            // Type::Identity => panic!("add_mark: not implemented"),
-            _ => panic!("add_mark: not implemented"),
+            Some(parent) => panic!("disconnect is not implemented for {}", parent.kind()),
+            _ => panic!("disconnect called for an orphan item"),
         }
     }
 
@@ -403,8 +399,7 @@ impl Type {
             // Type::Atom(n) => n.add_mark(mark),
             // Type::Proxy(n) => n.add_mark(mark),
             // Type::Move(n) => n.add_mark(mark),
-            // Type::Mark(n) => n.add_mark(mark),
-            Type::Identity => panic!("add_mark: not implemented"),
+            Type::Identity => panic!("add_mark: not implemented for identity"),
             _ => panic!("add_mark: not implemented"),
         }
     }

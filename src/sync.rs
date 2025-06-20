@@ -87,7 +87,7 @@ mod test {
     }
 
     #[test]
-    fn test_doc_commit_rollback() {
+    fn test_doc_commit_rollback_map_field() {
         let doc = Doc::default();
 
         doc.set("a", doc.string("hello"));
@@ -98,9 +98,38 @@ mod test {
         doc.set("b", doc.string("world"));
         assert_eq!(doc.get("b").unwrap().to_json(), json!({"text": "world"}));
 
+        // should rollback b field
         doc.rollback();
-
         assert_eq!(doc.get("b").is_some(), false)
+    }
+
+    #[test]
+    fn test_doc_commit_rollback_list_element() {
+        let doc = Doc::default();
+        let list = doc.list();
+        doc.set("list", list.clone());
+        doc.commit();
+
+        list.append(doc.string("hello"));
+
+        assert_eq!(list.size(), 1);
+        doc.rollback();
+        assert_eq!(list.size(), 0);
+
+        for i in 0..5 {
+            list.append(doc.string(i.to_string()));
+        }
+        doc.commit();
+
+        for i in 5..15 {
+            list.append(doc.string(i.to_string()));
+        }
+
+        print_yaml(&list);
+
+        assert_eq!(list.size(), 15);
+        doc.rollback();
+        assert_eq!(list.size(), 5);
     }
 
     #[test]

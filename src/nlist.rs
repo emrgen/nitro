@@ -22,6 +22,11 @@ pub struct NList {
 }
 
 impl NList {
+    pub(crate) fn remove_child(&self, child: &Type) {
+        self.list.borrow_mut().remove(child);
+        child.item_ref().disconnect();
+    }
+
     /// move the item after the target item
     pub(crate) fn move_after(&self, before: &Type, target: &Type) {
         let index = self.list.borrow().index_of(before);

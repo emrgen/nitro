@@ -135,42 +135,42 @@ impl Doc {
 
         // insert the changes to the dag
 
-        let (undo, mut changes) = self.prepare_changes(&diff);
-        let new_changes = diff.changes.hash_set();
-
-        // the changes are missing the items and deletes
-        // materialize the changes
-        {
-            let store = self.store.borrow_mut();
-            for change in &mut changes {
-                if new_changes.contains(&change.id) {
-                    change.items = diff.items.find_by_range(change.id.clone());
-                    change.deletes = diff.deletes.find_by_range(change.id.clone());
-                } else {
-                    change.items = store
-                        .items
-                        .find_by_range(change.id.clone())
-                        .iter()
-                        .map(|item| item.data())
-                        .collect();
-                    change.deletes = store
-                        .deletes
-                        .find_by_range(change.id.clone())
-                        .iter()
-                        .map(|item| item.clone())
-                        .collect();
-                }
-            }
-        }
-
-        // undo the applied changes
-
-        println!("changes: {:?}", changes);
-        // apply the changes
-        for change in &changes {
-            let mut store = self.store.borrow_mut();
-            store.insert_change(change.id);
-        }
+        // let (undo, mut changes) = self.prepare_changes(&diff);
+        // let new_changes = diff.changes.hash_set();
+        //
+        // // the changes are missing the items and deletes
+        // // materialize the changes
+        // {
+        //     let store = self.store.borrow_mut();
+        //     for change in &mut changes {
+        //         if new_changes.contains(&change.id) {
+        //             change.items = diff.items.find_by_range(change.id.clone());
+        //             change.deletes = diff.deletes.find_by_range(change.id.clone());
+        //         } else {
+        //             change.items = store
+        //                 .items
+        //                 .find_by_range(change.id.clone())
+        //                 .iter()
+        //                 .map(|item| item.data())
+        //                 .collect();
+        //             change.deletes = store
+        //                 .deletes
+        //                 .find_by_range(change.id.clone())
+        //                 .iter()
+        //                 .map(|item| item.clone())
+        //                 .collect();
+        //         }
+        //     }
+        // }
+        //
+        // // undo the applied changes
+        //
+        // println!("changes: {:?}", changes);
+        // // apply the changes
+        // for change in &changes {
+        //     let mut store = self.store.borrow_mut();
+        //     store.insert_change(change.id);
+        // }
 
         // TODO: for now we just apply the changes using a transaction, the changes are not used yet
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
@@ -180,48 +180,48 @@ impl Doc {
     // prepare the changes for the document
     // calculate the changes that need to be rolled back and the changes that need to be applied
     // the changes are not fully materialized yet
-    fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
-        let mut store = self.store.borrow_mut();
-        let frontier = store.changes.change_frontier();
-        let mut undo = Vec::new();
-        let (mut diff_changes, move_changes) = diff.changes();
-
-        if move_changes.is_empty() {
-            // move changes are present in the diff
-            let deps: Vec<ChangeId> = move_changes
-                .iter()
-                .map(|change| change.deps.clone())
-                .flatten()
-                .map(|id| id.clone().into())
-                .collect();
-
-            // need to undo-redo the changes
-            // let change_ids = store.dag.after(ChangeFrontier::new(deps));
-            // for id in change_ids {
-            // let items = store.items.find_by_range(id.into());
-            // let deleted_items = store.deleted_items.find_by_range(id.into());
-            // Change::new(id.clone(), items, deleted_items)
-            // }
-        }
-
-        while !diff_changes.is_empty() {
-            if let Some(change) = diff_changes.find_ready(&store.dag) {
-                diff_changes.progress(&change.id.client);
-                // let deps = change.deps.iter().map(|id| id.clone().into()).collect();
-                // store.dag.insert(&change.id, deps);
-            } else {
-                // println!("diff changes: {:?}", diff_changes);
-                break;
-                // unreachable!("should not happen");
-            }
-        }
-
-        // println!("frontier: {:?}", frontier);
-        let changes = store.dag.after(frontier);
-        // println!("diff changes: {:?}", changes);
-
-        (undo, vec![])
-    }
+    // fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
+    //     let mut store = self.store.borrow_mut();
+    //     let frontier = store.changes.change_frontier();
+    //     let mut undo = Vec::new();
+    //     let (mut diff_changes, move_changes) = diff.changes();
+    //
+    //     if move_changes.is_empty() {
+    //         // move changes are present in the diff
+    //         let deps: Vec<ChangeId> = move_changes
+    //             .iter()
+    //             .map(|change| change.deps.clone())
+    //             .flatten()
+    //             .map(|id| id.clone().into())
+    //             .collect();
+    //
+    //         // need to undo-redo the changes
+    //         // let change_ids = store.dag.after(ChangeFrontier::new(deps));
+    //         // for id in change_ids {
+    //         // let items = store.items.find_by_range(id.into());
+    //         // let deleted_items = store.deleted_items.find_by_range(id.into());
+    //         // Change::new(id.clone(), items, deleted_items)
+    //         // }
+    //     }
+    //
+    //     while !diff_changes.is_empty() {
+    //         if let Some(change) = diff_changes.find_ready(&store.dag) {
+    //             diff_changes.progress(&change.id.client);
+    //             // let deps = change.deps.iter().map(|id| id.clone().into()).collect();
+    //             // store.dag.insert(&change.id, deps);
+    //         } else {
+    //             // println!("diff changes: {:?}", diff_changes);
+    //             break;
+    //             // unreachable!("should not happen");
+    //         }
+    //     }
+    //
+    //     // println!("frontier: {:?}", frontier);
+    //     let changes = store.dag.after(frontier);
+    //     // println!("diff changes: {:?}", changes);
+    //
+    //     (undo, vec![])
+    // }
 
     /// Create a new list type in the document
     pub fn list(&self) -> NList {

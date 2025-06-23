@@ -53,7 +53,7 @@ pub(crate) struct DocStore {
     pub(crate) ready: ReadyStore,
 
     pub(crate) changes: ChangeStore,
-    pub(crate) dag: ChangeDag,
+    pub(crate) change_list: BiMap<ChangeId, Id>,
 }
 
 impl DocStore {
@@ -82,6 +82,8 @@ impl DocStore {
 
         self.insert_change(change_id);
 
+        // find the highest change dependency for the change
+
         let mut deps = HashSet::new();
 
         // update the deps for the inserted items
@@ -104,9 +106,6 @@ impl DocStore {
                 change_ids.insert(change.clone());
             }
         }
-
-        self.dag
-            .insert(&change_id, change_ids.into_iter().collect());
 
         self.commited_clock = self.clock
     }
@@ -572,6 +571,7 @@ impl IdRangeMap {
         set.insert(id);
     }
 
+    #[inline]
     pub(crate) fn has(&self, id: &Id) -> bool {
         self.map
             .get(&id.client)

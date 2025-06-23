@@ -5,6 +5,7 @@ use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
 use crate::id::{IdRange, WithId};
+use crate::item::ItemKind;
 use crate::store::{
     ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
 };
@@ -26,6 +27,8 @@ use std::ops::Range;
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
     pub(crate) id: ChangeId,
+    // if the change contains any move operations
+    pub(crate) moves: bool,
     pub(crate) items: Vec<ItemData>,
     pub(crate) deletes: Vec<DeleteItem>,
     pub(crate) deps: Vec<ChangeId>,
@@ -35,13 +38,14 @@ impl Change {
     pub(crate) fn new(
         id: ChangeId,
         items: Vec<ItemData>,
-        delete: Vec<DeleteItem>,
+        deletes: Vec<DeleteItem>,
         deps: Vec<ChangeId>,
     ) -> Change {
         Change {
             id,
+            moves: items.iter().any(|item| item.kind == ItemKind::Move),
             items,
-            deletes: delete,
+            deletes,
             deps,
         }
     }
@@ -49,9 +53,7 @@ impl Change {
     pub(crate) fn from_id(id: ChangeId) -> Change {
         Change {
             id,
-            items: Vec::new(),
-            deletes: Vec::new(),
-            deps: Vec::new(),
+            ..Self::default()
         }
     }
 

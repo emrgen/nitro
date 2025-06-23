@@ -28,6 +28,7 @@ use crate::index::*;
 
 mod bimapid;
 mod change;
+mod change_list;
 pub mod codec_v1;
 mod crdt_fugue;
 mod crdt_yata;

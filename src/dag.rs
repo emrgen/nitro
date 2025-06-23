@@ -174,20 +174,17 @@ impl ChangeDag {
     }
 
     /// rollback removes the given changes from the dag and returns the changes in the order they were applied
-    pub(crate) fn rollback(&mut self, changes: &Vec<ChangeId>) {
+    pub(crate) fn rollback(&mut self, changes: &[ChangeId]) -> Result<(), &'static str> {
         // reverse iterate over the changes to remove them in the reverse order
         // of integration
         for change in changes.iter().rev() {
-            if let Some(deps) = self.forward.remove(change) {
-                for dep in deps {
-                    if let Some(backward_deps) = self.backward.get_mut(&dep) {
-                        backward_deps.retain(|c| c != change);
-                    }
-                }
+            let dependents = self.forward.remove(change).map_or(0, |deps| deps.len());
+            if dependents != 0 {
+                return Err("Cannot rollback changes that have dependents");
             }
 
-            if let Some(backward_deps) = self.backward.remove(change) {
-                for dep in backward_deps {
+            if let Some(deps) = self.backward.remove(change) {
+                for dep in deps {
                     if let Some(forward_deps) = self.forward.get_mut(&dep) {
                         forward_deps.retain(|c| c != change);
                     }
@@ -196,6 +193,8 @@ impl ChangeDag {
 
             self.changes.remove(change);
         }
+
+        Ok(())
     }
 
     pub(crate) fn contains(&self, target_id: &Id) -> bool {

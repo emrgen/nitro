@@ -34,6 +34,16 @@ impl<K: Ord + Clone, V: Clone> Leaf<K, V> {
         let mid = self.keys.len() / 2;
 
         let mut new_leaf = Leaf::new(self.keys.capacity());
+        new_leaf.keys.extend(self.keys.drain(mid..));
+        new_leaf.values.extend(self.values.drain(mid..));
+
+        if pos < mid {
+            self.keys.insert(pos, key);
+            self.values.insert(pos, value);
+        } else {
+            new_leaf.keys.insert(pos - mid, key);
+            new_leaf.values.insert(pos - mid, value);
+        }
 
         new_leaf
     }
@@ -200,13 +210,24 @@ mod tests {
 
     #[test]
     fn test_btree_insert() {
-        let mut btree = BTree::new(3);
+        let mut btree = BTree::new(4);
         btree.insert(10, "A");
         btree.insert(20, "B");
         btree.insert(5, "C");
 
         assert_eq!(btree.size(), 3);
         assert!(!btree.is_empty());
+    }
+
+    #[test]
+    fn test_leaf_split() {
+        let mut leaf = Leaf::new(2);
+        leaf.insert(10, "A");
+        leaf.insert(20, "B");
+        let new_leaf = leaf.insert(5, "C");
+        assert!(new_leaf.is_some());
+        assert_eq!(new_leaf.unwrap().size(), 1);
+        assert_eq!(leaf.size(), 2);
     }
 
     //     #[test]

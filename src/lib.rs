@@ -27,6 +27,7 @@ pub use crate::utils::*;
 use crate::index::*;
 
 mod bimapid;
+mod btree;
 mod change;
 mod change_list;
 pub mod codec_v1;

@@ -1,4 +1,6 @@
-use std::fmt::Debug;
+use ptree::{print_tree, TreeBuilder};
+use std::fmt::{Debug, Display};
+use std::mem;
 
 #[derive(Debug, Clone)]
 struct Leaf<K, V> {
@@ -6,15 +8,19 @@ struct Leaf<K, V> {
     keys: Vec<K>,
 }
 
-impl<K: Ord + Clone, V: Clone> Leaf<K, V> {
+impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
     fn new(order: usize) -> Self {
+        if order == 1 {
+            panic!("Order should be greater than 0");
+        }
+
         Leaf {
             values: Vec::with_capacity(order),
             keys: Vec::with_capacity(order),
         }
     }
 
-    fn insert(&mut self, key: K, value: V) -> Option<Node<K, V>> {
+    fn insert(&mut self, key: K, value: V) -> Option<(K, Node<K, V>)> {
         let pos = self
             .keys
             .binary_search_by_key(&key, |k| k.clone())
@@ -22,7 +28,7 @@ impl<K: Ord + Clone, V: Clone> Leaf<K, V> {
 
         // If leaf is full, we need to handle splitting
         if self.keys.len() == self.keys.capacity() {
-            Some(Node::new_leaf(self.insert_and_split(pos, key, value)))
+            Some(self.insert_and_split(pos, key, value))
         } else {
             self.keys.insert(pos, key);
             self.values.insert(pos, value);
@@ -30,7 +36,7 @@ impl<K: Ord + Clone, V: Clone> Leaf<K, V> {
         }
     }
 
-    fn insert_and_split(&mut self, pos: usize, key: K, value: V) -> (Leaf<K, V>) {
+    fn insert_and_split(&mut self, pos: usize, key: K, value: V) -> (K, (Node<K, V>)) {
         let mid = self.keys.len() / 2;
 
         let mut new_leaf = Leaf::new(self.keys.capacity());
@@ -45,7 +51,9 @@ impl<K: Ord + Clone, V: Clone> Leaf<K, V> {
             new_leaf.values.insert(pos - mid, value);
         }
 
-        new_leaf
+        let min_key = new_leaf.min_key().unwrap().clone();
+
+        (min_key, Node::new_leaf(new_leaf))
     }
 
     fn min_key(&self) -> Option<&K> {
@@ -68,7 +76,7 @@ struct Branch<K, V> {
     count: usize, // pre-computed size for performance
 }
 
-impl<K: Ord + Clone, V: Clone> Branch<K, V> {
+impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> {
     fn new(order: usize) -> Self {
         Branch {
             keys: Vec::with_capacity(order),
@@ -77,10 +85,69 @@ impl<K: Ord + Clone, V: Clone> Branch<K, V> {
         }
     }
 
-    fn insert(&mut self, key: K, value: V) -> Option<Node<K, V>> {
-        self.count += 1;
+    fn insert(&mut self, key: K, value: V) -> Option<(K, Node<K, V>)> {
+        let pos = self
+            .keys
+            .binary_search_by_key(&key, |k| k.clone())
+            .unwrap_or_else(|e| e);
+
+        if let Some(child) = self.children.get_mut(pos) {
+            let new_child = child.insert(key, value);
+            if let Some((new_key, new_node)) = new_child {
+                if self.is_full() {
+                    // new key needs to be inserted at pos+1 position
+                    return Some(self.insert_and_split(pos, new_key, new_node));
+                } else {
+                    // If the child node split, we need to handle the new node
+                    self.keys.insert(pos, new_key);
+                    self.children.insert(pos + 1, new_node);
+                    self.count += 1;
+                }
+            }
+        }
 
         None
+    }
+
+    fn insert_and_split(
+        &mut self,
+        pos: usize,
+        new_key: K,
+        new_node: Node<K, V>,
+    ) -> (K, Node<K, V>) {
+        let mid = self.keys.len() / 2;
+
+        let mut new_branch = Branch::new(self.keys.capacity());
+
+        self.keys.insert(pos, new_key);
+        self.children.insert(pos + 1, new_node);
+
+        let mid_key = self.keys[mid].clone();
+
+        new_branch.keys.extend(self.keys[mid + 1..].iter().cloned());
+        new_branch
+            .children
+            .extend(self.children[mid + 1..].iter().cloned());
+
+        self.keys.truncate(mid);
+        self.children.truncate(mid + 1);
+
+        // keep the capacity of the self branch same as new_branch
+        self.keys.shrink_to(new_branch.keys.capacity());
+        self.children.shrink_to(new_branch.children.capacity());
+
+        new_branch.update_count();
+        self.update_count();
+
+        (mid_key, Node::new_branch(new_branch))
+    }
+
+    fn update_count(&mut self) {
+        self.count = self.children.iter().map(|child| child.size()).sum();
+    }
+
+    fn is_full(&self) -> bool {
+        self.keys.len() == self.keys.capacity()
     }
 
     fn min_key(&self) -> Option<&K> {
@@ -102,7 +169,7 @@ enum Node<K, T> {
     Branch(Branch<K, T>),
 }
 
-impl<K: Ord + Clone, V: Clone> Node<K, V> {
+impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
     fn new_leaf(leaf: Leaf<K, V>) -> Self {
         Node::Leaf(leaf)
     }
@@ -111,10 +178,29 @@ impl<K: Ord + Clone, V: Clone> Node<K, V> {
         Node::Branch(branch)
     }
 
-    fn insert(&mut self, key: K, value: V) -> Option<Node<K, V>> {
+    // Insert a key-value pair into the node
+    // Returns Some((key, new_node)) if the node was split
+    fn insert(&mut self, key: K, value: V) -> Option<(K, Node<K, V>)> {
         match self {
             Node::Leaf(leaf) => leaf.insert(key, value),
             Node::Branch(branch) => branch.insert(key, value),
+        }
+    }
+
+    fn find(&self, key: &K) -> Option<&V> {
+        match self {
+            Node::Leaf(leaf) => {
+                let pos = leaf.keys.binary_search(key).ok()?;
+                Some(&leaf.values[pos])
+            }
+            Node::Branch(branch) => {
+                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                if pos < branch.children.len() {
+                    branch.children[pos].find(key)
+                } else {
+                    None
+                }
+            }
         }
     }
 
@@ -153,6 +239,40 @@ impl<K: Ord + Clone, V: Clone> Node<K, V> {
             Node::Branch(branch) => branch.keys.is_empty(),
         }
     }
+
+    fn is_full(&self) -> bool {
+        match self {
+            Node::Leaf(leaf) => leaf.keys.len() == leaf.keys.capacity(),
+            Node::Branch(branch) => branch.is_full(),
+        }
+    }
+
+    fn print(&self, tree: &mut TreeBuilder) {
+        match self {
+            Node::Leaf(leaf) => {
+                let mut string_builder = String::new();
+                string_builder.push_str(&format!("Leaf: {} => ", leaf.keys.capacity()));
+                for (key, value) in leaf.keys.iter().zip(&leaf.values) {
+                    string_builder.push_str(&format!("{:?}: {:?}, ", key, value));
+                }
+                tree.begin_child(string_builder).end_child();
+            }
+            Node::Branch(branch) => {
+                tree.begin_child(format!("Branch: {}", branch.keys.len()));
+                for (i, child) in branch.children.iter().enumerate() {
+                    if i > 0 {
+                        let key = branch.keys.get(i - 1);
+                        tree.begin_child(format!("Key: {}", key.unwrap()));
+                    } else {
+                        tree.begin_child(format!("Key: {}", "#"));
+                    }
+                    child.print(tree);
+                    tree.end_child();
+                }
+                tree.end_child();
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -161,7 +281,7 @@ struct BTree<K, V> {
     order: usize,
 }
 
-impl<K: Debug + Ord + Clone, V: Clone + Debug> BTree<K, V> {
+impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
     fn default() -> Self {
         BTree::new(10) // Default order is 2
     }
@@ -175,11 +295,18 @@ impl<K: Debug + Ord + Clone, V: Clone + Debug> BTree<K, V> {
 
     // Insert a key-value pair into the B-Tree
     fn insert(&mut self, key: K, value: V) {
-        if let Some(node) = self.root.insert(key, value) {
-            let mut new_root = Branch::new(self.order);
-            new_root.children.push(self.root.clone());
-            new_root.children.push(node);
-            self.root = Node::new_branch(new_root);
+        if let Some((key, node)) = self.root.insert(key, value) {
+            let mut new_root = Node::new_branch(Branch::new(self.order));
+            let old_root = mem::replace(&mut self.root, new_root);
+            match self.root {
+                Node::Branch(ref mut branch) => {
+                    branch.children.push(old_root);
+                    branch.children.push(node);
+                    branch.keys.push(key);
+                    branch.update_count();
+                }
+                _ => unreachable!(),
+            }
         }
     }
 
@@ -190,9 +317,7 @@ impl<K: Debug + Ord + Clone, V: Clone + Debug> BTree<K, V> {
     }
 
     fn find(&self, key: &K) -> Option<&V> {
-        // Find logic will go here
-        // This is a placeholder for the actual implementation
-        None
+        self.root.find(key)
     }
 
     fn is_empty(&self) -> bool {
@@ -201,6 +326,12 @@ impl<K: Debug + Ord + Clone, V: Clone + Debug> BTree<K, V> {
 
     fn size(&self) -> usize {
         self.root.size()
+    }
+
+    fn print(&self) {
+        let mut tree = TreeBuilder::new(format!("BTree: {:?}", self.size()));
+        self.root.print(&mut tree);
+        print_tree(&tree.build()).unwrap();
     }
 }
 
@@ -226,30 +357,36 @@ mod tests {
         leaf.insert(20, "B");
         let new_leaf = leaf.insert(5, "C");
         assert!(new_leaf.is_some());
-        assert_eq!(new_leaf.unwrap().size(), 1);
+        assert_eq!(new_leaf.unwrap().1.size(), 1);
         assert_eq!(leaf.size(), 2);
     }
 
-    //     #[test]
-    //     fn test_btree_find() {
-    //         let mut btree = BTree::new(3);
-    //         btree.insert(10, "A");
-    //         btree.insert(20, "B");
-    //
-    //         assert_eq!(btree.find(&10), Some(&"A"));
-    //         assert_eq!(btree.find(&20), Some(&"B"));
-    //         assert_eq!(btree.find(&30), None);
-    //     }
-    // }
-    //
-    //     #[test]
-    //     fn test_btree_remove() {
-    //         let mut btree = BTree::new(3);
-    //         btree.insert(10, "A");
-    //         btree.insert(20, "B");
-    //         btree.insert(5, "C");
-    //
-    //         assert_eq!(btree.remove(&10), None); // Placeholder for actual removal logic
-    //         assert_eq!(btree.size(), 3); // Size should remain the same until remove is implemented
-    //     }
+    #[test]
+    fn test_branch_split() {
+        let mut tree = BTree::new(2);
+        tree.insert(10, "A");
+        tree.insert(20, "B");
+        assert!(tree.root.is_leaf());
+
+        tree.insert(30, "C");
+        assert!(tree.root.is_branch());
+        assert_eq!(tree.size(), 3);
+
+        tree.insert(5, "D");
+        tree.insert(7, "E");
+        tree.insert(6, "F");
+
+        // split should occur here
+        tree.insert(22, "G");
+
+        tree.print();
+
+        assert_eq!(tree.find(&10), Some(&"A"));
+        assert_eq!(tree.find(&5), Some(&"D"));
+        assert_eq!(tree.find(&30), Some(&"C"));
+
+        assert_eq!(tree.size(), 7);
+        // tree.insert(15, "H");
+        // assert_eq!(tree.size(), 5);
+    }
 }

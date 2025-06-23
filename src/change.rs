@@ -122,6 +122,7 @@ impl From<ChangeData> for ChangeDeps {
         }
     }
 }
+
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct PendingChangeStore {
     // the pending changes for each client
@@ -130,26 +131,26 @@ pub(crate) struct PendingChangeStore {
     pub(crate) heads: HashMap<ClientId, ChangeData>,
 }
 
-impl PendingChangeStore {
-    /// find the first ready change for a client
-    pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<ChangeData> {
-        let found = self
-            .heads
-            .iter()
-            .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
-
-        // println!("dag changes {:?}", dag.changes);
-        // println!(
-        //     "deps {:?}",
-        //     self.heads
-        //         .iter()
-        //         .map(|(_, change)| change.deps.clone())
-        //         .collect::<Vec<_>>()
-        // );
-
-        found.map(|(_, change)| change.clone())
-    }
-}
+// impl PendingChangeStore {
+//     /// find the first ready change for a client
+//     pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<ChangeData> {
+//         let found = self
+//             .heads
+//             .iter()
+//             .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
+//
+//         // println!("dag changes {:?}", dag.changes);
+//         // println!(
+//         //     "deps {:?}",
+//         //     self.heads
+//         //         .iter()
+//         //         .map(|(_, change)| change.deps.clone())
+//         //         .collect::<Vec<_>>()
+//         // );
+//
+//         found.map(|(_, change)| change.clone())
+//     }
+// }
 
 impl PendingChangeStore {
     pub(crate) fn add(&mut self, change: ChangeData) {
@@ -273,6 +274,7 @@ impl PartialOrd for ChangeId {
 }
 
 impl WithId for ChangeId {
+    #[inline]
     fn id(&self) -> Id {
         Id::new(self.client, self.start)
     }
@@ -318,7 +320,7 @@ impl ChangeStore {
     pub(crate) fn deps(&self, change: &Vec<Id>) -> HashSet<ChangeId> {
         let mut deps = HashSet::new();
         for id in change {
-            if let Some(c) = self.find(id) {
+            if let Some(c) = self.get(id) {
                 deps.insert(c.clone());
             }
         }
@@ -381,10 +383,10 @@ mod tests {
         cs.insert(ChangeId::new(1, 4, 4)); // [1,2]
 
         // if the change is in the store, it should return the change
-        assert_eq!(cs.find(&Id::new(1, 0)), Some(ChangeId::new(1, 0, 1)),);
-        assert_eq!(cs.find(&Id::new(1, 2)), Some(ChangeId::new(1, 2, 3)),);
-        assert_eq!(cs.find(&Id::new(1, 4)), Some(ChangeId::new(1, 4, 4)),);
-        assert_eq!(cs.find(&Id::new(1, 5)), None);
+        assert_eq!(cs.get(&Id::new(1, 0)), Some(ChangeId::new(1, 0, 1)),);
+        assert_eq!(cs.get(&Id::new(1, 2)), Some(ChangeId::new(1, 2, 3)),);
+        assert_eq!(cs.get(&Id::new(1, 4)), Some(ChangeId::new(1, 4, 4)),);
+        assert_eq!(cs.get(&Id::new(1, 5)), None);
     }
 
     #[test]

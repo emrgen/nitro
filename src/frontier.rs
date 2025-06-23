@@ -28,7 +28,7 @@ impl Frontier {
     pub(crate) fn change_frontier(&self, store: &ChangeStore) -> ChangeFrontier {
         let mut change_frontier = ChangeFrontier::default();
         for id in &self.changes {
-            if let Some(change) = store.find(id) {
+            if let Some(change) = store.get(id) {
                 change_frontier.insert(change.clone());
             }
         }

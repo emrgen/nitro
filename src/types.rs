@@ -322,7 +322,7 @@ impl Type {
     pub(crate) fn container(&self) -> Option<Type> {
         if let Some(container_id) = self.container_id() {
             let typ = self.store().upgrade().and_then(|store| {
-                let container = store.borrow().items.find(&container_id);
+                let container = store.borrow().items.get(&container_id);
                 return container.map_or(None, |container| Some(container.clone()));
             });
 

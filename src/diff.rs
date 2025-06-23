@@ -34,7 +34,7 @@ impl Diff {
 
     pub(crate) fn get_root(&self) -> Option<ItemData> {
         let client = self.state.clients.get_client_id(&self.created_by)?;
-        self.items.find(&Id::new(*client, 1))
+        self.items.get(&Id::new(*client, 1))
     }
 }
 

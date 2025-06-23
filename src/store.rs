@@ -102,7 +102,7 @@ impl DocStore {
         // this will create the change DAG
         let mut change_ids = HashSet::new();
         for dep in deps {
-            if let Some(change) = self.changes.find(&dep) {
+            if let Some(change) = self.changes.get(&dep) {
                 change_ids.insert(change.clone());
             }
         }
@@ -230,13 +230,13 @@ impl DocStore {
 
     #[inline]
     pub(crate) fn contains(&self, id: &Id) -> bool {
-        self.items.find(id).is_some()
+        self.items.get(id).is_some()
     }
 
     #[inline]
     pub(crate) fn find(&self, id: &Id) -> Option<Type> {
         let key = self.id_map.find(id);
-        self.items.find(&key)
+        self.items.get(&key)
     }
 
     pub(crate) fn insert(&mut self, item: impl Into<Type>) {
@@ -252,7 +252,7 @@ impl DocStore {
     }
 
     pub(crate) fn remove(&mut self, id: &Id) {
-        if let Some(item) = self.items.find(id) {
+        if let Some(item) = self.items.get(id) {
             if item.id().eq(id) {
                 item.disconnect();
                 self.items.remove(id);
@@ -357,7 +357,7 @@ impl ReadyStore {
     #[inline]
     pub(crate) fn find_item(&self, id: &Id) -> Option<ItemData> {
         let id = self.id_range_map.find(id);
-        self.items.find(&id)
+        self.items.get(&id)
     }
 
     #[inline]
@@ -720,8 +720,14 @@ impl<T: ClientStoreEntry> ClientStore<T> {
 
     #[inline]
     /// get the item for the given id
-    pub(crate) fn find(&self, id: &Id) -> Option<T> {
+    pub(crate) fn get(&self, id: &Id) -> Option<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
+    }
+
+    pub(crate) fn get_mut(&mut self, id: &Id) -> Option<&mut T> {
+        self.items
+            .get_mut(&id.client)
+            .and_then(|store| store.map.get_mut(id))
     }
 
     pub(crate) fn contains(&self, id: &Id) -> bool {
@@ -802,6 +808,16 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         }
 
         store
+    }
+
+    pub(crate) fn get_last(&self, client_id: &ClientId) -> Option<&T> {
+        self.items.get(client_id).and_then(|store| store.last())
+    }
+
+    pub(crate) fn pop_last(&mut self, client_id: &ClientId) -> Option<T> {
+        self.items
+            .get_mut(client_id)
+            .and_then(|store| store.pop_last())
     }
 }
 
@@ -920,6 +936,11 @@ impl<T: ItemStoreEntry> ItemStore<T> {
     #[inline]
     pub(crate) fn first(&self) -> Option<&T> {
         self.map.first_key_value().map(|(_, v)| v)
+    }
+
+    #[inline]
+    pub(crate) fn pop_last(&mut self) -> Option<T> {
+        self.map.pop_last().map(|(_, v)| v)
     }
 
     #[inline]

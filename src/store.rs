@@ -20,12 +20,92 @@ use serde::{Serialize, Serializer};
 use std::cell::RefCell;
 use std::collections::btree_map::IterMut;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::ops::Add;
 use std::rc::{Rc, Weak};
 
 pub(crate) type StoreRef = Rc<RefCell<DocStore>>;
 pub(crate) type WeakStoreRef = Weak<RefCell<DocStore>>;
+
+// Listener is a tuple of a token and a listener function
+type Listener = (u32, Rc<dyn Fn(&Type)>);
+
+/// TypeEmitter is a store for the types that are dirty and need to be emitted
+#[derive(Clone, Default)]
+struct TypeEmitter {
+    pub(crate) dirty: HashSet<Id>,
+    pub(crate) store: HashMap<Id, Vec<Listener>>,
+    token: u32,
+}
+
+impl TypeEmitter {
+    pub(crate) fn new() -> Self {
+        TypeEmitter {
+            dirty: HashSet::new(),
+            store: HashMap::new(),
+            token: 0,
+        }
+    }
+
+    pub(crate) fn add_listener<F>(&mut self, id: Id, listener: F) -> u32
+    where
+        F: Fn(&Type) + 'static,
+    {
+        let token = self.token;
+        self.token += 1;
+
+        let entry = self.store.entry(id).or_default();
+        entry.push((token, Rc::new(listener)));
+
+        token
+    }
+
+    pub(crate) fn remove_listener(&mut self, id: &Id, token: u32) {
+        if let Some(listeners) = self.store.get_mut(id) {
+            listeners.retain(|(t, _)| *t != token);
+            if listeners.is_empty() {
+                self.store.remove(id);
+            }
+        }
+    }
+
+    pub(crate) fn emit(&mut self, item: &Type) {
+        if let Some(listeners) = self.store.get(&item.id()) {
+            for (_, listener) in listeners.iter() {
+                listener(item);
+            }
+        }
+    }
+
+    pub(crate) fn add_dirty(&mut self, id: Id) {
+        self.dirty.insert(id);
+    }
+
+    pub(crate) fn reset_dirty(&mut self) {
+        self.dirty.clear();
+    }
+
+    pub(crate) fn remove_dirty(&mut self, id: &Id) {
+        self.dirty.remove(id);
+    }
+
+    /// publish will emit all dirty items to the listeners
+    pub(crate) fn publish(&mut self, store: &TypeStore) {}
+}
+
+impl Debug for TypeEmitter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl PartialEq<Self> for TypeEmitter {
+    fn eq(&self, other: &Self) -> bool {
+        todo!()
+    }
+}
+
+impl Eq for TypeEmitter {}
 
 /// DocStore is a store for the document CRDT items and metadata.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -34,14 +114,16 @@ pub(crate) struct DocStore {
     pub(crate) created_by: Client,
 
     pub(crate) client: ClientId,
-    pub(crate) commited_clock: ClockTick,
     pub(crate) clock: ClockTick,
+    pub(crate) commited_clock: ClockTick,
 
+    // space optimized document state
     pub(crate) fields: FieldMap,
     pub(crate) id_map: IdRangeMap,
     pub(crate) state: ClientState,
 
     // moves for at target are serialized by the change dag
+    // the top most move is the last one which is active
     pub(crate) moves: HashMap<Id, Vec<Type>>,
 
     pub(crate) items: TypeStore,
@@ -49,12 +131,10 @@ pub(crate) struct DocStore {
 
     pub(crate) pending: PendingStore,
 
-    // ready store is used during time travel to past
-    pub(crate) ready: ReadyStore,
-
     pub(crate) changes: ChangeStore,
-    // change dag for global change ordering
     pub(crate) dag: ChangeDag,
+
+    emitter: TypeEmitter,
 }
 
 impl DocStore {
@@ -119,6 +199,8 @@ impl DocStore {
             .insert(ChangeNode::new(change_id, parents).with_mover(moves));
 
         self.commited_clock = self.clock;
+
+        self.emitter.publish(&self.items);
     }
 
     // rollback the uncommited items from the store
@@ -144,9 +226,11 @@ impl DocStore {
     pub(crate) fn add_mover(&mut self, target_id: Id, mover: Type) {
         let entry = self.moves.entry(target_id).or_default();
         // mark the last mover as moved so that it will be treated as an invisible item
-        if entry.len() > 0 {
-            entry.last().unwrap().item_ref().mark_moved();
+        if let Some(last) = entry.last() {
+            last.item_ref().mark_moved();
         }
+
+        mover.item_ref().mark_active();
         entry.push(mover);
     }
 
@@ -154,19 +238,23 @@ impl DocStore {
     /// the last mover after remove is marked as unmoved
     pub(crate) fn remove_mover(&mut self, target_id: Id, mover: &Type) {
         let mover_id = mover.id();
-        self.moves.entry(target_id).and_modify(|v| {
-            v.retain(|x| x.id() != mover_id);
-            if v.len() > 0 {
-                v.last().unwrap().item_ref().unmark_moved();
+
+        self.moves.entry(target_id).and_modify(|movers| {
+            movers.retain(|x| x.id() != mover_id);
+            if let Some(last) = movers.last() {
+                last.item_ref().unmark_moved();
             }
-            // TODO: empty vectors should be removed
         });
 
-        if self.moves.get(&target_id).map_or(false, |v| v.is_empty()) {
+        let not_moved = self.moves.get(&target_id).map_or(false, |v| v.is_empty());
+
+        if not_moved {
             self.find(&target_id).map(|target| {
                 target.item_ref().unmark_moved();
             });
         }
+
+        mover.item_ref().mark_inactive();
     }
 
     #[inline]
@@ -233,6 +321,7 @@ impl DocStore {
 
     pub(crate) fn insert(&mut self, item: impl Into<Type>) {
         let item = item.into();
+
         if item.kind() == ItemKind::String {
             self.id_map.insert(item.id().range(item.size()));
         }
@@ -518,19 +607,6 @@ impl From<TypeStore> for ItemDataStore {
 pub type DeleteItemStore = ClientStore<DeleteItem>;
 // Types for clients
 pub type TypeStore = ClientStore<Type>;
-
-impl TypeStore {
-    pub(crate) fn frontier(&self) -> Frontier {
-        let mut frontier = Frontier::default();
-        for (_, store) in self.items.iter() {
-            if let Some((_, item)) = store.iter().last() {
-                frontier.add(item.range().end_id());
-            }
-        }
-
-        frontier
-    }
-}
 
 /// A map of client id to a set of id ranges
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

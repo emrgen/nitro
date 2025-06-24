@@ -7,68 +7,17 @@ use std::collections::{HashMap, HashSet};
 /// The Frontier struct represents the most recent operations in a document from all clients.
 #[derive(Default, Clone, Debug)]
 pub struct Frontier {
-    pub(crate) changes: Vec<Id>,
+    id: Id,
 }
 
 impl Frontier {
-    pub fn from(changes: Vec<ChangeId>) -> Self {
-        let changes = changes
-            .into_iter()
-            .map(|c| Id::new(c.client, c.end))
-            .collect();
-        Self { changes }
+    /// Creates a new Frontier with the given ID.
+    pub fn new(id: Id) -> Self {
+        Frontier { id }
     }
 
-    pub(crate) fn add(&mut self, id: Id) {
-        /// FIXME: may contain duplicates
-        self.changes.push(id);
-    }
-
-    /// Turn the frontier into a ChangeFrontier
-    pub(crate) fn change_frontier(&self, store: &ChangeStore) -> ChangeFrontier {
-        let mut change_frontier = ChangeFrontier::default();
-        for id in &self.changes {
-            if let Some(change) = store.get(id) {
-                change_frontier.insert(change.clone());
-            }
-        }
-
-        change_frontier
-    }
-}
-
-/// The ChangeFrontier struct represents the most recent changes in a document from all clients.
-#[derive(Default, Clone, Debug)]
-pub(crate) struct ChangeFrontier {
-    pub(crate) changes: Vec<ChangeId>,
-}
-
-impl ChangeFrontier {
-    pub(crate) fn new(changes: Vec<ChangeId>) -> Self {
-        Self { changes }
-    }
-
-    pub(crate) fn from(state: &ClientState) -> ChangeFrontier {
-        let mut frontier = Vec::new();
-        for (client_id, clock) in state.state.clients.iter() {
-            let change = ChangeId::new(client_id.clone(), *clock, *clock);
-            frontier.push(change);
-        }
-
-        Self::new(frontier)
-    }
-
-    pub(crate) fn insert(&mut self, change: ChangeId) {
-        self.changes.push(change);
-    }
-
-    pub(crate) fn frontier(&self) -> Frontier {
-        let changes = self
-            .changes
-            .iter()
-            .map(|c| Id::new(c.client, c.end))
-            .collect();
-
-        Frontier { changes }
+    /// Returns the ID of the Frontier.
+    pub fn id(&self) -> Id {
+        self.id
     }
 }

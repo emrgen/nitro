@@ -150,6 +150,21 @@ impl ItemRef {
     }
 
     #[inline]
+    pub(crate) fn mark_inactive(&self) {
+        self.borrow_mut().mark_inactive();
+    }
+
+    #[inline]
+    pub(crate) fn mark_active(&self) {
+        self.borrow_mut().mark_active();
+    }
+
+    #[inline]
+    pub(crate) fn is_inactive(&self) -> bool {
+        self.borrow().is_inactive()
+    }
+
+    #[inline]
     pub(crate) fn is_moved(&self) -> bool {
         self.borrow().is_moved()
     }
@@ -436,6 +451,7 @@ impl Item {
         self.flags & 0x02 == 0x02
     }
 
+    #[inline]
     pub(crate) fn is_deleted(&self) -> bool {
         if self.flags & 0x01 == 0x01 {
             return true;
@@ -452,6 +468,11 @@ impl Item {
             }
             _ => false,
         }
+    }
+
+    #[inline]
+    pub(crate) fn is_inactive(&self) -> bool {
+        self.flags & 0x04 == 0x04
     }
 
     pub(crate) fn field(&self, store: WeakStoreRef) -> Option<String> {
@@ -512,6 +533,16 @@ impl Item {
     #[inline]
     pub(crate) fn unmark_moved(&mut self) {
         self.flags &= !0x02;
+    }
+
+    #[inline]
+    pub(crate) fn mark_inactive(&mut self) {
+        self.flags |= 0x04;
+    }
+
+    #[inline]
+    pub(crate) fn mark_active(&mut self) {
+        self.flags &= !0x04;
     }
 
     pub(crate) fn set(&mut self, _key: &ItemKey, _ref: ItemRef) {}

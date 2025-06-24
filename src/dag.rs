@@ -3,6 +3,7 @@ use crate::change::{ChangeId, ChangeStore};
 use crate::change_store::ClientStackStore;
 use crate::decoder::{Decode, Decoder};
 use crate::encoder::{Encode, Encoder};
+use crate::frontier::Frontier;
 use crate::id::{IdComp, WithId};
 use crate::Id;
 use bitflags::bitflags;
@@ -17,7 +18,10 @@ bitflags! {
     /// Flags for ChangeNode, currently unused but reserved for future use
     #[derive(Default)]
     pub(crate) struct ChangeNodeFlags: u8 {
-        const MOVE = 0b00000001; // flag to indicate if the change should be skipped
+        // flag to indicate if the change should be skipped
+        const MOVE = 0b00000001;
+        // flag to indicate if the change is a text change, consecutive text changes can be merged and undone incrementally
+        const TEXT = 0b00000010;
     }
 }
 
@@ -177,6 +181,12 @@ pub(crate) struct ChangeDag {
 }
 
 impl ChangeDag {
+    /// Creates a frontier for the DAG, which is the last change in the queue.
+    fn frontier(&self) -> Frontier {
+        let change = self.queue.last().cloned().unwrap();
+        Frontier::new(Id::new(change.client, change.end))
+    }
+
     // Insert a new change into the DAG.
     pub(crate) fn insert(&mut self, node: ChangeNode) -> Result<(), String> {
         node.parents

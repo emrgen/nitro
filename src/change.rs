@@ -3,7 +3,6 @@ use crate::dag::{ChangeDag, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::frontier::ChangeFrontier;
 use crate::id::{IdComp, IdRange, WithId};
 use crate::item::ItemKind;
 use crate::store::{
@@ -349,18 +348,6 @@ impl ChangeStore {
         }
 
         deps
-    }
-
-    /// The most recent change for all clients
-    pub(crate) fn change_frontier(&self) -> ChangeFrontier {
-        let mut frontier = ChangeFrontier::default();
-        for (_, store) in self.iter() {
-            if let Some((_, change)) = store.iter().last() {
-                frontier.insert(change.clone());
-            }
-        }
-
-        frontier
     }
 
     pub(crate) fn hash_set(&self) -> HashSet<ChangeId> {

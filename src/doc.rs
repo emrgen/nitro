@@ -12,7 +12,6 @@ use crate::dag::{ChangeNode, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::frontier::ChangeFrontier;
 use crate::id::{Id, WithId};
 use crate::item::{Content, DocProps, ItemKey};
 use crate::json::JsonDoc;
@@ -174,13 +173,16 @@ impl Doc {
             }
 
             // undo the changes that were moved
+            // undo-mover does not remove the movers from the document state, it just removes them from the movers stack top
             // do - redo the changes
             // redo the changes that were undone
         }
 
-        // TODO: for now we just apply the changes using a transaction, the changes are not used yet
-        let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
-        tx.commit();
+        {
+            // TODO: for now we just apply the changes using a transaction, the changes are not used yet
+            let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);
+            tx.commit();
+        }
     }
 
     // prepare the changes for the document

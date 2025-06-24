@@ -343,8 +343,13 @@ impl Type {
     }
 
     #[inline]
+    pub(crate) fn is_inactive(&self) -> bool {
+        self.item_ref().borrow().is_inactive()
+    }
+
+    #[inline]
     pub(crate) fn is_visible(&self) -> bool {
-        !self.is_moved() && !self.is_deleted()
+        !self.is_moved() && !self.is_deleted() && !self.is_inactive()
     }
 
     #[inline]
@@ -422,6 +427,7 @@ impl Type {
             Type::Move(n) => n.content(),
             Type::Mark(n) => n.content(),
             Type::List(n) => n.content(),
+            Type::Map(n) => n.content(),
             _ => {
                 panic!("content: not implemented for {:?}", self.kind())
             }
@@ -443,27 +449,29 @@ impl Type {
 
     /// move the item after the given item
     pub fn move_after(&self, before: &Type) {
-        let parent = before.parent().unwrap();
-        match parent {
-            Type::List(n) => n.move_after(before, self),
-            _ => panic!(
-                "move: not implemented for {:?} to parent type: {:?}",
-                self.kind(),
-                parent.kind()
-            ),
+        if let Some(parent) = before.parent() {
+            match parent {
+                Type::List(n) => n.move_after(before, self),
+                _ => panic!(
+                    "move: not implemented for {:?} to parent type: {:?}",
+                    self.kind(),
+                    parent.kind()
+                ),
+            }
         }
     }
 
     /// move the item before the given item
     pub fn move_before(&self, after: &Type) {
-        let parent = after.parent().unwrap();
-        match parent {
-            Type::List(n) => n.move_before(after, self),
-            _ => panic!(
-                "move: not implemented for {:?} to parent type: {:?}",
-                self.kind(),
-                parent.kind()
-            ),
+        if let Some(parent) = after.parent() {
+            match parent {
+                Type::List(n) => n.move_before(after, self),
+                _ => panic!(
+                    "move: not implemented for {:?} to parent type: {:?}",
+                    self.kind(),
+                    parent.kind()
+                ),
+            }
         }
     }
 

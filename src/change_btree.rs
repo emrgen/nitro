@@ -1,22 +1,21 @@
 use ptree::{print_tree, TreeBuilder};
 use std::fmt::{Debug, Display};
+use std::io::Write;
 use std::mem;
 
 #[derive(Debug, Clone)]
 struct Leaf<K, V> {
     values: Vec<V>,
     keys: Vec<K>,
+    order: usize, // The order of the leaf node
 }
 
 impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
     fn new(order: usize) -> Self {
-        if order == 1 {
-            panic!("Order should be greater than 0");
-        }
-
         Leaf {
             values: Vec::with_capacity(order),
             keys: Vec::with_capacity(order),
+            order,
         }
     }
 
@@ -39,7 +38,7 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
     fn insert_and_split(&mut self, pos: usize, key: K, value: V) -> (K, (Node<K, V>)) {
         let mid = self.keys.len() / 2;
 
-        let mut new_leaf = Leaf::new(self.keys.capacity());
+        let mut new_leaf = Leaf::new(self.order);
         new_leaf.keys.extend(self.keys.drain(mid..));
         new_leaf.values.extend(self.values.drain(mid..));
 
@@ -73,6 +72,7 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
 struct Branch<K, V> {
     keys: Vec<K>,
     children: Vec<Node<K, V>>,
+    order: usize,
     total: usize, // pre-computed size for performance
 }
 
@@ -81,6 +81,7 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
         Branch {
             keys: Vec::with_capacity(order),
             children: Vec::with_capacity(order + 1),
+            order,
             total: 0,
         }
     }
@@ -115,9 +116,10 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
         new_key: K,
         new_node: Node<K, V>,
     ) -> (K, Node<K, V>) {
+        std::io::stdout().flush().unwrap();
         let mid = self.keys.len() / 2;
 
-        let mut new_branch = Branch::new(self.keys.capacity());
+        let mut new_branch = Branch::new(self.order);
 
         self.keys.insert(pos, new_key);
         self.children.insert(pos + 1, new_node);
@@ -204,6 +206,48 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
         }
     }
 
+    fn find_mut(&mut self, key: &K) -> Option<&mut V> {
+        match self {
+            Node::Leaf(leaf) => {
+                let pos = leaf.keys.binary_search(key).ok()?;
+                Some(&mut leaf.values[pos])
+            }
+            Node::Branch(branch) => {
+                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                if pos < branch.children.len() {
+                    branch.children[pos].find_mut(key)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn key_at_index(&self, index: usize) -> Option<&K> {
+        match self {
+            Node::Leaf(leaf) => leaf.keys.get(index),
+            Node::Branch(branch) => {
+                if index >= branch.size() {
+                    return None;
+                }
+
+                let mut current_index = index;
+                for (i, child) in branch.children.iter().enumerate() {
+                    if i > 0 {
+                        current_index -= branch.children[i - 1].size();
+                    }
+
+                    if current_index < child.size() {
+                        return child.key_at_index(current_index);
+                    }
+                }
+
+                None
+            }
+        }
+    }
+
+    /// Returns a reference to the value at the given index, if it exists.
     fn at_index(&self, index: usize) -> Option<&V> {
         match self {
             Node::Leaf(leaf) => leaf.values.get(index),
@@ -220,6 +264,32 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
 
                     if current_index < child.size() {
                         return child.at_index(current_index);
+                    }
+                }
+
+                None
+            }
+        }
+    }
+
+    /// Returns a mutable reference to the value at the given index, if it exists.
+    fn at_index_mut(&mut self, index: usize) -> Option<&mut V> {
+        match self {
+            Node::Leaf(leaf) => leaf.values.get_mut(index),
+            Node::Branch(branch) => {
+                if index >= branch.size() {
+                    return None;
+                }
+
+                let mut current_index = index;
+                let sizes = branch.children.iter().map(|c| c.size()).collect::<Vec<_>>();
+                for (i, child) in branch.children.iter_mut().enumerate() {
+                    if i > 0 {
+                        current_index -= sizes[i - 1];
+                    }
+
+                    if current_index < child.size() {
+                        return child.at_index_mut(current_index);
                     }
                 }
 
@@ -310,7 +380,7 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
         BTree::new(10) // Default order is 2
     }
 
-    fn new(order: usize) -> Self {
+    pub(crate) fn new(order: usize) -> Self {
         BTree {
             root: Node::Leaf(Leaf::new(order)),
             order,
@@ -318,7 +388,7 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
     }
 
     // Insert a key-value pair into the B-Tree
-    fn insert(&mut self, key: K, value: V) {
+    pub(crate) fn insert(&mut self, key: K, value: V) {
         if let Some((key, node)) = self.root.insert(key, value) {
             let mut new_root = Node::new_branch(Branch::new(self.order));
             let old_root = mem::replace(&mut self.root, new_root);
@@ -334,38 +404,118 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
         }
     }
 
-    fn remove(&mut self, key: &K) -> Option<V> {
+    pub(crate) fn remove(&mut self, key: &K) -> Option<V> {
         // Removal logic will go here
         // This is a placeholder for the actual implementation
         None
     }
 
-    fn find(&self, key: &K) -> Option<&V> {
+    pub(crate) fn find(&self, key: &K) -> Option<&V> {
         self.root.find(key)
     }
 
-    fn at_index(&self, index: usize) -> Option<&V> {
+    pub(crate) fn find_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.find_mut(key)
+    }
+
+    pub(crate) fn at_index(&self, index: usize) -> Option<&V> {
         self.root.at_index(index)
     }
 
-    fn is_empty(&self) -> bool {
+    pub(crate) fn at_index_mut(&mut self, index: usize) -> Option<&mut V> {
+        self.root.at_index_mut(index)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
         self.root.is_empty()
     }
 
-    fn size(&self) -> usize {
+    pub(crate) fn size(&self) -> usize {
         self.root.size()
     }
 
-    fn print(&self) {
+    pub(crate) fn print(&self) {
         let mut tree = TreeBuilder::new(format!("BTree: {:?}", self.size()));
         self.root.print(&mut tree);
         print_tree(&tree.build()).unwrap();
+    }
+
+    pub(crate) fn iter(&self) -> EntryIter<K, V> {
+        EntryIter::new(&self.root)
+    }
+}
+
+pub(crate) struct EntryIter<'a, K: Ord + Clone + Display + Debug, V: std::fmt::Debug> {
+    internals: Vec<(&'a Node<K, V>, usize)>,
+    leaf: &'a Node<K, V>,
+    index: usize,
+}
+
+impl<'a, K: Ord + Clone + Display + Debug, V: Debug> EntryIter<'a, K, V> {
+    fn new(node: &'a Node<K, V>) -> Self {
+        let mut internals = vec![(node, 0)];
+
+        while let (Node::Branch(internal), _) = internals.last().unwrap() {
+            let child = &internal.children[0];
+            internals.push((child, 0));
+        }
+
+        let (leaf, _) = internals.pop().unwrap();
+
+        EntryIter {
+            internals,
+            leaf,
+            index: 0,
+        }
+    }
+}
+
+impl<'a, K: Ord + Clone + Display + Debug, V: Debug + Clone> Iterator for EntryIter<'a, K, V> {
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.leaf.size() {
+            let value = self.leaf.at_index(self.index)?;
+            let key = self.leaf.key_at_index(self.index)?;
+            self.index += 1;
+
+            Some((key, value))
+        } else {
+            while self.internals.len() > 0 {
+                let (node, index) = self.internals.pop().unwrap();
+                if let Node::Branch(branch) = node {
+                    if index + 1 < branch.children.len() {
+                        let child = &branch.children[index + 1];
+                        self.internals.push((node, index + 1));
+                        self.internals.push((child, 0));
+                    } else {
+                        continue;
+                    }
+
+                    while let (Node::Branch(branch), _) = self.internals.last().unwrap() {
+                        let child = &branch.children[0];
+                        self.internals.push((child, 0));
+                    }
+
+                    let (leaf, _) = self.internals.pop().unwrap();
+
+                    self.leaf = leaf;
+                    self.index = 0;
+
+                    return self.next();
+                }
+            }
+
+            None
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::prelude::{SliceRandom, StdRng};
+    use rand::{Rng, SeedableRng};
 
     #[test]
     fn test_btree_insert() {
@@ -423,5 +573,36 @@ mod tests {
         assert_eq!(tree.at_index(6), Some(&"C"));
         // tree.insert(15, "H");
         // assert_eq!(tree.size(), 5);
+    }
+
+    #[test]
+    fn test_btree_iter() {
+        for i in 0..100 {
+            for order in 2..10 {
+                let mut tree = BTree::new(order);
+
+                let mut keys = (0..100).collect::<Vec<_>>();
+                let sorted_keys = keys.clone();
+
+                let mut rng = StdRng::seed_from_u64(i);
+                // Shuffle the keys to ensure random order
+                keys.shuffle(&mut rng);
+
+                // Insert keys into the B-Tree
+                for i in keys.iter() {
+                    tree.insert(*i, i);
+                    // tree.print();
+                }
+
+                let mut iter = tree.iter();
+                let items = iter.map(|(k, _)| *k).collect::<Vec<_>>();
+
+                assert_eq!(items.len(), keys.len());
+                assert_eq!(items, sorted_keys);
+
+                // println!("items: {:?}", items);
+                // println!("sorted: {:?}", sorted_keys);
+            }
+        }
     }
 }

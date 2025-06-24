@@ -513,6 +513,11 @@ pub(crate) trait WithId {
     fn id(&self) -> Id;
 }
 
+pub(crate) trait IdComp {
+    // check if self is less, equal or greater than other
+    fn comp_id(&self, other: &Id) -> Ordering;
+}
+
 pub(crate) trait WithTarget {
     fn set_target(&self, target: Type);
     fn get_target(&self) -> Option<Type>;

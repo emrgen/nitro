@@ -4,7 +4,7 @@ use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::frontier::ChangeFrontier;
-use crate::id::{IdRange, WithId};
+use crate::id::{IdComp, IdRange, WithId};
 use crate::item::ItemKind;
 use crate::store::{
     ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
@@ -28,7 +28,6 @@ use std::ops::Range;
 pub(crate) struct Change {
     pub(crate) id: ChangeId,
     // if the change contains any move operations
-    pub(crate) moves: bool,
     pub(crate) items: Vec<ItemData>,
     pub(crate) deletes: Vec<DeleteItem>,
     pub(crate) deps: Vec<ChangeId>,
@@ -43,7 +42,6 @@ impl Change {
     ) -> Change {
         Change {
             id,
-            moves: items.iter().any(|item| item.kind == ItemKind::Move),
             items,
             deletes,
             deps,
@@ -63,6 +61,14 @@ impl Change {
             deps,
             ..Self::default()
         }
+    }
+
+    pub(crate) fn moves(&self) -> Vec<ItemData> {
+        self.items
+            .iter()
+            .filter(|item| item.kind == ItemKind::Move)
+            .cloned()
+            .collect()
     }
 
     pub(crate) fn add_item(&mut self, item: ItemData) {
@@ -228,7 +234,7 @@ impl ChangeId {
     }
 
     #[inline]
-    pub(crate) fn compare(&self, other: &Self) -> std::cmp::Ordering {
+    pub(crate) fn comp(&self, other: &Self) -> std::cmp::Ordering {
         if self.client == other.client {
             if self.end < other.start {
                 std::cmp::Ordering::Less
@@ -255,6 +261,22 @@ impl From<&Id> for ChangeId {
     }
 }
 
+impl IdComp for ChangeId {
+    fn comp_id(&self, other: &Id) -> std::cmp::Ordering {
+        if self.client == other.client {
+            if other.clock < self.start {
+                std::cmp::Ordering::Greater
+            } else if self.end < other.clock {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        } else {
+            self.client.cmp(&other.client)
+        }
+    }
+}
+
 impl From<IdRange> for ChangeId {
     fn from(id: IdRange) -> Self {
         ChangeId::new(id.client, id.start, id.end)
@@ -263,13 +285,13 @@ impl From<IdRange> for ChangeId {
 
 impl Ord for ChangeId {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.compare(other)
+        self.comp(other)
     }
 }
 
 impl PartialOrd for ChangeId {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.compare(other))
+        Some(self.comp(other))
     }
 }
 
@@ -312,7 +334,7 @@ impl Serialize for ChangeId {
 }
 
 // TODO: use bitmap based change id store for smaller memory footprint in disk
-/// ChangeStore is a store for changes made to a document.
+/// ChangeStoreX is a store for changes made to a document.
 pub(crate) type ChangeStore = ClientStore<ChangeId>;
 
 impl ChangeStore {

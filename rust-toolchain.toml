@@ -1,0 +1,6 @@
+# use rust nightly
+[toolchain]
+channel = "nightly"
+
+# use the latest stable version of rustfmt
+components = ["rustfmt-preview", "clippy-preview", "llvm-tools-preview"]

@@ -27,9 +27,10 @@ pub use crate::utils::*;
 use crate::index::*;
 
 mod bimapid;
-mod btree;
 mod change;
+mod change_btree;
 mod change_list;
+mod change_store;
 pub mod codec_v1;
 mod crdt_fugue;
 mod crdt_yata;

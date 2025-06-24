@@ -1,5 +1,5 @@
 use crate::bimapid::ClientId;
-use crate::dag::ChangeDag;
+use crate::dag::{ChangeDag, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -13,13 +13,14 @@ use crate::{ClientState, ClockTick, Content, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
+use queues::Queue;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_columnar::Itertools;
 use std::collections::{BTreeSet, VecDeque};
 use std::default::Default;
 use std::fmt::Debug;
-use std::hash::Hasher;
+use std::hash::{Hash, Hasher};
 use std::mem::swap;
 use std::ops::Range;
 
@@ -27,6 +28,7 @@ use std::ops::Range;
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
     pub(crate) id: ChangeId,
+    pub(crate) flag: u8,
     // if the change contains any move operations
     pub(crate) items: Vec<ItemData>,
     pub(crate) deletes: Vec<DeleteItem>,
@@ -42,6 +44,7 @@ impl Change {
     ) -> Change {
         Change {
             id,
+            flag: 0,
             items,
             deletes,
             deps,
@@ -85,16 +88,72 @@ impl Change {
     }
 }
 
-/// ChangeData represents a set of changes made to a document by one client in a single transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
+pub(crate) struct PendingChangeStore {
+    // the pending changes for each client
+    pub(crate) pending: HashMap<ClientId, Vec<ChangeId>>,
+    pub(crate) changes: HashMap<Id, ChangeData>,
+}
+
+impl PendingChangeStore {
+    pub(crate) fn add(&mut self, change: ChangeData) {
+        self.pending
+            .entry(change.id.client)
+            .or_insert_with(Vec::new)
+            .push(change.id);
+        self.changes.insert(change.id.id(), change);
+    }
+
+    pub(crate) fn remove(&mut self, id: Id) {
+        // just remove the change from the pending changes
+        self.changes.remove(&id);
+    }
+
+    pub(crate) fn ready_list(mut self) -> Vec<ChangeData> {
+        let mut ready = Vec::new();
+        // let mut children = HashMap::new();
+        // let mut queue = BTreeSet::new();
+        // for (client, change) in self.changes.iter() {
+        //     queue.insert(change.id.clone());
+        // }
+        //
+        // while !queue.is_empty() {
+        //     if let Some(first) = queue.pop_first() {
+        //         if let Some(change) = self.changes.remove(&first.id()) {
+        //             ready.push(change);
+        //         }
+        //
+        //         // pull the first
+        //     }
+        // }
+
+        ready
+    }
+}
+
+/// ChangeData represents a set of changes made to a document by one client in a single transaction.
+#[derive(Debug, Clone, Default)]
 pub(crate) struct ChangeData {
     pub(crate) id: ChangeId,
+    pub(crate) flag: u8,
     pub(crate) items: Vec<ItemData>,
     pub(crate) delete: Vec<DeleteItem>,
     pub(crate) deps: Vec<Id>,
 }
 
 impl ChangeData {
+    // / Create an empty ChangeData with the given id.
+    pub(crate) fn empty(id: ChangeId) -> ChangeData {
+        ChangeData {
+            id,
+            flag: 0,
+            items: Vec::new(),
+            delete: Vec::new(),
+            deps: Vec::new(),
+        }
+    }
+
+    /// Create a new ChangeData with the given id, items, and delete items.
     pub(crate) fn new(id: ChangeId, items: Vec<ItemData>, delete: Vec<DeleteItem>) -> ChangeData {
         let mut deps = Vec::new();
         for item in items.iter() {
@@ -107,10 +166,35 @@ impl ChangeData {
 
         ChangeData {
             id,
+            flag: 0,
             items,
             delete,
             deps,
         }
+    }
+
+    pub(crate) fn has_mover(&self) -> bool {
+        self.flag & ChangeNodeFlags::MOVE.bits() != 0
+    }
+
+    pub(crate) fn with_mover(mut self, moves: bool) -> Self {
+        self.flag |= ChangeNodeFlags::MOVE.bits();
+
+        self
+    }
+}
+
+impl Eq for ChangeData {}
+
+impl PartialEq for ChangeData {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Hash for ChangeData {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
     }
 }
 
@@ -126,89 +210,6 @@ impl From<ChangeData> for ChangeDeps {
             id: change.id,
             deps: change.deps,
         }
-    }
-}
-
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub(crate) struct PendingChangeStore {
-    // the pending changes for each client
-    pub(crate) pending: HashMap<ClientId, VecDeque<ChangeData>>,
-    // the first change for each client
-    pub(crate) heads: HashMap<ClientId, ChangeData>,
-}
-
-// impl PendingChangeStore {
-//     /// find the first ready change for a client
-//     pub(crate) fn find_ready(&mut self, dag: &ChangeDag) -> Option<ChangeData> {
-//         let found = self
-//             .heads
-//             .iter()
-//             .find(|(_, change)| change.deps.iter().all(|id| dag.contains(id)));
-//
-//         // println!("dag changes {:?}", dag.changes);
-//         // println!(
-//         //     "deps {:?}",
-//         //     self.heads
-//         //         .iter()
-//         //         .map(|(_, change)| change.deps.clone())
-//         //         .collect::<Vec<_>>()
-//         // );
-//
-//         found.map(|(_, change)| change.clone())
-//     }
-// }
-
-impl PendingChangeStore {
-    pub(crate) fn add(&mut self, change: ChangeData) {
-        // if the head is empty for this client, insert the change
-        if self.heads.get(&change.id.client).is_none() {
-            self.heads.insert(change.id.client, change.clone());
-        }
-
-        self.pending
-            .entry(change.id.client)
-            .or_insert_with(VecDeque::new)
-            .push_back(change);
-    }
-
-    // return all header change ids
-    pub(crate) fn change_heads(&mut self) -> &mut HashMap<ClientId, ChangeData> {
-        &mut self.heads
-    }
-
-    pub(crate) fn iter(&self) -> Iter<'_, ClientId, ChangeData> {
-        self.heads.iter()
-    }
-
-    /// remove the change from the head and insert the first change from pending to the heads
-    pub(crate) fn progress(&mut self, client_id: &ClientId) -> Option<ChangeData> {
-        let change = self
-            .pending
-            .get_mut(&client_id)
-            .and_then(|queue| queue.pop_front());
-
-        let head = self
-            .pending
-            .get(&client_id)
-            .and_then(|queue| queue.front())
-            .cloned();
-        if let Some(head) = head {
-            self.heads.insert(client_id.clone(), head.clone());
-        } else {
-            self.heads.remove(&client_id);
-        }
-
-        change
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        // get sum all the pending changes
-        let mut sum = 0;
-        for queue in self.pending.values() {
-            sum += queue.len();
-        }
-
-        sum == 0
     }
 }
 

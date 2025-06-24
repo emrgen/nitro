@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
 use crate::change::{Change, ChangeData, ChangeId, ChangeStore};
+use crate::dag::{ChangeNode, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
@@ -132,44 +133,50 @@ impl Doc {
             diff.adjust(&store_ref)
         };
 
-        // insert the changes to the dag
-        let mut new_changes = diff.changes.hash_set();
+        {
+            let mut store = self.store.borrow_mut();
 
-        // let (undo, mut changes) = self.prepare_changes(&diff);
-        //
-        // // the changes are missing the items and deletes
-        // // materialize the changes
-        // {
-        //     let store = self.store.borrow_mut();
-        //     for change in &mut changes {
-        //         if new_changes.contains(&change.id) {
-        //             change.items = diff.items.find_by_range(change.id.clone());
-        //             change.deletes = diff.deletes.find_by_range(change.id.clone());
-        //         } else {
-        //             change.items = store
-        //                 .items
-        //                 .find_by_range(change.id.clone())
-        //                 .iter()
-        //                 .map(|item| item.data())
-        //                 .collect();
-        //             change.deletes = store
-        //                 .deletes
-        //                 .find_by_range(change.id.clone())
-        //                 .iter()
-        //                 .map(|item| item.clone())
-        //                 .collect();
-        //         }
-        //     }
-        // }
-        //
-        // // undo the applied changes
-        //
-        // println!("changes: {:?}", changes);
-        // // apply the changes
-        // for change in &changes {
-        //     let mut store = self.store.borrow_mut();
-        //     store.insert_change(change.id);
-        // }
+            let (mut changes, mut movers) = diff.changes();
+            let mut change_ids = changes.keys().collect::<HashSet<_>>();
+
+            for (change, _) in &changes {
+                store.changes.insert(change.clone());
+            }
+
+            // find parents for each change
+            for (_, change) in &changes {
+                let parent_change_ids: Vec<ChangeId> = change
+                    .deps
+                    .iter()
+                    .map(|id| store.changes.get(id).unwrap())
+                    .collect::<HashSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                store.dag.insert(
+                    ChangeNode::new(change.id, parent_change_ids).with_mover(change.has_mover()),
+                );
+            }
+
+            let mut redo = Vec::new();
+            let mut undone = Vec::new();
+            // undo the changes until we undo all diff movers
+            while !movers.is_empty() {
+                if let Some((undo_change_id, flag)) = store.dag.undo() {
+                    movers.remove(&undo_change_id);
+
+                    if change_ids.remove(&undo_change_id) {
+                        redo.push(undo_change_id);
+                    } else if flag & ChangeNodeFlags::MOVE.bits() != 0 {
+                        redo.push(undo_change_id);
+                        undone.push(undo_change_id);
+                    }
+                }
+            }
+
+            // undo the changes that were moved
+            // do - redo the changes
+            // redo the changes that were undone
+        }
 
         // TODO: for now we just apply the changes using a transaction, the changes are not used yet
         let mut tx = Tx::new(Rc::downgrade(&self.store.clone()), diff);

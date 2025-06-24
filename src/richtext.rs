@@ -24,6 +24,10 @@ impl RichText {
         }
     }
 
+    pub fn commit(&self) {
+        self.doc.commit();
+    }
+
     pub fn sync(&mut self, other: &RichText) {
         sync_docs(&self.doc, &other.doc, SyncDirection::default());
     }
@@ -341,6 +345,11 @@ mod tests {
         docs[7].insert(0, "h");
         docs[8].insert(0, "i");
         docs[9].insert(0, "j");
+
+        for doc in &docs {
+            doc.commit()
+        }
+
         sync_all_docs(&docs);
         for i in 0..docs.len() {
             for j in 0..docs.len() {
@@ -358,6 +367,9 @@ mod tests {
         docs[7].insert(0, "r");
         docs[8].insert(0, "s");
         docs[9].insert(0, "t");
+        for doc in &docs {
+            doc.commit()
+        }
 
         sync_all_docs(&docs);
         for i in 0..docs.len() {

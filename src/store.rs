@@ -89,11 +89,13 @@ impl DocStore {
 
         let mut deps = HashSet::new();
 
+        let mut moves = false;
         // update the deps for the inserted items
-        self.items
-            .find_by_range(change_id)
-            .iter()
-            .map(|item| deps.extend(item.data().deps()));
+        self.items.find_by_range(change_id).iter().map(|item| {
+            let data = item.data();
+            moves |= data.kind == ItemKind::Move;
+            deps.extend(data.deps())
+        });
 
         // update the deps for the change deletes
         self.deletes
@@ -113,7 +115,8 @@ impl DocStore {
         // insert the new change into the change store
         self.changes.insert(change_id.clone());
         let parents = change_ids.into_iter().collect();
-        self.dag.insert(ChangeNode::new(change_id, parents));
+        self.dag
+            .insert(ChangeNode::new(change_id, parents).with_mover(moves));
 
         self.commited_clock = self.clock;
     }

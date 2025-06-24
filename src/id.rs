@@ -231,18 +231,22 @@ impl Id {
 
     #[inline]
     pub(crate) fn compare_without_client(&self, other: &Id) -> Ordering {
+        if self.client != other.client {
+            return self.client.cmp(&other.client);
+        }
+
         self.clock.cmp(&other.clock)
     }
 
-    pub(crate) fn compare_with_client(&self, other: &Id) -> Ordering {
-        if self.client != other.client {
-            let left = calculate_hash(&format!("{}{}", self.client, self.clock));
-            let right = calculate_hash(&format!("{}{}", self.client, other.clock));
-            return left.cmp(&right);
-        }
-
-        self.compare_without_client(other)
-    }
+    // pub(crate) fn compare_with_client(&self, other: &Id) -> Ordering {
+    //     if self.client != other.client {
+    //         let left = calculate_hash(&format!("{}{}", self.client, self.clock));
+    //         let right = calculate_hash(&format!("{}{}", self.client, other.clock));
+    //         return left.cmp(&right);
+    //     }
+    //
+    //     self.compare_without_client(other)
+    // }
 
     pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> Ordering {
         if self.client != other.client {

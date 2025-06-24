@@ -10,7 +10,7 @@ struct Leaf<K, V> {
     order: usize, // The order of the leaf node
 }
 
-impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
+impl<K: Ord + Clone + Debug, V: Clone + Debug> Leaf<K, V> {
     fn new(order: usize) -> Self {
         Leaf {
             values: Vec::with_capacity(order),
@@ -76,7 +76,7 @@ struct Branch<K, V> {
     total: usize, // pre-computed size for performance
 }
 
-impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> {
+impl<K: Ord + Clone + Debug, V: Clone + Debug> Branch<K, V> {
     fn new(order: usize) -> Self {
         Branch {
             keys: Vec::with_capacity(order),
@@ -171,7 +171,7 @@ enum Node<K, T> {
     Branch(Branch<K, T>),
 }
 
-impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
+impl<K: Ord + Clone + Debug, V: Clone + Debug> Node<K, V> {
     fn new_leaf(leaf: Leaf<K, V>) -> Self {
         Node::Leaf(leaf)
     }
@@ -216,6 +216,34 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
                 let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
                 if pos < branch.children.len() {
                     branch.children[pos].find_mut(key)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn contains(&self, key: &K) -> bool {
+        match self {
+            Node::Leaf(leaf) => leaf.keys.contains(key),
+            Node::Branch(branch) => {
+                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                if pos < branch.children.len() {
+                    branch.children[pos].contains(key)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn index_of(&self, key: &K) -> Option<usize> {
+        match self {
+            Node::Leaf(leaf) => leaf.keys.binary_search(key).ok(),
+            Node::Branch(branch) => {
+                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                if pos < branch.children.len() {
+                    branch.children[pos].index_of(key)
                 } else {
                     None
                 }
@@ -356,7 +384,7 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
                 for (i, child) in branch.children.iter().enumerate() {
                     if i > 0 {
                         let key = branch.keys.get(i - 1);
-                        tree.begin_child(format!("Key: {}", key.unwrap()));
+                        tree.begin_child(format!("Key: {:?}", key.unwrap()));
                     } else {
                         tree.begin_child(format!("Key: {}", "#"));
                     }
@@ -370,12 +398,12 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
 }
 
 #[derive(Debug, Clone)]
-struct BTree<K, V> {
+pub(crate) struct BTree<K, V> {
     root: Node<K, V>,
     order: usize,
 }
 
-impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
+impl<K: Debug + Ord + Clone + Debug, V: Clone + Debug> BTree<K, V> {
     fn default() -> Self {
         BTree::new(10) // Default order is 2
     }
@@ -415,7 +443,15 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
     }
 
     pub(crate) fn find_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.find_mut(key)
+        self.root.find_mut(key)
+    }
+
+    pub(crate) fn contains(&self, key: &K) -> bool {
+        self.contains(key)
+    }
+
+    pub(crate) fn index_of(&self, key: &K) -> Option<usize> {
+        self.root.index_of(key)
     }
 
     pub(crate) fn at_index(&self, index: usize) -> Option<&V> {
@@ -445,13 +481,13 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
     }
 }
 
-pub(crate) struct EntryIter<'a, K: Ord + Clone + Display + Debug, V: std::fmt::Debug> {
+pub(crate) struct EntryIter<'a, K: Ord + Clone + Debug, V: std::fmt::Debug> {
     internals: Vec<(&'a Node<K, V>, usize)>,
     leaf: &'a Node<K, V>,
     index: usize,
 }
 
-impl<'a, K: Ord + Clone + Display + Debug, V: Debug> EntryIter<'a, K, V> {
+impl<'a, K: Ord + Clone + Debug, V: Debug> EntryIter<'a, K, V> {
     fn new(node: &'a Node<K, V>) -> Self {
         let mut internals = vec![(node, 0)];
 
@@ -571,8 +607,6 @@ mod tests {
         assert_eq!(tree.at_index(4), Some(&"B"));
         assert_eq!(tree.at_index(5), Some(&"G"));
         assert_eq!(tree.at_index(6), Some(&"C"));
-        // tree.insert(15, "H");
-        // assert_eq!(tree.size(), 5);
     }
 
     #[test]

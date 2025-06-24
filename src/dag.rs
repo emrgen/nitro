@@ -5,6 +5,7 @@ use crate::decoder::{Decode, Decoder};
 use crate::encoder::{Encode, Encoder};
 use crate::id::{IdComp, WithId};
 use crate::Id;
+use bitflags::bitflags;
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
@@ -12,9 +13,17 @@ use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 
+bitflags! {
+    /// Flags for ChangeNode, currently unused but reserved for future use
+    #[derive(Default)]
+    pub(crate) struct ChangeNodeFlags: u8 {
+        const MOVE = 0b00000001; // flag to indicate if the change should be skipped
+    }
+}
+
 //     Default + WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize
 pub(crate) struct ChangeNode {
-    skip: bool,
+    flags: u8, // flags for future use, currently unused
     change: ChangeId,
     parents: Vec<ChangeId>,
 }
@@ -24,7 +33,7 @@ impl ChangeNode {
         Self {
             change,
             parents: Vec::new(),
-            skip: false,
+            flags: 0, // no flags set
         }
     }
 
@@ -33,13 +42,19 @@ impl ChangeNode {
         Self {
             change,
             parents,
-            skip: false,
+            flags: 0, // no flags set
         }
     }
 
     #[inline]
     pub(crate) fn skipped(mut self) -> Self {
-        self.skip = true;
+        self
+    }
+
+    pub(crate) fn with_mover(mut self, moved: bool) -> Self {
+        if moved {
+            self.flags |= ChangeNodeFlags::MOVE.bits();
+        }
         self
     }
 
@@ -54,7 +69,7 @@ impl Default for ChangeNode {
         Self {
             change: ChangeId::default(),
             parents: vec![],
-            skip: false,
+            flags: 0, // no flags set
         }
     }
 }
@@ -182,7 +197,7 @@ impl ChangeDag {
     }
 
     // pop the last change from the store in topological order
-    fn undo(&mut self) -> Option<ChangeId> {
+    pub(crate) fn undo(&mut self) -> Option<(ChangeId, u8)> {
         // pop the last change from the queue
         let last_id = self.queue.pop_last();
         if let Some(change_id) = last_id {
@@ -190,13 +205,7 @@ impl ChangeDag {
 
             // move the cursor to the previous change
             // TODO: keep doing prev if current change is shippable
-            while self
-                .store
-                .prev(change_id.client)
-                .map_or(false, |node| node.skip)
-            {
-                // if the change is can be skipped for undo, we continue to the previous one
-            }
+            self.store.prev(change_id.client);
 
             self.dirty.insert(change_id.client);
 
@@ -227,7 +236,12 @@ impl ChangeDag {
             }
         }
 
-        last_id
+        let flags = last_id
+            .map(|id| self.store.find(id.id()).map(|node| node.flags))
+            .flatten()
+            .unwrap_or_default();
+
+        last_id.map(|id| (id, flags))
     }
 
     // Reset the state of the DAG, clearing the queue and resetting the store
@@ -247,7 +261,7 @@ impl ChangeDag {
     fn sort_changes(&mut self) -> Vec<ChangeId> {
         let mut sorted_changes = Vec::new();
 
-        while let Some(change_id) = self.undo() {
+        while let Some((change_id, _)) = self.undo() {
             sorted_changes.push(change_id);
         }
 
@@ -379,15 +393,15 @@ mod tests {
 
         assert_eq!(dag.queue.len(), 1);
         let item = dag.undo();
-        assert_eq!(item.unwrap(), c3);
+        assert_eq!(item.unwrap().0, c3);
 
         assert_eq!(dag.queue.len(), 1);
         let item = dag.undo();
-        assert_eq!(item.unwrap(), c2);
+        assert_eq!(item.unwrap().0, c2);
 
         assert_eq!(dag.queue.len(), 1);
         let item = dag.undo();
-        assert_eq!(item.unwrap(), c1);
+        assert_eq!(item.unwrap().0, c1);
 
         dag.done();
 

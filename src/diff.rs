@@ -1,11 +1,11 @@
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::cell::RefMut;
 use std::cmp::max;
 use std::ops::Add;
 
-use crate::bimapid::FieldMap;
+use crate::bimapid::{ClientId, FieldMap};
 use crate::change::{ChangeData, ChangeId, ChangeStore, PendingChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
@@ -70,14 +70,17 @@ impl Diff {
     }
 
     /// get all the changes for this diff
-    pub(crate) fn changes(&self) -> (PendingChangeStore, Vec<ChangeData>) {
-        let mut changes = PendingChangeStore::default();
-        let mut mover_changes = Vec::new();
+    ///
+    pub(crate) fn changes(&self) -> (HashMap<ChangeId, ChangeData>, HashSet<ChangeId>) {
+        let mut non_mover_changes = HashMap::default();
+        let mut mover_changes = HashSet::new();
+
         let mut clients = HashSet::new();
         clients.extend(self.items.clients());
         clients.extend(self.deletes.clients());
 
         if self.changes.size() == 0 {
+            // panic!("no changes in diff, using items and deletes");
             for client in clients {
                 let mut items = ItemStore::default();
                 let mut delete_items = DeleteItemStore::default();
@@ -114,33 +117,39 @@ impl Diff {
                 }
             }
         } else {
+            // panic!("changes in diff, using changes");
             // if there are changes, we need to get the changes for each client
             for (client_id, change_store) in self.changes.iter() {
                 for (_, change_id) in change_store.iter() {
-                    let mut items = ItemStore::default();
-                    let mut delete_items = DeleteItemStore::default();
+                    let mut items = Vec::new();
+                    let mut delete_items = Vec::new();
                     let mut moves = false;
-                    if let Some(item_store) = self.items.id_store(client_id) {
-                        for item in item_store.get_range(&change_id.clone().into()) {
+
+                    if let Some(store) = self.items.id_store(client_id) {
+                        for item in store.get_range(&change_id.clone().into()) {
                             moves |= item.kind.is_move();
-                            items.insert(item.clone());
+                            items.push(item.clone());
                         }
                     }
 
                     if let Some(store) = self.deletes.id_store(client_id) {
-                        for (_, item) in store.iter() {
-                            delete_items.insert(item.clone());
+                        for item in store.get_range(&change_id.clone().into()) {
+                            delete_items.push(item.clone());
                         }
                     }
 
-                    // let change = ChangeData::new(change_id.clone(), items, delete_items);
-                    // mover_changes.push(change.clone());
-                    // changes.add(change);
+                    let change =
+                        ChangeData::new(change_id.clone(), items, delete_items).with_mover(moves);
+                    if moves {
+                        mover_changes.insert(change.id);
+                    }
+
+                    non_mover_changes.insert(change.id, change);
                 }
             }
         }
 
-        (changes, mover_changes)
+        (non_mover_changes, mover_changes)
     }
 
     // create a diff from a diff

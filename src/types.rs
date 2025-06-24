@@ -865,6 +865,7 @@ impl Ord for Type {
         let store = self.store().upgrade().unwrap();
         let store = store.borrow();
         self.id().compare(&other.id(), &store.state.clients)
+        // self.id().compare(&other.id(), &store.state.clients)
     }
 }
 impl PartialOrd for Type {

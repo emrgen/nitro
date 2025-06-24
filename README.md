@@ -16,7 +16,6 @@ flamegraph -- cargo run --example huge_list
 - [x] string
 - [x] atom
 - [x] mark
-- [x] proxy
 - [x] move
 - [x] delete
 - [x] diff

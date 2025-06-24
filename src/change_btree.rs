@@ -73,7 +73,7 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Leaf<K, V> {
 struct Branch<K, V> {
     keys: Vec<K>,
     children: Vec<Node<K, V>>,
-    count: usize, // pre-computed size for performance
+    total: usize, // pre-computed size for performance
 }
 
 impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> {
@@ -81,7 +81,7 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
         Branch {
             keys: Vec::with_capacity(order),
             children: Vec::with_capacity(order + 1),
-            count: 0,
+            total: 0,
         }
     }
 
@@ -101,7 +101,7 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
                     // If the child node split, we need to handle the new node
                     self.keys.insert(pos, new_key);
                     self.children.insert(pos + 1, new_node);
-                    self.count += 1;
+                    self.total += 1;
                 }
             }
         }
@@ -143,7 +143,7 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
     }
 
     fn update_count(&mut self) {
-        self.count = self.children.iter().map(|child| child.size()).sum();
+        self.total = self.children.iter().map(|child| child.size()).sum();
     }
 
     fn is_full(&self) -> bool {
@@ -159,7 +159,7 @@ impl<K: Ord + Clone + Debug + std::fmt::Display, V: Clone + Debug> Branch<K, V> 
     }
 
     fn size(&self) -> usize {
-        self.count
+        self.total
     }
 }
 
@@ -200,6 +200,30 @@ impl<K: Ord + Clone + Debug + Display, V: Clone + Debug> Node<K, V> {
                 } else {
                     None
                 }
+            }
+        }
+    }
+
+    fn at_index(&self, index: usize) -> Option<&V> {
+        match self {
+            Node::Leaf(leaf) => leaf.values.get(index),
+            Node::Branch(branch) => {
+                if index >= branch.size() {
+                    return None;
+                }
+
+                let mut current_index = index;
+                for (i, child) in branch.children.iter().enumerate() {
+                    if i > 0 {
+                        current_index -= branch.children[i - 1].size();
+                    }
+
+                    if current_index < child.size() {
+                        return child.at_index(current_index);
+                    }
+                }
+
+                None
             }
         }
     }
@@ -320,6 +344,10 @@ impl<K: Debug + Ord + Clone + Debug + Display, V: Clone + Debug> BTree<K, V> {
         self.root.find(key)
     }
 
+    fn at_index(&self, index: usize) -> Option<&V> {
+        self.root.at_index(index)
+    }
+
     fn is_empty(&self) -> bool {
         self.root.is_empty()
     }
@@ -386,6 +414,13 @@ mod tests {
         assert_eq!(tree.find(&30), Some(&"C"));
 
         assert_eq!(tree.size(), 7);
+        assert_eq!(tree.at_index(0), Some(&"D"));
+        assert_eq!(tree.at_index(1), Some(&"F"));
+        assert_eq!(tree.at_index(2), Some(&"E"));
+        assert_eq!(tree.at_index(3), Some(&"A"));
+        assert_eq!(tree.at_index(4), Some(&"B"));
+        assert_eq!(tree.at_index(5), Some(&"G"));
+        assert_eq!(tree.at_index(6), Some(&"C"));
         // tree.insert(15, "H");
         // assert_eq!(tree.size(), 5);
     }

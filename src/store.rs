@@ -1,6 +1,6 @@
 use crate::bimapid::{ClientId, Field, FieldId, FieldMap};
 use crate::change::{ChangeId, ChangeStore};
-use crate::dag::ChangeDag;
+use crate::dag::{ChangeDag, ChangeNode};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::diff::Diff;
@@ -41,8 +41,8 @@ pub(crate) struct DocStore {
     pub(crate) id_map: IdRangeMap,
     pub(crate) state: ClientState,
 
+    // moves for at target are serialized by the change dag
     pub(crate) moves: HashMap<Id, Vec<Type>>,
-    pub(crate) proxies: HashMap<Id, Vec<Type>>,
 
     pub(crate) items: TypeStore,
     pub(crate) deletes: DeleteItemStore,
@@ -53,10 +53,13 @@ pub(crate) struct DocStore {
     pub(crate) ready: ReadyStore,
 
     pub(crate) changes: ChangeStore,
-    pub(crate) change_list: BiMap<ChangeId, Id>,
+    // change dag for global change ordering
+    pub(crate) dag: ChangeDag,
 }
 
 impl DocStore {
+    // Commit creates a new change in the store, it is designed to run in local context
+    // only the commited changes are transmitted to the remote sites
     pub(crate) fn commit(&mut self) {
         if self.commited_clock == self.clock {
             return;
@@ -107,7 +110,12 @@ impl DocStore {
             }
         }
 
-        self.commited_clock = self.clock
+        // insert the new change into the change store
+        self.changes.insert(change_id.clone());
+        let parents = change_ids.into_iter().collect();
+        self.dag.insert(ChangeNode::new(change_id, parents));
+
+        self.commited_clock = self.clock;
     }
 
     // rollback the uncommited items from the store
@@ -161,25 +169,6 @@ impl DocStore {
     #[inline]
     pub(crate) fn get_move(&mut self, id: &Id) -> Option<Type> {
         self.moves.get(id).and_then(|v| v.last()).cloned()
-    }
-
-    #[inline]
-    pub(crate) fn add_proxy(&mut self, target_id: Id, proxy: Type) {
-        self.proxies.entry(target_id).or_default().push(proxy);
-    }
-
-    #[inline]
-    pub(crate) fn remove_proxy(&mut self, id: &Id, proxy: &Type) {
-        let proxy_id = proxy.id();
-        self.proxies.entry(*id).and_modify(|v| {
-            v.retain(|x| x.id() != proxy_id);
-            // TODO: empty vectors should be removed
-        });
-    }
-
-    #[inline]
-    pub(crate) fn get_proxies(&mut self, id: &Id) -> Option<Vec<Type>> {
-        self.proxies.get(id).cloned()
     }
 
     #[inline]
@@ -270,14 +259,13 @@ impl DocStore {
     #[inline]
     pub(crate) fn insert_delete(&mut self, item: DeleteItem) -> &mut DocStore {
         self.deletes.insert(item);
-
         self
     }
 
+    // replace the item with two items, used for splitting items
     #[inline]
     pub(crate) fn replace(&mut self, item: &Type, items: (Type, Type)) -> &mut DocStore {
         self.items.replace(item, items);
-
         self
     }
 
@@ -350,7 +338,6 @@ impl ReadyStore {
 
     #[inline]
     pub(crate) fn contains(&self, id: &Id) -> bool {
-        // self.items_exists.contains(id)
         self.find_item(id).is_some()
     }
 
@@ -724,6 +711,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         self.items.get(&id.client).and_then(|store| store.get(&id))
     }
 
+    #[inline]
     pub(crate) fn get_mut(&mut self, id: &Id) -> Option<&mut T> {
         self.items
             .get_mut(&id.client)
@@ -810,6 +798,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
         store
     }
 
+    #[inline]
     pub(crate) fn get_last(&self, client_id: &ClientId) -> Option<&T> {
         self.items.get(client_id).and_then(|store| store.last())
     }
@@ -821,7 +810,7 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     }
 }
 
-impl<T: ClientStoreEntry> std::iter::IntoIterator for ClientStore<T> {
+impl<T: ClientStoreEntry> IntoIterator for ClientStore<T> {
     type Item = (ClientId, ItemStore<T>);
     type IntoIter = std::collections::btree_map::IntoIter<ClientId, ItemStore<T>>;
 

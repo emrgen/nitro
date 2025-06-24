@@ -2,7 +2,6 @@ use crate::change::Change;
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
-use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 use crate::{ClockTick, Content, Id, NString, NText, Type};
 use std::rc::Rc;
@@ -65,13 +64,6 @@ impl Transaction {
         self.update_tick();
 
         string
-    }
-
-    pub fn proxy(&mut self, item: impl Into<Type>) -> NProxy {
-        let proxy = NProxy::new(self.next_id(), item.into(), self.store.clone());
-        self.update_tick();
-
-        proxy
     }
 
     fn current_tick(&self) -> ClockTick {

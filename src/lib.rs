@@ -55,7 +55,6 @@ mod nlist;
 mod nmap;
 mod nmark;
 mod nmove;
-mod nproxy;
 mod nstring;
 mod ntext;
 mod ntree;

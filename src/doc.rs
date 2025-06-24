@@ -19,7 +19,6 @@ use crate::mark::Mark;
 use crate::natom::NAtom;
 use crate::nlist::NList;
 use crate::nmap::NMap;
-use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::state::ClientState;
@@ -134,9 +133,9 @@ impl Doc {
         };
 
         // insert the changes to the dag
+        let mut new_changes = diff.changes.hash_set();
 
         // let (undo, mut changes) = self.prepare_changes(&diff);
-        // let new_changes = diff.changes.hash_set();
         //
         // // the changes are missing the items and deletes
         // // materialize the changes
@@ -269,13 +268,6 @@ impl Doc {
         self.store.borrow_mut().insert(string.clone());
 
         string
-    }
-
-    /// Create a new proxy type in the document
-    pub fn proxy(&self, item: impl Into<Type>) -> NProxy {
-        let proxy = NProxy::new(self.next_id(), item.into(), Rc::downgrade(&self.store));
-
-        proxy
     }
 
     /// Create a new change in the document

@@ -16,7 +16,6 @@ use crate::nlist::NList;
 use crate::nmap::NMap;
 use crate::nmark::NMark;
 use crate::nmove::NMove;
-use crate::nproxy::NProxy;
 use crate::nstring::NString;
 use crate::ntext::NText;
 use crate::store::{StoreRef, WeakStoreRef};
@@ -31,7 +30,6 @@ pub enum Type {
     Text(NText),     // container
     String(NString), // elementary
     Atom(NAtom),     // elementary
-    Proxy(NProxy),   // elementary
     Move(NMove),     // elementary
     Mark(NMark),     // elementary
     #[default]
@@ -115,13 +113,6 @@ impl Type {
         }
     }
 
-    #[inline]
-    pub(crate) fn as_proxy(&self) -> Option<NProxy> {
-        match self {
-            Type::Proxy(n) => Some(n.clone()),
-            _ => None,
-        }
-    }
     #[inline]
     pub(crate) fn as_move(&self) -> Option<NMove> {
         match self {
@@ -309,7 +300,6 @@ impl Type {
             Type::Text(n) => n.item_ref(),
             Type::String(n) => n.item_ref(),
             Type::Atom(n) => n.item_ref(),
-            Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
             Type::Doc(n) => n.root.item_ref(),
@@ -397,7 +387,6 @@ impl Type {
             // Type::Text(n) => n.add_mark(mark),
             Type::String(n) => n.add_mark(mark),
             // Type::Atom(n) => n.add_mark(mark),
-            // Type::Proxy(n) => n.add_mark(mark),
             // Type::Move(n) => n.add_mark(mark),
             Type::Identity => panic!("add_mark: not implemented for identity"),
             _ => panic!("add_mark: not implemented"),
@@ -419,7 +408,6 @@ impl Type {
             Type::Text(n) => n.size(),
             Type::String(n) => n.size(),
             Type::Atom(n) => n.size(),
-            Type::Proxy(n) => n.size(),
             Type::Move(n) => n.size(),
             Type::Mark(n) => n.size(),
             _ => panic!("size: not implemented"),
@@ -431,7 +419,6 @@ impl Type {
             Type::String(n) => n.content(),
             Type::Atom(n) => n.content(),
             Type::Text(n) => n.content(),
-            Type::Proxy(n) => n.content(),
             Type::Move(n) => n.content(),
             Type::Mark(n) => n.content(),
             Type::List(n) => n.content(),
@@ -585,7 +572,6 @@ impl Type {
             Type::Text(n) => n.to_json(),
             Type::String(n) => n.to_json(),
             Type::Atom(n) => n.to_json(),
-            Type::Proxy(n) => n.to_json(),
             Type::Move(n) => n.to_json(),
             Type::Mark(n) => n.to_json(),
             Type::Doc(n) => n.to_json(),
@@ -631,13 +617,6 @@ impl Type {
     fn is_atom(&self) -> bool {
         match self {
             Type::Atom(_) => true,
-            _ => false,
-        }
-    }
-
-    fn is_proxy(&self) -> bool {
-        match self {
-            Type::Proxy(_) => true,
             _ => false,
         }
     }
@@ -736,7 +715,6 @@ impl Serialize for Type {
             Type::String(n) => n.serialize(serializer),
             Type::Atom(n) => n.serialize(serializer),
             Type::Mark(n) => n.serialize(serializer),
-            Type::Proxy(n) => n.serialize(serializer),
             Type::Move(n) => n.serialize(serializer),
             _ => panic!("Type: serialize: not implemented for {:?}", self),
         }
@@ -785,7 +763,6 @@ impl WithIdRange for Type {
             Type::Text(n) => n.range(),
             Type::String(n) => n.range(),
             Type::Atom(n) => n.range(),
-            Type::Proxy(n) => n.range(),
             Type::Move(n) => n.range(),
             Type::Mark(n) => n.range(),
             Type::Doc(n) => n.root.range(),
@@ -833,12 +810,6 @@ impl From<NAtom> for Type {
     }
 }
 
-impl From<NProxy> for Type {
-    fn from(n: NProxy) -> Self {
-        Self::Proxy(n)
-    }
-}
-
 impl From<NMove> for Type {
     fn from(n: NMove) -> Self {
         Self::Move(n)
@@ -860,7 +831,6 @@ impl From<ItemRef> for Type {
             ItemKind::Text => Self::Text(item.into()),
             ItemKind::String => Self::String(item.into()),
             ItemKind::Atom => Self::Atom(item.into()),
-            // ItemKind::Proxy => Self::Proxy(item.into()),
             ItemKind::Move => Self::Move(item.into()),
             ItemKind::Mark => Self::Mark(item.into()),
             _ => panic!("Type::from(ItemRef): not implemented"),
@@ -876,7 +846,6 @@ impl From<Type> for ItemRef {
             Type::Text(n) => n.item_ref(),
             Type::String(n) => n.item_ref(),
             Type::Atom(n) => n.item_ref(),
-            Type::Proxy(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
             Type::Doc(n) => n.root.item_ref(),

@@ -102,7 +102,7 @@ impl WithId for ChangeNode {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct ChangeLinks {
     children: HashMap<Id, (u32, u32)>, // (total_count, current_count)
     dirty: HashSet<Id>,                // dirty children that need to be updated
@@ -147,7 +147,7 @@ impl ChangeLinks {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug, Eq, PartialEq)]
 pub(crate) struct ChangeDag {
     // store of changes, indexed by (client, clock)
     store: ClientStackStore<ChangeNode>,
@@ -257,6 +257,7 @@ impl ChangeDag {
     }
 }
 
+// Testing utility to generate a random DAG
 struct RandomDag {
     clients: Vec<ClientId>,
     ends: HashMap<ClientId, u32>,

@@ -1,7 +1,6 @@
 use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef};
 use crate::nlist::NList;
-use crate::nproxy::NProxy;
 use crate::store::WeakStoreRef;
 use crate::Type;
 use fake::Opt;

@@ -15,7 +15,7 @@ pub(crate) trait ItemStackStoreEntry:
 
 impl<T: WithId + IdComp + Clone + Eq + PartialEq + Ord> ItemStackStoreEntry for T {}
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ClientStackStore<T: ItemStackStoreEntry> {
     map: HashMap<ClientId, ItemStackStore<T>>,
 }
@@ -100,7 +100,7 @@ impl<T: ItemStackStoreEntry + Default> ClientStackStore<T> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ItemStackStore<T: ItemStackStoreEntry> {
     items: Vec<T>,
     cursor: usize,

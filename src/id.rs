@@ -1,6 +1,7 @@
 use std::bstr::ByteStr;
 use std::cmp::Ordering;
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 use std::ops::{Add, Sub};
 
 use serde::{Serialize, Serializer};
@@ -233,6 +234,16 @@ impl Id {
         self.clock.cmp(&other.clock)
     }
 
+    pub(crate) fn compare_with_client(&self, other: &Id) -> Ordering {
+        if self.client != other.client {
+            let left = calculate_hash(&format!("{}{}", self.client, self.clock));
+            let right = calculate_hash(&format!("{}{}", self.client, other.clock));
+            return left.cmp(&right);
+        }
+
+        self.compare_without_client(other)
+    }
+
     pub(crate) fn compare(&self, other: &Id, clients: &ClientMap) -> Ordering {
         if self.client != other.client {
             if clients.size() == 0 {
@@ -319,7 +330,7 @@ impl Add<ClockTick> for &Id {
 
 impl PartialEq<Self> for Id {
     fn eq(&self, other: &Self) -> bool {
-        self.clock == other.clock
+        self.client == other.client && self.clock == other.clock
     }
 }
 

@@ -1,17 +1,19 @@
 use crate::bimapid::ClientId;
-use crate::change::ChangeId;
+use crate::change::{ChangeId, ChangeStore};
 use crate::change_store::ClientStackStore;
 use crate::decoder::{Decode, Decoder};
 use crate::encoder::{Encode, Encoder};
 use crate::id::{IdComp, WithId};
 use crate::Id;
+use rand::prelude::{SliceRandom, StdRng};
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 
 //     Default + WithId + Clone + Encode + Decode + Eq + PartialEq + Serialize
-struct ChangeNode {
+pub(crate) struct ChangeNode {
     skip: bool,
     change: ChangeId,
     parents: Vec<ChangeId>,
@@ -126,6 +128,15 @@ impl ChangeLinks {
         }
     }
 
+    // check if the parent is ready to be undone
+    fn is_ready(&self, parent_id: Id) -> bool {
+        if let Some(entry) = self.children.get(&parent_id) {
+            entry.1 == 0 // If current count is 0, it's ready to be undone
+        } else {
+            true // if no entry exists, consider it ready, in other words the parent has no children
+        }
+    }
+
     fn reset(&mut self) {
         self.dirty.iter().for_each(|id| {
             if let Some(entry) = self.children.get_mut(id) {
@@ -207,6 +218,13 @@ impl ChangeDag {
                         });
                     });
             }
+
+            if let Some(curr) = self.store.current(change_id.client) {
+                if self.parents.is_ready(curr.change.id()) {
+                    self.queue.insert(curr.change.clone());
+                    self.ends.insert(curr.change.client, curr.change.clone());
+                }
+            }
         }
 
         last_id
@@ -228,6 +246,7 @@ impl ChangeDag {
     // this is for testing purposes, to sort the changes in the order they were undone
     fn sort_changes(&mut self) -> Vec<ChangeId> {
         let mut sorted_changes = Vec::new();
+
         while let Some(change_id) = self.undo() {
             sorted_changes.push(change_id);
         }
@@ -238,9 +257,113 @@ impl ChangeDag {
     }
 }
 
+struct RandomDag {
+    clients: Vec<ClientId>,
+    ends: HashMap<ClientId, u32>,
+    changes: Vec<ChangeId>,
+    children: HashMap<ChangeId, Vec<ChangeId>>,
+    parents: HashMap<ChangeId, Vec<ChangeId>>,
+    rng: StdRng,
+}
+
+impl RandomDag {
+    fn default() -> Self {
+        Self::with_clients(1, 0)
+    }
+
+    fn with_clients(count: u32, rand: u64) -> Self {
+        let clients = (0..count).map(|i| i).collect::<Vec<ClientId>>();
+        let change = ChangeId::new(0, 1, 1);
+        let mut ends = HashMap::new();
+        for client in &clients {
+            ends.insert(client.clone(), 1);
+        }
+        // first client has already taken a clock of 1
+        ends.insert(0, 2);
+
+        Self {
+            clients,
+            ends,
+            changes: vec![change],
+            children: HashMap::new(),
+            parents: HashMap::new(),
+            rng: StdRng::seed_from_u64(rand),
+        }
+    }
+
+    // randomly generate a DAG with the given number of nodes
+    fn generate(&mut self, nodes: u32) {
+        for _ in 0..nodes {
+            let client = self.clients[self.rng.gen_range(0..self.clients.len())];
+            // randomly choose parents
+            let parent_count = self.rng.gen_range(1..=4);
+            let mut parents = HashSet::new();
+            for _ in 0..parent_count {
+                if let Some(parent) = self.changes.get(self.rng.gen_range(0..self.changes.len())) {
+                    parents.insert(parent.clone());
+                }
+            }
+
+            let start = self.ends.get(&client).cloned().unwrap_or(1);
+            let end = start + self.rng.gen_range(1..4);
+            self.ends.insert(client.clone(), end + 1);
+
+            // create a new change
+            let change = ChangeId::new(client, start, end);
+            self.changes.push(change.clone());
+
+            // add the change to the links
+            parents.iter().for_each(|parent| {
+                self.children
+                    .entry(parent.clone())
+                    .or_insert_with(Vec::new)
+                    .push(change.clone());
+            });
+
+            let parents = parents.iter().cloned().collect::<Vec<ChangeId>>();
+            self.parents.insert(change.clone(), parents);
+        }
+    }
+
+    // random topological sort of the changes
+    fn sort(&mut self) -> Vec<ChangeId> {
+        let mut done = HashSet::new();
+        let mut sorted = Vec::new();
+        let mut store = ChangeStore::default();
+        let deps = self.parents.clone();
+        for change_id in self.changes.iter() {
+            store.insert(change_id.clone());
+        }
+        let mut size = store.size();
+        let clients = self.clients.clone();
+        while size > 0 {
+            // choose random client
+            if let Some(client) = clients.choose(&mut self.rng).cloned() {
+                if let Some(store) = store.id_store_mut(&client) {
+                    if let Some(first) = store.first().cloned() {
+                        let ok = deps.get(&first).map_or(true, |parents| {
+                            parents.iter().all(|parent| done.contains(parent))
+                        });
+                        if ok {
+                            sorted.push(first.clone());
+                            done.insert(first.clone());
+                            store.pop_first();
+                            size -= 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        sorted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sha1::digest::HashMarker;
+    use std::fmt::format;
 
     #[test]
     fn test_change_dag_insert_and_undo() {
@@ -270,5 +393,76 @@ mod tests {
         let items = dag.sort_changes();
         assert_eq!(items.len(), 3);
         assert_eq!(items, vec![c1, c2, c3]);
+    }
+
+    #[test]
+    fn test_change_dag_insert_and_undo_1() {
+        let mut dag = ChangeDag::default();
+        let c1 = ChangeId::new(1, 1, 1);
+        let c2 = ChangeId::new(1, 2, 3);
+        let c3 = ChangeId::new(1, 4, 7);
+
+        dag.insert(ChangeNode::root(c1));
+        dag.insert(ChangeNode::new(c2, vec![c1]));
+        dag.insert(ChangeNode::new(c3, vec![c1]));
+
+        let items = dag.sort_changes();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items, vec![c1, c2, c3]);
+    }
+
+    #[test]
+    fn test_change_dag_insert_and_undo_2() {
+        for i in 0..1000 {
+            let mut dag = ChangeDag::default();
+            let c1 = ChangeId::new(0, 1, 1);
+            let c2 = ChangeId::new(0, 2, 5);
+            let c3 = ChangeId::new(0, 6, 9);
+            let c4 = ChangeId::new(1, 1, 2);
+            let c5 = ChangeId::new(1, 3, 5);
+
+            dag.insert(ChangeNode::root(c1));
+            dag.insert(ChangeNode::new(c2, vec![c1]));
+            dag.insert(ChangeNode::new(c3, vec![c1]));
+            dag.insert(ChangeNode::new(c4, vec![c3]));
+            dag.insert(ChangeNode::new(c5, vec![c3, c4]));
+
+            let items = dag.sort_changes();
+            assert_eq!(items.len(), 5);
+            assert_eq!(items, vec![c1, c2, c3, c4, c5]);
+        }
+    }
+
+    #[test]
+    fn generate_random_dag() {
+        let mut rng = rand::thread_rng();
+        let mut dag = RandomDag::with_clients(10, 2);
+
+        dag.generate(1000);
+
+        // println!("{:?}", dag.children);
+        // println!("{:?}", dag.sort());
+
+        let mut ch_dag1 = ChangeDag::default();
+        let sort1 = dag.sort();
+        for change in &sort1 {
+            let parents = dag.parents.get(&change).cloned().unwrap_or_default();
+            ch_dag1.insert(ChangeNode::new(change.clone(), parents));
+        }
+        let sorted_changes1 = ch_dag1.sort_changes();
+
+        // fuzz test, for different topological sort must converge
+        for i in 0..500 {
+            let mut ch_dag2 = ChangeDag::default();
+            let sort2 = dag.sort();
+            for change in &sort2 {
+                let parents = dag.parents.get(&change).cloned().unwrap_or_default();
+                ch_dag2.insert(ChangeNode::new(change.clone(), parents));
+            }
+            let sorted_changes2 = ch_dag2.sort_changes();
+
+            assert_ne!(sort1, sort2);
+            assert_eq!(sorted_changes1, sorted_changes2)
+        }
     }
 }

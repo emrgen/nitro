@@ -6,6 +6,7 @@ use crate::store::ItemStoreEntry;
 use crate::Id;
 use hashbrown::{HashMap, HashSet};
 use serde::Serialize;
+use std::collections::hash_map::Iter;
 
 pub(crate) trait ItemStackStoreEntry:
     WithId + IdComp + Clone + Eq + PartialEq + Ord
@@ -26,6 +27,10 @@ impl<T: ItemStackStoreEntry + Default> ClientStackStore<T> {
             .entry(client_id)
             .or_insert_with(|| ItemStackStore::default());
         entry.push(item);
+    }
+
+    pub(crate) fn iter(&self) -> hashbrown::hash_map::Iter<'_, ClientId, ItemStackStore<T>> {
+        self.map.iter()
     }
 
     pub(crate) fn reset_cursor(&mut self, client_id: &ClientId) {
@@ -96,7 +101,7 @@ impl<T: ItemStackStoreEntry + Default> ClientStackStore<T> {
 }
 
 #[derive(Debug, Clone, Default)]
-struct ItemStackStore<T: ItemStackStoreEntry> {
+pub(crate) struct ItemStackStore<T: ItemStackStoreEntry> {
     items: Vec<T>,
     cursor: usize,
 }
@@ -158,6 +163,10 @@ impl<T: ItemStackStoreEntry> ItemStackStore<T> {
     }
 
     pub(crate) fn current(&self) -> Option<&T> {
+        if self.cursor == 0 {
+            return None;
+        }
+
         self.items.get(self.cursor - 1)
     }
 
@@ -179,6 +188,10 @@ impl<T: ItemStackStoreEntry> ItemStackStore<T> {
 
     pub(crate) fn clear(&mut self) {
         self.items.clear();
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &T> {
+        self.items.iter()
     }
 }
 

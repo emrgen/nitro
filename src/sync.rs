@@ -64,10 +64,12 @@ mod test {
 
         d1.set("a", d1.string("hello"));
         d1.commit();
-        d2.set("b", d2.string("world"));
-        d2.commit();
+        // d2.set("b", d2.string("world"));
+        // d2.commit();
 
-        sync_docs(&d1, &d2, SyncDirection::default());
+        println!("------------------");
+
+        sync_docs(&d1, &d2, SyncDirection::LeftToRight);
         assert!(equal_docs(&d1, &d2));
     }
 

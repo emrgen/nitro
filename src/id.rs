@@ -7,7 +7,7 @@ use std::ops::{Add, Sub};
 use serde::{Serialize, Serializer};
 use uuid::Uuid;
 
-use crate::bimapid::{ClientId, ClientMap};
+use crate::bimapid::{ClientId, ClientMap, ClientMapper};
 use crate::change::ChangeId;
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};

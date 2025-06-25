@@ -25,7 +25,7 @@ use crate::state::ClientState;
 use crate::store::{DocStore, StoreRef};
 use crate::tx::Tx;
 use crate::types::Type;
-use crate::{print_yaml, Client, ClientFrontier, ClockTick};
+use crate::{print_yaml, Client, ClockTick};
 
 /// Doc is a document that contains a tree of items.
 /// Everything in nitro is to manage this document change.
@@ -134,13 +134,20 @@ impl Doc {
 
         {
             let mut store = self.store.borrow_mut();
+            store.fields.extend(&diff.fields);
+            store.state.clients.extend(&diff.state.clients);
 
             let (mut changes, mut movers) = diff.changes();
+            // println!("changes: {:?}", changes);
+            // println!("movers: {:?}", movers);
+
             let mut change_ids = changes.keys().collect::<HashSet<_>>();
 
             for (change, _) in &changes {
                 store.changes.insert(change.clone());
             }
+
+            let clients = &store.state.clients.clone();
 
             // find parents for each change
             for (_, change) in &changes {
@@ -153,29 +160,49 @@ impl Doc {
                     .collect::<Vec<_>>();
                 store.dag.insert(
                     ChangeNode::new(change.id, parent_change_ids).with_mover(change.has_mover()),
+                    clients,
                 );
             }
 
-            let mut redo = Vec::new();
-            let mut undone = Vec::new();
-            // undo the changes until we undo all diff movers
-            while !movers.is_empty() {
-                if let Some((undo_change_id, flag)) = store.dag.undo() {
-                    movers.remove(&undo_change_id);
+            // remove the changes from the store to calculate the change ready order
+            change_ids.iter().for_each(|change_id| {
+                store.changes.remove(&change_id.id());
+            });
 
-                    if change_ids.remove(&undo_change_id) {
-                        redo.push(undo_change_id);
-                    } else if flag & ChangeNodeFlags::MOVE.bits() != 0 {
-                        redo.push(undo_change_id);
-                        undone.push(undo_change_id);
+            if !movers.is_empty() {
+                let mut redo = Vec::new();
+                let mut undo = Vec::new();
+                println!("movers: {:?}", movers);
+                // undo the changes until we undo all diff movers
+                while !movers.is_empty() {
+                    if let Some((undo_change_id, flag)) = store.dag.undo(clients) {
+                        movers.remove(&undo_change_id);
+
+                        if change_ids.remove(&undo_change_id) {
+                            redo.push(undo_change_id);
+                        } else if flag & ChangeNodeFlags::MOVE.bits() != 0 {
+                            redo.push(undo_change_id);
+                            undo.push(undo_change_id);
+                        }
                     }
                 }
+                store.dag.done(clients);
+
+                println!("undo: {:?}", undo);
+                println!("undo: {:?}", undo);
+                println!("redo: {:?}", redo);
+            } else {
+                println!("do: {:?}", change_ids);
             }
 
             // undo the changes that were moved
             // undo-mover does not remove the movers from the document state, it just removes them from the movers stack top
             // do - redo the changes
             // redo the changes that were undone
+
+            change_ids.iter().for_each(|change_id| {
+                store.changes.insert(*change_id.clone());
+            })
         }
 
         {

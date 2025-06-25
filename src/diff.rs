@@ -5,7 +5,7 @@ use std::cell::RefMut;
 use std::cmp::max;
 use std::ops::Add;
 
-use crate::bimapid::{ClientId, FieldMap};
+use crate::bimapid::{ClientId, ClientMapper, FieldMap};
 use crate::change::{ChangeData, ChangeId, ChangeStore, PendingChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;

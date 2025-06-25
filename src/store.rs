@@ -195,8 +195,10 @@ impl DocStore {
         // insert the new change into the change store
         self.changes.insert(change_id.clone());
         let parents = change_ids.into_iter().collect();
-        self.dag
-            .insert(ChangeNode::new(change_id, parents).with_mover(moves));
+        self.dag.insert(
+            ChangeNode::new(change_id, parents).with_mover(moves),
+            &self.state.clients,
+        );
 
         self.commited_clock = self.clock;
 
@@ -849,10 +851,11 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     }
 
     #[inline]
-    pub(crate) fn remove(&mut self, id: &Id) {
-        if let Some(store) = self.items.get_mut(&id.client) {
-            store.remove(id);
-        }
+    pub(crate) fn remove(&mut self, id: &Id) -> Option<T> {
+        self.items
+            .get_mut(&id.client)
+            .map(|store| store.remove(id))
+            .flatten()
     }
 
     pub(crate) fn replace(&mut self, item: &T, items: (T, T)) {

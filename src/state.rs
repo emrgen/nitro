@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::ops::Add;
 
-use crate::bimapid::{ClientId, ClientMap};
+use crate::bimapid::{ClientId, ClientMap, ClientMapper};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::id::ClockTick;

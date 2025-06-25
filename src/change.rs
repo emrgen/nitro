@@ -1,14 +1,15 @@
-use crate::bimapid::ClientId;
+use crate::bimapid::{ClientId, ClientMap, ClientMapper};
 use crate::dag::{ChangeDag, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::delete::DeleteItem;
 use crate::encoder::{Encode, EncodeContext, Encoder};
+use crate::hash::calculate_hash;
 use crate::id::{IdComp, IdRange, WithId};
 use crate::item::ItemKind;
 use crate::store::{
     ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
 };
-use crate::{ClientState, ClockTick, Content, Id, ItemData, Type};
+use crate::{Client, ClientState, ClockTick, Content, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
@@ -16,6 +17,7 @@ use queues::Queue;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_columnar::Itertools;
+use std::cmp::Ordering;
 use std::collections::{BTreeSet, VecDeque};
 use std::default::Default;
 use std::fmt::Debug;
@@ -229,6 +231,14 @@ impl ChangeId {
         ChangeId { client, start, end }
     }
 
+    pub(crate) fn to_client_change_id<T: ClientMapper>(&self, client_map: &T) -> ClientChangeId {
+        ClientChangeId {
+            client: client_map.get_client(&self.client).cloned().unwrap(),
+            start: self.start,
+            end: self.end,
+        }
+    }
+
     pub(crate) fn range(&self) -> Range<ClockTick> {
         self.start..self.end
     }
@@ -245,6 +255,54 @@ impl ChangeId {
             }
         } else {
             self.client.cmp(&other.client)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Hash)]
+pub(crate) struct ClientChangeId {
+    pub(crate) client: Client,
+    pub(crate) start: ClockTick,
+    pub(crate) end: ClockTick,
+}
+
+impl PartialEq<Self> for ClientChangeId {
+    fn eq(&self, other: &Self) -> bool {
+        self.client == other.client && self.start == other.start
+    }
+}
+impl Eq for ClientChangeId {}
+
+impl PartialOrd<Self> for ClientChangeId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ClientChangeId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.client == other.client {
+            if self.end < other.start {
+                (Ordering::Less)
+            } else if self.start > other.end {
+                (Ordering::Greater)
+            } else {
+                (Ordering::Equal)
+            }
+        } else {
+            let left = calculate_hash(&format!("{}{}", self.client, self.start));
+            let right = calculate_hash(&format!("{}{}", other.client, other.start));
+            left.cmp(&right)
+        }
+    }
+}
+
+impl ClientChangeId {
+    pub(crate) fn to_change_id<T: ClientMapper>(&self, client_map: &T) -> ChangeId {
+        ChangeId {
+            client: client_map.get_client_id(&self.client).cloned().unwrap(),
+            start: self.start,
+            end: self.end,
         }
     }
 }

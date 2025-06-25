@@ -189,9 +189,9 @@ impl Tx {
     pub(crate) fn apply(&mut self) -> Result<(), String> {
         // println!("[items ready to integrate: {}]", self.ready.queue.len());
 
-        let fields = self.store.upgrade().unwrap().borrow().fields.clone();
+        // let fields = self.store.upgrade().unwrap().borrow().fields.clone();
 
-        self.store.upgrade().unwrap().borrow_mut().fields = fields.as_per(&self.diff.fields);
+        // self.store.upgrade().unwrap().borrow_mut().fields = fields.as_per(&self.diff.fields);
 
         let now = std::time::Instant::now();
         let mut times: Vec<Duration> = Vec::new();
@@ -265,8 +265,8 @@ impl Tx {
         if let Some(store) = self.store.upgrade() {
             let mut store = store.borrow_mut();
 
-            store.fields.extend(&self.diff.fields);
-            store.state.clients.extend(&self.diff.state.clients);
+            // store.fields.extend(&self.diff.fields);
+            // store.state.clients.extend(&self.diff.state.clients);
             store.pending.extend(&self.pending);
             // self.pending_queue.items.iter().for_each(|(client, queue)| {
             //     for item in queue.iter() {

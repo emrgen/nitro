@@ -1,15 +1,16 @@
-use hashbrown::HashMap;
-use std::fmt::Debug;
-use std::hash::Hash;
-use std::ops::Add;
-
-use bimap::BiMap;
-use serde::{Serialize, Serializer};
-
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::mark::Mark;
 use crate::Client;
+use bimap::BiMap;
+use hashbrown::HashMap;
+use serde::{Serialize, Serializer};
+use std::cell::RefCell;
+use std::fmt::Debug;
+use std::hash::Hash;
+use std::ops::Add;
+use std::rc::Rc;
+use uuid::Uuid;
 
 /// ClientId is an u32 id that is used to identify a client
 pub type ClientId = u32;
@@ -236,6 +237,40 @@ impl Decode for EncoderMap<Mark> {
     }
 }
 
+pub(crate) trait ClientMapper {
+    fn get_client_id(&self, client_id: &Client) -> Option<&ClientId>;
+    fn get_client(&self, client: &ClientId) -> Option<&Client>;
+}
+
+#[derive(Default)]
+pub(crate) struct FixedClientMapper {
+    client_map: BiMap<ClientId, Client>,
+}
+
+impl FixedClientMapper {
+    pub(crate) fn add(&mut self, client_id: ClientId, client: Client) {
+        self.client_map.insert(client_id, client);
+    }
+}
+
+impl ClientMapper for FixedClientMapper {
+    fn get_client_id(&self, client: &Client) -> Option<&ClientId> {
+        if let Some(client_id) = self.client_map.get_by_right(client) {
+            Some(client_id)
+        } else {
+            None
+        }
+    }
+
+    fn get_client(&self, client_id: &ClientId) -> Option<&Client> {
+        if let Some(client) = self.client_map.get_by_left(client_id) {
+            Some(client)
+        } else {
+            None
+        }
+    }
+}
+
 /// ClientMap is a map that maps a client to an u32 id
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ClientMap {
@@ -288,14 +323,6 @@ impl ClientMap {
         self.map.map.remove_by_left(client);
     }
 
-    pub(crate) fn get_client_id(&self, client_id: &Client) -> Option<&ClientId> {
-        self.map.get_value(client_id)
-    }
-
-    pub(crate) fn get_client(&self, client: &ClientId) -> Option<&Client> {
-        self.map.get_key(client)
-    }
-
     pub(crate) fn as_per(&self, other: &ClientMap) -> ClientMap {
         let map = self.map.as_per(&other.map);
         ClientMap { map }
@@ -308,6 +335,16 @@ impl ClientMap {
 
     pub(crate) fn entries(&self) -> impl Iterator<Item = (&Client, &u32)> {
         self.map.map.iter()
+    }
+}
+
+impl ClientMapper for ClientMap {
+    fn get_client_id(&self, client_id: &Client) -> Option<&ClientId> {
+        self.map.get_value(client_id)
+    }
+
+    fn get_client(&self, client: &ClientId) -> Option<&Client> {
+        self.map.get_key(client)
     }
 }
 

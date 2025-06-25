@@ -127,6 +127,7 @@ pub(crate) struct DocStore {
     pub(crate) moves: HashMap<Id, Vec<Type>>,
 
     pub(crate) items: TypeStore,
+    pub(crate) movers: TypeStore,
     pub(crate) deletes: DeleteItemStore,
 
     pub(crate) pending: PendingStore,
@@ -329,6 +330,11 @@ impl DocStore {
         }
 
         let id_range = item.range();
+
+        // keep the move items in a separate store for quick undo,redo
+        if item.kind() == ItemKind::Move {
+            self.movers.insert(item.clone())
+        }
         self.items.insert(item);
 
         self.state.update(id_range.client, id_range.end);

@@ -74,6 +74,27 @@ mod test {
     }
 
     #[test]
+    fn test_sync11() {
+        let d1 = Doc::default();
+        let d2 = d1.clone_deep();
+        d2.update_client();
+
+        let list = d1.list();
+        d1.set("list", list.clone());
+
+        list.append(d1.atom("a"));
+        list.append(d1.atom("b"));
+        // list.append(d1.atom("c"));
+
+        d1.commit();
+
+        println!("------------------");
+
+        sync_docs(&d1, &d2, SyncDirection::LeftToRight);
+        assert!(equal_docs(&d1, &d2));
+    }
+
+    #[test]
     fn test_sync2() {
         let doc1 = Doc::default();
         let doc2 = doc1.clone_deep();

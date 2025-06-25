@@ -87,7 +87,7 @@ mod tests {
 
         let diff = store.get(&diff.doc_id, &ClientState::default()).unwrap();
 
-        let doc3 = Doc::from_diff(&diff).unwrap();
+        let doc3 = Doc::from(&diff).unwrap();
 
         assert_eq!(doc, doc3);
     }
@@ -107,7 +107,7 @@ mod tests {
 
         print_yaml(&ds);
 
-        let doc2 = Doc::from_diff(&ds).unwrap();
+        let doc2 = Doc::from(&ds).unwrap();
 
         doc2.set("day", doc2.atom("good day"));
 

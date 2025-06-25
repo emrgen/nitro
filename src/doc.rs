@@ -1,5 +1,6 @@
 use hashbrown::{HashMap, HashSet};
 use serde::ser::SerializeStruct;
+use serde_columnar::Itertools;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -7,12 +8,13 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
-use crate::change::{Change, ChangeData, ChangeId, ChangeStore};
+use crate::change::{sort_changes, Change, ChangeData, ChangeId, ChangeStore};
+use crate::cycle::creates_cycle;
 use crate::dag::{ChangeNode, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::diff::Diff;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{Id, WithId};
+use crate::id::{Id, WithId, WithTarget};
 use crate::item::{Content, DocProps, ItemKey};
 use crate::json::JsonDoc;
 use crate::mark::Mark;
@@ -79,20 +81,8 @@ impl Doc {
         JsonDoc::new(json).to_doc()
     }
 
-    /// Document ID
-    pub fn id(&self) -> DocId {
-        self.meta.id.clone()
-    }
-
-    pub(crate) fn state(&self) -> ClientState {
-        let store = self.store.borrow();
-
-        let state = &store.state;
-        store.state.clone()
-    }
-
-    // create a new doc from a diff
-    pub(crate) fn from_diff(diff: &Diff) -> Option<Doc> {
+    /// create a new doc from a diff
+    pub fn from(diff: &Diff) -> Option<Doc> {
         if let Some(root) = &diff.get_root() {
             if let Content::Doc(content) = &root.content {
                 let doc = Doc::new(DocMeta {
@@ -109,6 +99,19 @@ impl Doc {
         }
 
         None
+    }
+
+    /// Document ID
+    #[inline]
+    pub fn id(&self) -> DocId {
+        self.meta.id.clone()
+    }
+
+    pub(crate) fn state(&self) -> ClientState {
+        let store = self.store.borrow();
+
+        let state = &store.state;
+        store.state.clone()
     }
 
     /// Create a new document diff from the current document and the given ClientState
@@ -148,16 +151,29 @@ impl Doc {
             }
 
             let clients = &store.state.clients.clone();
+            let mut parents = HashMap::new();
 
             // find parents for each change
             for (_, change) in &changes {
+                // println!("change_id: {:?}, deps: {:?}", change.id, change.deps);
+                // println!("change_id: {:?}", store.changes.get(&Id::new(0, 1)));
                 let parent_change_ids: Vec<ChangeId> = change
                     .deps
                     .iter()
-                    .map(|id| store.changes.get(id).unwrap())
+                    .filter(|id| !change.id.contains(id)) // filter out the self dependency
+                    .map(|id| store.changes.get(id).unwrap()) // find the parent change IDs
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
+
+                // println!("parents: {:?}", parent_change_ids);
+                let diff_parents = parent_change_ids
+                    .clone()
+                    .iter()
+                    .filter(|id| change_ids.contains(id))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                parents.insert(change.id, diff_parents);
                 store.dag.insert(
                     ChangeNode::new(change.id, parent_change_ids).with_mover(change.has_mover()),
                     clients,
@@ -169,9 +185,10 @@ impl Doc {
                 store.changes.remove(&change_id.id());
             });
 
+            let mut redo = Vec::new();
+            let mut undo_movers = Vec::new();
+
             if !movers.is_empty() {
-                let mut redo = Vec::new();
-                let mut undo = Vec::new();
                 println!("movers: {:?}", movers);
                 // undo the changes until we undo all diff movers
                 while !movers.is_empty() {
@@ -182,23 +199,69 @@ impl Doc {
                             redo.push(undo_change_id);
                         } else if flag & ChangeNodeFlags::MOVE.bits() != 0 {
                             redo.push(undo_change_id);
-                            undo.push(undo_change_id);
+                            undo_movers.push(undo_change_id);
                         }
                     }
                 }
                 store.dag.done(clients);
 
-                println!("undo: {:?}", undo);
-                println!("undo: {:?}", undo);
+                println!("undo: {:?}", undo_movers);
+                println!("undo: {:?}", undo_movers);
                 println!("redo: {:?}", redo);
             } else {
                 println!("do: {:?}", change_ids);
             }
 
-            // undo the changes that were moved
+            let mut ready = sort_changes(parents);
+
+            println!("ready: {:?}", ready);
+            // println!("parents: {:?}", parents);
+
+            // // undo the changes that were moved
+            while !ready.is_empty() {
+                // do integrate the items from new change
+                let change_id = ready.pop_front().unwrap();
+                store.changes.insert(change_id.clone());
+            }
+
             // undo-mover does not remove the movers from the document state, it just removes them from the movers stack top
+            undo_movers.reverse();
+            // just remove the movers from the document state
+            for mover_change in &undo_movers {
+                // find the movers
+                let movers = store.movers.find_by_range(*mover_change);
+                for mover in movers.into_iter().rev() {
+                    if let Some(target) = mover.item_ref().get_target() {
+                        store.remove_mover(target.id(), &mover);
+                    }
+                }
+            }
+
+            // NOTE: this section is active only when there was mover item in undo-changes and in current change
             // do - redo the changes
             // redo the changes that were undone
+            for change_id in &redo {
+                // if this change was undone, and it includes a mover, we need to re-apply the mover
+                // if applying the mover creates cycle, we need to skip it
+                if undo_movers.contains(change_id) {
+                    for mover in store.movers.find_by_range(*change_id) {
+                        match (mover.item_ref().get_target(), mover.parent()) {
+                            (Some(target), Some(parent)) => {
+                                if !creates_cycle(&parent, &target) {
+                                    store.add_mover(target.id(), mover);
+                                }
+                            }
+                            _ => todo!(),
+                        }
+                    }
+                } else {
+
+                    // do integrate the items from new change
+                    // println!("redo: {:?}", change_id);
+                }
+
+                store.changes.insert(change_id.clone());
+            }
 
             change_ids.iter().for_each(|change_id| {
                 store.changes.insert(*change_id.clone());
@@ -211,52 +274,6 @@ impl Doc {
             tx.commit();
         }
     }
-
-    // prepare the changes for the document
-    // calculate the changes that need to be rolled back and the changes that need to be applied
-    // the changes are not fully materialized yet
-    // fn prepare_changes(&self, diff: &Diff) -> (Vec<Change>, Vec<Change>) {
-    //     let mut store = self.store.borrow_mut();
-    //     let frontier = store.changes.change_frontier();
-    //     let mut undo = Vec::new();
-    //     let (mut diff_changes, move_changes) = diff.changes();
-    //
-    //     if move_changes.is_empty() {
-    //         // move changes are present in the diff
-    //         let deps: Vec<ChangeId> = move_changes
-    //             .iter()
-    //             .map(|change| change.deps.clone())
-    //             .flatten()
-    //             .map(|id| id.clone().into())
-    //             .collect();
-    //
-    //         // need to undo-redo the changes
-    //         // let change_ids = store.dag.after(ChangeFrontier::new(deps));
-    //         // for id in change_ids {
-    //         // let items = store.items.find_by_range(id.into());
-    //         // let deleted_items = store.deleted_items.find_by_range(id.into());
-    //         // Change::new(id.clone(), items, deleted_items)
-    //         // }
-    //     }
-    //
-    //     while !diff_changes.is_empty() {
-    //         if let Some(change) = diff_changes.find_ready(&store.dag) {
-    //             diff_changes.progress(&change.id.client);
-    //             // let deps = change.deps.iter().map(|id| id.clone().into()).collect();
-    //             // store.dag.insert(&change.id, deps);
-    //         } else {
-    //             // println!("diff changes: {:?}", diff_changes);
-    //             break;
-    //             // unreachable!("should not happen");
-    //         }
-    //     }
-    //
-    //     // println!("frontier: {:?}", frontier);
-    //     let changes = store.dag.after(frontier);
-    //     // println!("diff changes: {:?}", changes);
-    //
-    //     (undo, vec![])
-    // }
 
     /// Create a new list type in the document
     pub fn list(&self) -> NList {

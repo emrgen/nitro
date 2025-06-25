@@ -6,7 +6,7 @@ use std::cmp::max;
 use std::ops::Add;
 
 use crate::bimapid::{ClientId, ClientMapper, FieldMap};
-use crate::change::{ChangeData, ChangeId, ChangeStore, PendingChangeStore};
+use crate::change::{ChangeData, ChangeId, ChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};

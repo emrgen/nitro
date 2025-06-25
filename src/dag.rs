@@ -201,12 +201,15 @@ impl ChangeDag {
             .for_each(|change_id| self.parents.add(change_id.id()));
 
         if let Some(last) = self.store.last(&node.client()) {
-            self.queue
-                .remove(&last.change.to_client_change_id(client_map));
+            if let Some(last) = last.change.to_client_change_id(client_map) {
+                self.queue.remove(&last);
+            }
         }
 
-        self.queue
-            .insert(node.change.to_client_change_id(client_map));
+        if let Some(last) = node.change.to_client_change_id(client_map) {
+            self.queue.insert(last);
+        }
+
         // insert into ends
         self.ends.insert(node.change.client, node.change.clone());
 
@@ -220,48 +223,54 @@ impl ChangeDag {
         // pop the last change from the queue
         let last_id = self.queue.pop_last();
         if let Some(client_change_id) = last_id {
-            let change_id = client_change_id.to_change_id(client_map);
-            let cursor = self.store.cursor(change_id.client);
+            if let Some(change_id) = client_change_id.to_change_id(client_map) {
+                let cursor = self.store.cursor(change_id.client);
 
-            // move the cursor to the previous change
-            self.store.prev(change_id.client);
-            self.dirty.insert(change_id.client);
+                // move the cursor to the previous change
+                self.store.prev(change_id.client);
+                self.dirty.insert(change_id.client);
 
-            if let Some(cursor) = cursor {
-                self.store
-                    .at_cursor(change_id.client, cursor)
-                    .map(|node| &node.parents)
-                    .map(|parents| {
-                        parents.iter().for_each(|id| {
-                            if self.parents.unlink_parent(id.id()) {
-                                if let Some(last) = self.store.current(id.client) {
-                                    // if the last change has become ready to be undone,
-                                    if last.id() == id.id() {
-                                        self.queue
-                                            .insert(last.change.to_client_change_id(client_map));
-                                        self.ends.insert(last.change.client, last.change.clone());
+                if let Some(cursor) = cursor {
+                    self.store
+                        .at_cursor(change_id.client, cursor)
+                        .map(|node| &node.parents)
+                        .map(|parents| {
+                            parents.iter().for_each(|id| {
+                                if self.parents.unlink_parent(id.id()) {
+                                    if let Some(last) = self.store.current(id.client) {
+                                        // if the last change has become ready to be undone,
+                                        if last.id() == id.id() {
+                                            if let Some(last) =
+                                                last.change.to_client_change_id(client_map)
+                                            {
+                                                self.queue.insert(last);
+                                            }
+                                            self.ends
+                                                .insert(last.change.client, last.change.clone());
+                                        }
                                     }
                                 }
-                            }
+                            });
                         });
-                    });
-            }
-
-            if let Some(curr) = self.store.current(change_id.client) {
-                if self.parents.is_ready(curr.change.id()) {
-                    self.queue
-                        .insert(curr.change.to_client_change_id(client_map));
-                    self.ends.insert(curr.change.client, curr.change.clone());
                 }
+
+                if let Some(curr) = self.store.current(change_id.client) {
+                    if self.parents.is_ready(curr.change.id()) {
+                        if let Some(curr) = curr.change.to_client_change_id(client_map) {
+                            self.queue.insert(curr);
+                        }
+                        self.ends.insert(curr.change.client, curr.change.clone());
+                    }
+                }
+
+                let flags = self
+                    .store
+                    .find(change_id.id())
+                    .map(|node| node.flags)
+                    .unwrap_or_default();
+
+                return Some((change_id, flags));
             }
-
-            let flags = self
-                .store
-                .find(change_id.id())
-                .map(|node| node.flags)
-                .unwrap_or_default();
-
-            return Some((change_id, flags));
         }
 
         None
@@ -272,10 +281,13 @@ impl ChangeDag {
         self.dirty.iter().for_each(|client_id| {
             self.store.reset_cursor(&client_id);
             if let Some(end) = self.ends.get(client_id) {
-                self.queue.remove(&end.to_client_change_id(client_map));
+                if let Some(end) = end.to_client_change_id(client_map) {
+                    self.queue.remove(&end);
+                }
                 if let Some(last) = self.store.last(client_id) {
-                    self.queue
-                        .insert(last.change.to_client_change_id(client_map));
+                    if let Some(last) = last.change.to_client_change_id(client_map) {
+                        self.queue.insert(last);
+                    }
                 }
             }
         });

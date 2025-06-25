@@ -25,6 +25,12 @@ use std::hash::{Hash, Hasher};
 use std::mem::swap;
 use std::ops::Range;
 
+pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> VecDeque<ChangeId> {
+    let mut ready = VecDeque::new();
+
+    ready
+}
+
 /// Change represents a set of changes made to a document by one client in a single transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
@@ -86,49 +92,6 @@ impl Change {
     // apply the changes to the document through the store
     pub(crate) fn try_apply(&mut self, store: WeakStoreRef) -> Result<(), String> {
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub(crate) struct PendingChangeStore {
-    // the pending changes for each client
-    pub(crate) pending: HashMap<ClientId, Vec<ChangeId>>,
-    pub(crate) changes: HashMap<Id, ChangeData>,
-}
-
-impl PendingChangeStore {
-    pub(crate) fn add(&mut self, change: ChangeData) {
-        self.pending
-            .entry(change.id.client)
-            .or_insert_with(Vec::new)
-            .push(change.id);
-        self.changes.insert(change.id.id(), change);
-    }
-
-    pub(crate) fn remove(&mut self, id: Id) {
-        // just remove the change from the pending changes
-        self.changes.remove(&id);
-    }
-
-    pub(crate) fn ready_list(mut self) -> Vec<ChangeData> {
-        let mut ready = Vec::new();
-        // let mut children = HashMap::new();
-        // let mut queue = BTreeSet::new();
-        // for (client, change) in self.changes.iter() {
-        //     queue.insert(change.id.clone());
-        // }
-        //
-        // while !queue.is_empty() {
-        //     if let Some(first) = queue.pop_first() {
-        //         if let Some(change) = self.changes.remove(&first.id()) {
-        //             ready.push(change);
-        //         }
-        //
-        //         // pull the first
-        //     }
-        // }
-
-        ready
     }
 }
 
@@ -231,12 +194,14 @@ impl ChangeId {
         ChangeId { client, start, end }
     }
 
-    pub(crate) fn to_client_change_id<T: ClientMapper>(&self, client_map: &T) -> ClientChangeId {
-        ClientChangeId {
-            client: client_map.get_client(&self.client).cloned().unwrap(),
-            start: self.start,
-            end: self.end,
-        }
+    pub(crate) fn to_client_change_id<T: ClientMapper>(
+        &self,
+        client_map: &T,
+    ) -> Option<ClientChangeId> {
+        client_map
+            .get_client(&self.client)
+            .cloned()
+            .map(|client| ClientChangeId::new(client, self.start, self.end))
     }
 
     pub(crate) fn range(&self) -> Range<ClockTick> {
@@ -244,18 +209,22 @@ impl ChangeId {
     }
 
     #[inline]
-    pub(crate) fn comp(&self, other: &Self) -> std::cmp::Ordering {
+    pub(crate) fn comp(&self, other: &Self) -> Ordering {
         if self.client == other.client {
             if self.end < other.start {
-                std::cmp::Ordering::Less
+                Ordering::Less
             } else if self.start > other.end {
-                std::cmp::Ordering::Greater
+                Ordering::Greater
             } else {
-                std::cmp::Ordering::Equal
+                Ordering::Equal
             }
         } else {
             self.client.cmp(&other.client)
         }
+    }
+
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.client == id.client && self.start <= id.clock && id.clock <= self.end
     }
 }
 
@@ -264,6 +233,16 @@ pub(crate) struct ClientChangeId {
     pub(crate) client: Client,
     pub(crate) start: ClockTick,
     pub(crate) end: ClockTick,
+}
+
+impl ClientChangeId {
+    pub(crate) fn new(client: Client, start: ClockTick, end: ClockTick) -> Self {
+        ClientChangeId { client, start, end }
+    }
+
+    pub(crate) fn range(&self) -> Range<ClockTick> {
+        self.start..self.end
+    }
 }
 
 impl PartialEq<Self> for ClientChangeId {
@@ -298,12 +277,11 @@ impl Ord for ClientChangeId {
 }
 
 impl ClientChangeId {
-    pub(crate) fn to_change_id<T: ClientMapper>(&self, client_map: &T) -> ChangeId {
-        ChangeId {
-            client: client_map.get_client_id(&self.client).cloned().unwrap(),
-            start: self.start,
-            end: self.end,
-        }
+    pub(crate) fn to_change_id<T: ClientMapper>(&self, client_map: &T) -> Option<ChangeId> {
+        client_map
+            .get_client_id(&self.client)
+            .cloned()
+            .map(|client_id| ChangeId::new(client_id, self.start, self.end))
     }
 }
 

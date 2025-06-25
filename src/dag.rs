@@ -308,7 +308,7 @@ impl ChangeDag {
 }
 
 // Testing utility to generate a random DAG
-struct RandomDag {
+pub(crate) struct RandomDag {
     clients: Vec<ClientId>,
     ends: HashMap<ClientId, u32>,
     changes: Vec<ChangeId>,
@@ -322,7 +322,11 @@ impl RandomDag {
         Self::with_clients(1, 0)
     }
 
-    fn with_clients(count: u32, rand: u64) -> Self {
+    pub(crate) fn parents(&self, child: &ChangeId) -> Vec<ChangeId> {
+        self.parents.get(child).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn with_clients(count: u32, rand: u64) -> Self {
         let clients = (0..count).map(|i| i).collect::<Vec<ClientId>>();
         let change = ChangeId::new(0, 1, 1);
         let mut ends = HashMap::new();
@@ -343,7 +347,7 @@ impl RandomDag {
     }
 
     // randomly generate a DAG with the given number of nodes
-    fn generate(&mut self, nodes: u32) {
+    pub(crate) fn generate(&mut self, nodes: u32) {
         for _ in 0..nodes {
             let client = self.clients[self.rng.gen_range(0..self.clients.len())];
             // randomly choose parents
@@ -377,7 +381,7 @@ impl RandomDag {
     }
 
     // random topological sort of the changes
-    fn sort(&mut self) -> Vec<ChangeId> {
+    pub(crate) fn sort(&mut self) -> Vec<ChangeId> {
         let mut done = HashSet::new();
         let mut sorted = Vec::new();
         let mut store = ChangeStore::default();

@@ -52,7 +52,7 @@ struct ChangeListNode {
 }
 
 struct ChangeList {
-    index_map: BTree<FractionalIndex, Id>,
+    index_map: BTree<FractionalIndex, ChangeId>,
     changes: HashMap<Id, ChangeListNode>,
     moves: BTree<FractionalIndex, ()>, // sorted moves
 }
@@ -76,7 +76,7 @@ impl ChangeList {
             flag: 0,
         };
 
-        self.index_map.insert(node.index.clone(), change_id.id());
+        self.index_map.insert(node.index.clone(), change_id.clone());
         self.changes.insert(change_id.id(), node);
     }
 
@@ -108,6 +108,7 @@ impl ChangeList {
         parent_node.children.insert(pos, child_id);
 
         let prev_item = if pos == 0 {
+            println!("parent: {}", parent_id.id());
             parent_id.id()
         } else {
             let sibling = parent_node
@@ -118,6 +119,7 @@ impl ChangeList {
                 .flatten()
                 .unwrap();
 
+            println!("xxx");
             sibling.last_decedent
         };
 
@@ -129,18 +131,34 @@ impl ChangeList {
             .unwrap()
             .clone();
         let prev_index = self.index_map.index_of(&prev_frac_index).unwrap_or(0);
+        let items = self
+            .index_map
+            .iter()
+            .map(|cid| return (cid.0, cid.1))
+            .collect::<Vec<_>>();
+
+        println!(
+            "prev_index: {}, prev_frac_index: {:?}, items: {:?}",
+            prev_index, prev_frac_index, items
+        );
+
         let next_frac_index = self
             .index_map
             .at_index(prev_index + 1)
-            .map(|n| self.changes.get(n))
+            .map(|n| self.changes.get(&n.id()))
             .map(|n| n.map(|n| n.index.clone()))
             .flatten();
 
-        let frac_index = match (next_frac_index) {
+        let frac_index = match (&next_frac_index) {
             Some(next_index) => FractionalIndex::new_between(&prev_frac_index, &next_index),
             _ => Option::from({ FractionalIndex::new_after(&prev_frac_index) }),
         }
-        .unwrap();
+        .unwrap_or_else(|| {
+            panic!(
+                "failed to create a change frac index: prev: {:?}, next: {:?}",
+                prev_frac_index, next_frac_index
+            );
+        });
 
         // If the flags indicate a move, insert it into the moves map
         if flags > 0 {
@@ -157,7 +175,7 @@ impl ChangeList {
             flag: flags,
         };
 
-        self.index_map.insert(node.index.clone(), change_id.id());
+        self.index_map.insert(node.index.clone(), change_id.clone());
         self.changes.insert(id, node);
 
         let mut count = 0;
@@ -192,12 +210,17 @@ impl ChangeList {
     pub(crate) fn contains(&self, change_id: &ChangeId) -> bool {
         self.changes.contains_key(&change_id.id())
     }
+
+    pub(crate) fn sort_changes(&self) -> Vec<ChangeId> {
+        self.index_map.iter().map(|(_, cid)| cid.clone()).collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::bimapid::FixedClientMapper;
+    use crate::dag::{ChangeDag, ChangeNode, RandomDag};
     use crate::Client;
     use uuid::Uuid;
 
@@ -231,5 +254,58 @@ mod tests {
         assert_eq!(list.index_of(&c3), Some(2));
         assert_eq!(list.index_of(&c4), Some(3));
         assert_eq!(list.index_of(&c5), Some(4));
+    }
+
+    fn insert_into<T: ClientMapper>(
+        list: &mut ChangeList,
+        dag: &RandomDag,
+        clients: &T,
+        child: &ChangeId,
+    ) {
+        let parents = dag.parents(child);
+        let parent = parents.iter().max_by_key(|k| list.index_of(k));
+        if let Some(parent) = parent {
+            list.insert(child, parent, 0, clients)
+        } else {
+            list.insert_root(child);
+        }
+    }
+
+    #[test]
+    fn test_change_list_generate_random_dag() {
+        let mut rng = rand::thread_rng();
+        let clients = 1;
+        let mut dag = RandomDag::with_clients(clients, 2);
+        let mut client_map = FixedClientMapper::default();
+        for i in 0..clients {
+            client_map.add(i, Client::UUID(Uuid::new_v4()));
+        }
+        dag.generate(13);
+
+        let sort1 = dag.sort();
+        let mut list = ChangeList::new();
+        let mut count = 0;
+        sort1.iter().for_each(|id| {
+            count += 1;
+            println!("count: {}, id: {:?}", count, id);
+            insert_into(&mut list, &dag, &client_map, id);
+        });
+        let sorted_changes1 = list.sort_changes();
+
+        println!("changes: {:?}", list.sort_changes());
+
+        // for i in 0..1 {
+        //     let sort2 = dag.sort();
+        //     let mut list = ChangeList::new();
+        //     sort2.iter().for_each(|id| {
+        //         insert_into(&mut list, &dag, &client_map, id);
+        //     });
+        //
+        //     let sorted_changes2 = list.sort_changes();
+        //
+        //     // the change integration may happen in any order
+        //     // assert_ne!(sort1, sort2);
+        //     // assert_eq!(sorted_changes1, sorted_changes2);
+        // }
     }
 }

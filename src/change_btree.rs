@@ -66,6 +66,15 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Leaf<K, V> {
     fn size(&self) -> usize {
         self.values.len()
     }
+
+    fn print(&self, tree: &mut TreeBuilder) {
+        let mut string_builder = String::new();
+        string_builder.push_str(&format!("Leaf: {} => ", self.keys.capacity()));
+        for (key, value) in self.keys.iter().zip(&self.values) {
+            string_builder.push_str(&format!("{:?}: {:?}, ", key, value));
+        }
+        tree.begin_child(string_builder).end_child();
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -163,12 +172,31 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Branch<K, V> {
     fn size(&self) -> usize {
         self.total
     }
+
+    fn print(&self, tree: &mut TreeBuilder) {
+        tree.begin_child(format!("Branch: {}", self.keys.len()));
+        for (i, child) in self.children.iter().enumerate() {
+            if i > 0 {
+                let key = self.keys.get(i - 1);
+                tree.begin_child(format!("Key: {:?}", key.unwrap()));
+            } else {
+                tree.begin_child(format!("Key: {}", "#"));
+            }
+            child.print(tree);
+            tree.end_child();
+        }
+        tree.end_child();
+    }
 }
 
 #[derive(Debug, Clone)]
 enum Node<K, T> {
     Leaf(Leaf<K, T>),
     Branch(Branch<K, T>),
+}
+
+fn binary_search<K: Ord + Debug>(keys: &[K], key: &K) -> usize {
+    keys.partition_point(|k| k <= key)
 }
 
 impl<K: Ord + Clone + Debug, V: Clone + Debug> Node<K, V> {
@@ -192,11 +220,33 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Node<K, V> {
     fn find(&self, key: &K) -> Option<&V> {
         match self {
             Node::Leaf(leaf) => {
-                let pos = leaf.keys.binary_search(key).ok()?;
-                Some(&leaf.values[pos])
+                let mut tree = TreeBuilder::new(format!("Leaf: {:?}", self.size()));
+                leaf.print(&mut tree);
+                print_tree(&tree.build()).unwrap();
+
+                let pos = leaf.keys.binary_search(key).unwrap_or_else(|e| e);
+                if leaf.keys.len() > pos && leaf.keys.get(pos) == Some(key) {
+                    leaf.values.get(pos)
+                } else {
+                    None
+                }
             }
             Node::Branch(branch) => {
-                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                let mut tree = TreeBuilder::new(format!("Branch: {:?}", self.size()));
+                branch.print(&mut tree);
+                print_tree(&tree.build()).unwrap();
+
+                let pos = branch.keys.partition_point(|k| k <= key);
+
+                // let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                println!(
+                    "key: {:?}, pos: {}, keys: {:?}, children: {}",
+                    key,
+                    pos,
+                    branch.keys,
+                    branch.children.len()
+                );
+
                 if pos < branch.children.len() {
                     branch.children[pos].find(key)
                 } else {
@@ -241,9 +291,15 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Node<K, V> {
         match self {
             Node::Leaf(leaf) => leaf.keys.binary_search(key).ok(),
             Node::Branch(branch) => {
-                let pos = branch.keys.binary_search(key).unwrap_or_else(|e| e);
+                let pos = branch.keys.partition_point(|k| k <= key);
                 if pos < branch.children.len() {
-                    branch.children[pos].index_of(key)
+                    // calculate total value count in children[0..pos]
+                    let total_size: usize = branch.children[0..pos]
+                        .iter()
+                        .map(|child| child.size())
+                        .sum();
+
+                    branch.children[pos].index_of(key).map(|i| i + total_size)
                 } else {
                     None
                 }
@@ -371,28 +427,8 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Node<K, V> {
 
     fn print(&self, tree: &mut TreeBuilder) {
         match self {
-            Node::Leaf(leaf) => {
-                let mut string_builder = String::new();
-                string_builder.push_str(&format!("Leaf: {} => ", leaf.keys.capacity()));
-                for (key, value) in leaf.keys.iter().zip(&leaf.values) {
-                    string_builder.push_str(&format!("{:?}: {:?}, ", key, value));
-                }
-                tree.begin_child(string_builder).end_child();
-            }
-            Node::Branch(branch) => {
-                tree.begin_child(format!("Branch: {}", branch.keys.len()));
-                for (i, child) in branch.children.iter().enumerate() {
-                    if i > 0 {
-                        let key = branch.keys.get(i - 1);
-                        tree.begin_child(format!("Key: {:?}", key.unwrap()));
-                    } else {
-                        tree.begin_child(format!("Key: {}", "#"));
-                    }
-                    child.print(tree);
-                    tree.end_child();
-                }
-                tree.end_child();
-            }
+            Node::Leaf(leaf) => leaf.print(tree),
+            Node::Branch(branch) => branch.print(tree),
         }
     }
 }
@@ -506,7 +542,7 @@ impl<'a, K: Ord + Clone + Debug, V: Debug> EntryIter<'a, K, V> {
     }
 }
 
-impl<'a, K: Ord + Clone + Display + Debug, V: Debug + Clone> Iterator for EntryIter<'a, K, V> {
+impl<'a, K: Ord + Clone + Debug, V: Debug + Clone> Iterator for EntryIter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -607,6 +643,45 @@ mod tests {
         assert_eq!(tree.at_index(4), Some(&"B"));
         assert_eq!(tree.at_index(5), Some(&"G"));
         assert_eq!(tree.at_index(6), Some(&"C"));
+    }
+
+    #[test]
+    fn test_btree_index_of() {
+        for i in 0..1 {
+            for order in 2..3 {
+                let mut tree = BTree::new(order);
+
+                let mut keys = (0..4).collect::<Vec<_>>();
+                let sorted_keys = keys.clone();
+
+                let mut rng = StdRng::seed_from_u64(i);
+                // Shuffle the keys to ensure random order
+                keys.shuffle(&mut rng);
+
+                for k in &keys {
+                    tree.insert(*k, *k);
+                }
+
+                // tree.print();
+
+                // let index = tree.index_of(&3).unwrap();
+                for k in &sorted_keys {
+                    let index = tree.index_of(k).unwrap();
+                    // println!("key: {}, index: {:?}", k, index);
+                }
+                let sorted = sorted_keys
+                    .iter()
+                    .map(|k| tree.index_of(k).unwrap())
+                    .collect::<Vec<_>>();
+                assert_eq!(sorted, sorted_keys);
+            }
+        }
+    }
+
+    #[test]
+    fn test_binary_search() {
+        let l1 = [1, 2, 3, 4, 5];
+        assert_eq!(binary_search(&l1, &3), 3);
     }
 
     #[test]

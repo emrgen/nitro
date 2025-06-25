@@ -1,5 +1,7 @@
 A high performance CRDT library.
 
+**Note**: This project is under active development. **NOT READY FOR PRODUCTION USE**
+
 ### Bench
 
 ```

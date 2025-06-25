@@ -164,15 +164,13 @@ impl DocStore {
 
         // println!("change_id: {:?}", change_id);
 
-        self.insert_change(change_id);
-
         // find the highest change dependency for the change
 
         let mut deps = HashSet::new();
 
         let mut moves = false;
         // update the deps for the inserted items
-        self.items.find_by_range(change_id).iter().map(|item| {
+        self.items.get_by_range(change_id).iter().map(|item| {
             let data = item.data();
             moves |= data.kind == ItemKind::Move;
             deps.extend(data.deps())
@@ -180,7 +178,7 @@ impl DocStore {
 
         // update the deps for the change deletes
         self.deletes
-            .find_by_range(change_id)
+            .get_by_range(change_id)
             .iter()
             .map(|item| deps.insert(item.target()));
 
@@ -194,7 +192,7 @@ impl DocStore {
         }
 
         // insert the new change into the change store
-        self.changes.insert(change_id.clone());
+        self.insert_change(change_id.clone());
         let parents = change_ids.into_iter().collect();
         self.dag.insert(
             ChangeNode::new(change_id, parents).with_mover(moves),
@@ -216,10 +214,10 @@ impl DocStore {
         let range = IdRange::new(self.client, self.commited_clock, self.clock + 1);
 
         // find all items within the clock tick
-        let items = self.items.find_by_range(range);
+        let items = self.items.get_by_range(range);
         items.iter().rev().for_each(|item| self.remove(&item.id()));
 
-        let deleted = self.deletes.find_by_range(range);
+        let deleted = self.deletes.get_by_range(range);
         items
             .iter()
             .rev()
@@ -376,6 +374,7 @@ impl DocStore {
 
     #[inline]
     pub(crate) fn insert_change(&mut self, change_id: ChangeId) {
+        println!("insert change: {:?}", change_id);
         self.changes.insert(change_id);
     }
 
@@ -805,6 +804,16 @@ impl<T: ClientStoreEntry> ClientStore<T> {
             .and_then(|store| store.map.get_mut(id))
     }
 
+    /// get items in the inclusive clock range [start, end] for the given client
+    #[inline]
+    pub(crate) fn get_by_range(&self, range: impl Into<IdRange>) -> Vec<T> {
+        let range = range.into();
+        self.items
+            .get(&range.client)
+            .map(|store| store.get_range(&range))
+            .unwrap_or_default()
+    }
+
     pub(crate) fn contains(&self, id: &Id) -> bool {
         self.items
             .get(&id.client)
@@ -817,16 +826,6 @@ impl<T: ClientStoreEntry> ClientStore<T> {
     #[inline]
     pub(crate) fn store(&mut self, client_id: &ClientId) -> &mut ItemStore<T> {
         self.items.entry(*client_id).or_default()
-    }
-
-    /// get items in the inclusive clock range [start, end] for the given client
-    #[inline]
-    pub(crate) fn find_by_range(&self, range: impl Into<IdRange>) -> Vec<T> {
-        let range = range.into();
-        self.items
-            .get(&range.client)
-            .map(|store| store.get_range(&range))
-            .unwrap_or_default()
     }
 
     #[inline]
@@ -983,7 +982,7 @@ impl<T: ItemStoreEntry> ItemStore<T> {
     // get items in the inclusive clock range [start, end]
     pub(crate) fn get_range(&self, range: &IdRange) -> Vec<T> {
         let start = Id::new(range.client, range.start);
-        let end = Id::new(range.client, range.end + 1);
+        let end = Id::new(range.client, range.end);
         self.map
             .range(start..=end)
             .map(|(_, v)| v.clone())

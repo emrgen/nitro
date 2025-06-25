@@ -147,6 +147,7 @@ impl Doc {
             let mut change_ids = changes.keys().collect::<HashSet<_>>();
 
             for (change, _) in &changes {
+                println!("inserting: {:?}", change);
                 store.changes.insert(change.clone());
             }
 
@@ -155,13 +156,18 @@ impl Doc {
 
             // find parents for each change
             for (_, change) in &changes {
-                // println!("change_id: {:?}, deps: {:?}", change.id, change.deps);
-                // println!("change_id: {:?}", store.changes.get(&Id::new(0, 1)));
+                println!("change_id: {:?}, deps: {:?}", change.id, change.deps);
                 let parent_change_ids: Vec<ChangeId> = change
                     .deps
                     .iter()
                     .filter(|id| !change.id.contains(id)) // filter out the self dependency
-                    .map(|id| store.changes.get(id).unwrap()) // find the parent change IDs
+                    .map(|id| {
+                        let client_store = store.changes.id_store(&id.client);
+                        println!("client_store: {:?}", client_store);
+                        let dound = client_store.map(|store| store.get(id)).flatten();
+                        println!("id: {:?}, found: {:?}", id, dound);
+                        dound.unwrap()
+                    }) // find the parent change IDs
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
@@ -217,11 +223,11 @@ impl Doc {
             println!("ready: {:?}", ready);
             // println!("parents: {:?}", parents);
 
-            // // undo the changes that were moved
-            while !ready.is_empty() {
+            // undo the changes that were moved
+            for change_id in &ready {
                 // do integrate the items from new change
-                let change_id = ready.pop_front().unwrap();
                 store.changes.insert(change_id.clone());
+                // println!("redo: {:?}", change_id);
             }
 
             // undo-mover does not remove the movers from the document state, it just removes them from the movers stack top
@@ -229,7 +235,7 @@ impl Doc {
             // just remove the movers from the document state
             for mover_change in &undo_movers {
                 // find the movers
-                let movers = store.movers.find_by_range(*mover_change);
+                let movers = store.movers.get_by_range(*mover_change);
                 for mover in movers.into_iter().rev() {
                     if let Some(target) = mover.item_ref().get_target() {
                         store.remove_mover(target.id(), &mover);
@@ -244,7 +250,7 @@ impl Doc {
                 // if this change was undone, and it includes a mover, we need to re-apply the mover
                 // if applying the mover creates cycle, we need to skip it
                 if undo_movers.contains(change_id) {
-                    for mover in store.movers.find_by_range(*change_id) {
+                    for mover in store.movers.get_by_range(*change_id) {
                         match (mover.item_ref().get_target(), mover.parent()) {
                             (Some(target), Some(parent)) => {
                                 if !creates_cycle(&parent, &target) {

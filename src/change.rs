@@ -25,8 +25,43 @@ use std::hash::{Hash, Hasher};
 use std::mem::swap;
 use std::ops::Range;
 
-pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> VecDeque<ChangeId> {
-    let mut ready = VecDeque::new();
+// topological sort the changes as per dependencies
+pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> Vec<ChangeId> {
+    let mut ready = Vec::new();
+    let mut queue = VecDeque::new();
+    let mut inputs = HashMap::new();
+    let mut children_changes = HashMap::new();
+
+    for (change_id, parents) in &parents {
+        if parents.len() == 0 {
+            queue.push_back(change_id);
+        }
+
+        inputs.insert(change_id, parents.len());
+        parents.iter().for_each(|parent| {
+            children_changes
+                .entry(parent.clone())
+                .or_insert_with(Vec::new)
+                .push(change_id.clone())
+        })
+    }
+
+    while let Some(change_id) = queue.pop_front() {
+        ready.push(change_id.clone());
+        let children1 = children_changes.get(change_id).cloned();
+
+        if let Some(children) = children1 {
+            for child in children {
+                if let Some(input) = inputs.get_mut(&child) {
+                    // update the input count
+                    *input -= 1;
+                    if *input == 0 {
+                        queue.push_back(change_id);
+                    }
+                }
+            }
+        }
+    }
 
     ready
 }
@@ -371,9 +406,19 @@ impl Serialize for ChangeId {
 
 // TODO: use bitmap based change id store for smaller memory footprint in disk
 /// ChangeStoreX is a store for changes made to a document.
-pub(crate) type ChangeStore = ClientStore<ChangeId>;
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ChangeStore {
+    map: HashMap<ClientId, BTreeSet<ChangeId>>,
+}
 
 impl ChangeStore {
+    pub(crate) fn get(&self, id: &Id) -> Option<&ChangeId> {
+        self.map
+            .get(&id.client)
+            .map(|store| store.get(&ChangeId::from(id)))
+            .flatten()
+    }
+
     /// find all previous changes for a given dependencies
     pub(crate) fn deps(&self, change: &Vec<Id>) -> HashSet<ChangeId> {
         let mut deps = HashSet::new();
@@ -388,25 +433,26 @@ impl ChangeStore {
 
     pub(crate) fn hash_set(&self) -> HashSet<ChangeId> {
         let mut set = HashSet::new();
-        for (_, store) in self.iter() {
-            for (_, change_id) in store.iter() {
-                set.insert(change_id.clone());
-            }
-        }
+        // for (_, store) in self.iter() {
+        //     for (_, change_id) in store.iter() {
+        //         set.insert(change_id.clone());
+        //     }
+        // }
+
         set
     }
 
     pub(crate) fn diff(&self, state: &ClientState) -> ChangeStore {
         let mut diff = ChangeStore::default();
 
-        for (client, store) in self.items.iter() {
+        for (client, store) in self.map.iter() {
             let client_tick = state.get(client).unwrap_or_else(|| &0);
-            let change_store = diff.store(client);
+            let change_store = diff.map.get(client);
             store.iter().for_each(|(id, change_id)| {
-                if change_id.start > *client_tick {
-                    change_store.insert(change_id.clone());
-                }
-            })
+            //     if change_id.start > *client_tick {
+            //         change_store.insert(change_id.clone());
+            //     }
+            // })
         }
 
         diff
@@ -457,10 +503,10 @@ mod tests {
         items.insert(DeleteItem::new(Id::new(1, 5), IdRange::new(1, 4, 4)));
         items.insert(DeleteItem::new(Id::new(1, 7), IdRange::new(2, 6, 6)));
 
-        let found = items.find_by_range(ChangeId::new(1, 0, 5));
+        let found = items.get_by_range(ChangeId::new(1, 0, 5));
         assert_eq!(found.len(), 3);
 
-        let found = items.find_by_range(ChangeId::new(1, 6, 7));
+        let found = items.get_by_range(ChangeId::new(1, 6, 7));
         assert_eq!(found.len(), 1);
     }
 }

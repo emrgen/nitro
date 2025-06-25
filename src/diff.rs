@@ -10,7 +10,7 @@ use crate::change::{ChangeData, ChangeId, ChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
 use crate::doc::DocId;
 use crate::encoder::{Encode, EncodeContext, Encoder};
-use crate::id::{Id, WithId, WithIdRange};
+use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore, ItemStore};
@@ -121,12 +121,15 @@ impl Diff {
             // if there are changes, we need to get the changes for each client
             for (client_id, change_store) in self.changes.iter() {
                 for (_, change_id) in change_store.iter() {
+                    // println!("### change_id: {:?}", change_id);
                     let mut items = Vec::new();
                     let mut delete_items = Vec::new();
                     let mut moves = false;
 
                     if let Some(store) = self.items.id_store(client_id) {
+                        // println!("@@@ item: {:?}", IdRange::from(change_id.clone()));
                         for item in store.get_range(&change_id.clone().into()) {
+                            // println!("### item: {:?}", item);
                             moves |= item.kind.is_move();
                             items.push(item.clone());
                         }
@@ -140,6 +143,8 @@ impl Diff {
 
                     let change =
                         ChangeData::new(change_id.clone(), items, delete_items).with_mover(moves);
+
+                    // println!("change_id: {:?}, change: {:?}\n", change_id, change);
                     if moves {
                         mover_changes.insert(change.id);
                     }

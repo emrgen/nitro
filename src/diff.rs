@@ -120,7 +120,7 @@ impl Diff {
             // panic!("changes in diff, using changes");
             // if there are changes, we need to get the changes for each client
             for (client_id, change_store) in self.changes.iter() {
-                for (_, change_id) in change_store.iter() {
+                for (change_id) in change_store.iter() {
                     // println!("### change_id: {:?}", change_id);
                     let mut items = Vec::new();
                     let mut delete_items = Vec::new();

@@ -374,7 +374,6 @@ impl DocStore {
 
     #[inline]
     pub(crate) fn insert_change(&mut self, change_id: ChangeId) {
-        println!("insert change: {:?}", change_id);
         self.changes.insert(change_id);
     }
 

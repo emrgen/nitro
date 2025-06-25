@@ -147,7 +147,6 @@ impl Doc {
             let mut change_ids = changes.keys().collect::<HashSet<_>>();
 
             for (change, _) in &changes {
-                println!("inserting: {:?}", change);
                 store.changes.insert(change.clone());
             }
 
@@ -156,18 +155,12 @@ impl Doc {
 
             // find parents for each change
             for (_, change) in &changes {
-                println!("change_id: {:?}, deps: {:?}", change.id, change.deps);
+                // println!("change_id: {:?}, deps: {:?}", change.id, change.deps);
                 let parent_change_ids: Vec<ChangeId> = change
                     .deps
                     .iter()
                     .filter(|id| !change.id.contains(id)) // filter out the self dependency
-                    .map(|id| {
-                        let client_store = store.changes.id_store(&id.client);
-                        println!("client_store: {:?}", client_store);
-                        let dound = client_store.map(|store| store.get(id)).flatten();
-                        println!("id: {:?}, found: {:?}", id, dound);
-                        dound.unwrap()
-                    }) // find the parent change IDs
+                    .map(|id| store.changes.get(id).cloned().unwrap()) // find the parent change IDs
                     .collect::<HashSet<_>>()
                     .into_iter()
                     .collect::<Vec<_>>();
@@ -220,7 +213,7 @@ impl Doc {
 
             let mut ready = sort_changes(parents);
 
-            println!("ready: {:?}", ready);
+            // println!("ready: {:?}", ready);
             // println!("parents: {:?}", parents);
 
             // undo the changes that were moved

@@ -6,16 +6,17 @@ use crate::encoder::{Encode, EncodeContext, Encoder};
 use crate::hash::calculate_hash;
 use crate::id::{IdComp, IdRange, WithId};
 use crate::item::ItemKind;
+use crate::persist::DocStoreData;
 use crate::store::{
     ClientStore, DeleteItemStore, ItemDataStore, ItemStore, TypeStore, WeakStoreRef,
 };
-use crate::{Client, ClientState, ClockTick, Content, Id, ItemData, Type};
+use crate::{Client, ClientState, ClockTick, Content, Diff, Id, ItemData, Type};
 use btree_slab::BTreeMap;
 use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
 use queues::Queue;
 use serde::ser::SerializeStruct;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_columnar::Itertools;
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, VecDeque};
@@ -27,14 +28,17 @@ use std::ops::Range;
 
 // topological sort the changes as per dependencies
 pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> Vec<ChangeId> {
+    // too many structures
     let mut ready = Vec::new();
     let mut queue = VecDeque::new();
     let mut inputs = HashMap::new();
     let mut children_changes = HashMap::new();
+    let mut visited = HashSet::new();
 
+    // incoming edge count
     for (change_id, parents) in &parents {
         if parents.len() == 0 {
-            queue.push_back(change_id);
+            queue.push_back(change_id.clone());
         }
 
         inputs.insert(change_id, parents.len());
@@ -46,17 +50,24 @@ pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> Vec<Cha
         })
     }
 
+    // topological sort
     while let Some(change_id) = queue.pop_front() {
+        visited.insert(change_id);
         ready.push(change_id.clone());
-        let children1 = children_changes.get(change_id).cloned();
+        let children = children_changes.get(&change_id).cloned();
 
-        if let Some(children) = children1 {
+        if let Some(children) = children {
             for child in children {
+                if visited.contains(&child) {
+                    continue;
+                }
                 if let Some(input) = inputs.get_mut(&child) {
-                    // update the input count
-                    *input -= 1;
-                    if *input == 0 {
-                        queue.push_back(change_id);
+                    if *input > 0 {
+                        // update the input count
+                        *input -= 1;
+                        if *input == 0 {
+                            queue.push_back(child.clone());
+                        }
                     }
                 }
             }
@@ -406,16 +417,42 @@ impl Serialize for ChangeId {
 
 // TODO: use bitmap based change id store for smaller memory footprint in disk
 /// ChangeStoreX is a store for changes made to a document.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct ChangeStore {
-    map: HashMap<ClientId, BTreeSet<ChangeId>>,
+    map: HashMap<ClientId, ClientChangeStore>,
 }
 
 impl ChangeStore {
+    pub(crate) fn size(&self) -> usize {
+        self.map.values().map(|m| m.size()).sum()
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        if let Some(store) = self.map.get_mut(&id.client) {
+            store.remove(id);
+        }
+    }
+
+    pub(crate) fn id_store(&self, client: &ClientId) -> Option<&ClientChangeStore> {
+        self.map.get(client)
+    }
+
+    pub(crate) fn id_store_mut(&mut self, client: &ClientId) -> Option<&mut ClientChangeStore> {
+        self.map.get_mut(client)
+    }
+
+    pub(crate) fn insert(&mut self, change_id: ChangeId) {
+        let entry = self
+            .map
+            .entry(change_id.client)
+            .or_insert_with(ClientChangeStore::default);
+        entry.insert(change_id);
+    }
+
     pub(crate) fn get(&self, id: &Id) -> Option<&ChangeId> {
         self.map
             .get(&id.client)
-            .map(|store| store.get(&ChangeId::from(id)))
+            .map(|store| store.get(id))
             .flatten()
     }
 
@@ -442,20 +479,130 @@ impl ChangeStore {
         set
     }
 
+    pub(crate) fn iter(&self) -> Iter<'_, ClientId, ClientChangeStore> {
+        self.map.iter()
+    }
+
     pub(crate) fn diff(&self, state: &ClientState) -> ChangeStore {
         let mut diff = ChangeStore::default();
 
         for (client, store) in self.map.iter() {
             let client_tick = state.get(client).unwrap_or_else(|| &0);
-            let change_store = diff.map.get(client);
-            store.iter().for_each(|(id, change_id)| {
-            //     if change_id.start > *client_tick {
-            //         change_store.insert(change_id.clone());
-            //     }
-            // })
+            let change_store = diff
+                .map
+                .entry(*client)
+                .or_insert_with(ClientChangeStore::default);
+            store.iter().for_each(|(change_id)| {
+                if change_id.start > *client_tick {
+                    change_store.insert(change_id.clone());
+                }
+            })
         }
 
         diff
+    }
+}
+
+impl Serialize for ChangeStore {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("Changes", 0)?;
+
+        s.end()
+    }
+}
+
+impl Decode for ChangeStore {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let mut map = HashMap::new();
+        let size = d.u32()?;
+        for i in 0..size {
+            let client = ClientId::decode(d, ctx)?;
+            let store = ClientChangeStore::decode(d, ctx)?;
+            map.insert(client, store);
+        }
+
+        Ok(Self { map })
+    }
+}
+
+impl Encode for ChangeStore {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
+        e.u32(self.size() as u32);
+        for (client, store) in self.map.iter() {
+            ClientId::encode(client, e, ctx);
+            ClientChangeStore::encode(store, e, ctx);
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct ClientChangeStore {
+    set: BTreeSet<ChangeId>,
+}
+
+impl ClientChangeStore {
+    pub(crate) fn insert(&mut self, change_id: ChangeId) {
+        self.set.insert(change_id);
+    }
+
+    pub(crate) fn remove(&mut self, id: &Id) {
+        self.set.remove(&id.into());
+    }
+
+    pub(crate) fn get(&self, id: &Id) -> Option<&ChangeId> {
+        self.set.get(&id.into())
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.set.len()
+    }
+    pub(crate) fn iter(&self) -> std::collections::btree_set::Iter<'_, ChangeId> {
+        self.set.iter()
+    }
+    pub(crate) fn pop_first(&mut self) -> Option<ChangeId> {
+        self.set.pop_first()
+    }
+
+    pub(crate) fn pop_last(&mut self) -> Option<ChangeId> {
+        self.set.pop_last()
+    }
+
+    pub(crate) fn first(&self) -> Option<&ChangeId> {
+        self.set.first()
+    }
+    pub(crate) fn last(&self) -> Option<&ChangeId> {
+        self.set.last()
+    }
+}
+
+impl Decode for ClientChangeStore {
+    fn decode<T: Decoder>(d: &mut T, ctx: &DecodeContext) -> Result<Self, String>
+    where
+        Self: Sized,
+    {
+        let size = d.u32()?;
+        let mut set = BTreeSet::new();
+        for i in 0..size {
+            let change_id = ChangeId::decode(d, &ctx)?;
+            set.insert(change_id);
+        }
+
+        Ok(Self { set })
+    }
+}
+
+impl Encode for ClientChangeStore {
+    fn encode<T: Encoder>(&self, e: &mut T, ctx: &mut EncodeContext) {
+        e.u32(self.size() as u32);
+        for item in self.set.iter() {
+            item.encode(e, ctx);
+        }
     }
 }
 
@@ -475,9 +622,9 @@ mod tests {
         cs.insert(ChangeId::new(1, 4, 4)); // [1,2]
 
         // if the change is in the store, it should return the change
-        assert_eq!(cs.get(&Id::new(1, 0)), Some(ChangeId::new(1, 0, 1)),);
-        assert_eq!(cs.get(&Id::new(1, 2)), Some(ChangeId::new(1, 2, 3)),);
-        assert_eq!(cs.get(&Id::new(1, 4)), Some(ChangeId::new(1, 4, 4)),);
+        assert_eq!(cs.get(&Id::new(1, 0)), Some(&ChangeId::new(1, 0, 1)),);
+        assert_eq!(cs.get(&Id::new(1, 2)), Some(&ChangeId::new(1, 2, 3)),);
+        assert_eq!(cs.get(&Id::new(1, 4)), Some(&ChangeId::new(1, 4, 4)),);
         assert_eq!(cs.get(&Id::new(1, 5)), None);
     }
 

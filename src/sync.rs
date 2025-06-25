@@ -89,8 +89,8 @@ mod test {
 
         println!("------------------");
 
-        sync_docs(&d1, &d2, SyncDirection::LeftToRight);
-        // assert!(equal_docs(&d1, &d2));
+        sync_docs(&d1, &d2, SyncDirection::default());
+        assert!(equal_docs(&d1, &d2));
     }
 
     #[test]

@@ -203,24 +203,21 @@ impl Doc {
                     }
                 }
                 store.dag.done(clients);
-
-                println!("undo: {:?}", undo_movers);
-                println!("undo: {:?}", undo_movers);
-                println!("redo: {:?}", redo);
-            } else {
-                println!("do: {:?}", change_ids);
+                //
+                // println!("undo: {:?}", undo_movers);
+                // println!("undo: {:?}", undo_movers);
+                // println!("redo: {:?}", redo);
             }
 
             let mut ready = sort_changes(parents);
 
-            // println!("ready: {:?}", ready);
+            println!("ready: {:?}", ready);
             // println!("parents: {:?}", parents);
 
             // undo the changes that were moved
             for change_id in &ready {
                 // do integrate the items from new change
                 store.changes.insert(change_id.clone());
-                // println!("redo: {:?}", change_id);
             }
 
             // undo-mover does not remove the movers from the document state, it just removes them from the movers stack top

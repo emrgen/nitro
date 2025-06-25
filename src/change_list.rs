@@ -1,18 +1,51 @@
+use crate::bimapid::{ClientMap, ClientMapper};
 use crate::change::ChangeId;
 use crate::change_btree::BTree;
+use crate::hash::calculate_hash;
 use crate::id::WithId;
 use crate::Id;
 use btree_slab::{BTreeMap, BTreeSet};
 use fractional_index::FractionalIndex;
 use hashbrown::{HashMap, HashSet};
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
 
+#[derive(Clone)]
+struct ChildId {
+    id: Id,
+    hash: u64,
+}
+
+impl Eq for ChildId {}
+
+impl PartialEq<Self> for ChildId {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl PartialOrd<Self> for ChildId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ChildId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.id.client.eq(&other.id.client) {
+            return self.id.clock.cmp(&other.id.clock);
+        }
+
+        self.hash.cmp(&other.hash)
+    }
+}
+
 struct ChangeListNode {
     index: FractionalIndex,
-    parent_id: ChangeId,
-    children: Vec<Id>,
+    parent_id: Id,
+    children: Vec<ChildId>,
     last_decedent: Id,
     child_count: u32,
     flag: u8,
@@ -20,23 +53,23 @@ struct ChangeListNode {
 
 struct ChangeList {
     index_map: BTree<FractionalIndex, Id>,
-    moves: BTree<FractionalIndex, ()>,
     changes: HashMap<Id, ChangeListNode>,
+    moves: BTree<FractionalIndex, ()>, // sorted moves
 }
 
 impl ChangeList {
     pub fn new() -> Self {
         ChangeList {
             index_map: BTree::new(10),
-            moves: BTree::new(10),
             changes: HashMap::new(),
+            moves: BTree::new(10),
         }
     }
 
     pub(crate) fn insert_root(&mut self, change_id: &ChangeId) {
         let node = ChangeListNode {
             index: FractionalIndex::default(),
-            parent_id: change_id.clone(),
+            parent_id: change_id.id(),
             last_decedent: change_id.id(),
             children: Vec::new(),
             child_count: 0,
@@ -47,20 +80,32 @@ impl ChangeList {
         self.changes.insert(change_id.id(), node);
     }
 
-    pub(crate) fn insert(&mut self, change_id: &ChangeId, parent_id: &ChangeId, flags: u8) {
+    // insert the
+    pub(crate) fn insert<T: ClientMapper>(
+        &mut self,
+        change_id: &ChangeId,
+        parent_id: &ChangeId,
+        flags: u8,
+        client_map: &T,
+    ) {
         if !self.changes.contains_key(&parent_id.id()) {
             panic!("Parent change ID does not exist in the change list.");
         }
 
         let id = change_id.id();
+        let child_id = ChildId {
+            id: id.clone(),
+            hash: calculate_hash(&client_map.get_client(&id.client)),
+        };
 
         let parent_node = self.changes.get_mut(&parent_id.id()).unwrap();
         let pos = parent_node
             .children
-            .binary_search(&id)
+            .binary_search(&child_id)
             .unwrap_or_else(|e| e);
+
         // Insert the new change ID into the parent's children vector
-        parent_node.children.insert(pos, id);
+        parent_node.children.insert(pos, child_id);
 
         let prev_item = if pos == 0 {
             parent_id.id()
@@ -69,10 +114,11 @@ impl ChangeList {
                 .children
                 .get(pos - 1)
                 .cloned()
-                .map(|id| self.changes.get(&id))
-                .flatten();
+                .map(|child_id| self.changes.get(&child_id.id))
+                .flatten()
+                .unwrap();
 
-            sibling.unwrap().last_decedent
+            sibling.last_decedent
         };
 
         // calculate the fractional index for the new change
@@ -94,7 +140,7 @@ impl ChangeList {
             Some(next_index) => FractionalIndex::new_between(&prev_frac_index, &next_index),
             _ => Option::from({ FractionalIndex::new_after(&prev_frac_index) }),
         }
-        .unwrap_or_else(|| FractionalIndex::new_after(&prev_frac_index));
+        .unwrap();
 
         // If the flags indicate a move, insert it into the moves map
         if flags > 0 {
@@ -104,7 +150,7 @@ impl ChangeList {
         // Insert the change into the index map and changes map
         let node = ChangeListNode {
             index: frac_index,
-            parent_id: parent_id.clone(),
+            parent_id: parent_id.id(),
             children: Vec::new(),
             last_decedent: id.clone(),
             child_count: 0,
@@ -113,14 +159,26 @@ impl ChangeList {
 
         self.index_map.insert(node.index.clone(), change_id.id());
         self.changes.insert(id, node);
-        let mut parent_id = parent_id.clone();
 
-        while let Some(parent_node) = self.changes.get_mut(&parent_id.id()) {
+        let mut count = 0;
+        // update descendent count for each parent
+        let mut parent_id = parent_id.id().clone();
+        while let Some(parent_node) = self.changes.get_mut(&parent_id) {
             if parent_node.parent_id == parent_id {
                 break;
             }
 
+            count += 1;
+            if count > 10 {
+                println!(
+                    "cycle found: child: {}, parent: {}",
+                    parent_id, parent_node.parent_id
+                );
+                break;
+            }
+
             parent_node.child_count += 1;
+            parent_id = parent_node.parent_id.clone();
         }
     }
 
@@ -133,5 +191,45 @@ impl ChangeList {
 
     pub(crate) fn contains(&self, change_id: &ChangeId) -> bool {
         self.changes.contains_key(&change_id.id())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bimapid::FixedClientMapper;
+    use crate::Client;
+    use uuid::Uuid;
+
+    #[test]
+    fn test_insert_changes() {
+        let mut list = ChangeList::new();
+        let c1 = ChangeId::new(1, 1, 1);
+        let c2 = ChangeId::new(1, 2, 2);
+        let c3 = ChangeId::new(1, 3, 3);
+        let c4 = ChangeId::new(1, 4, 4);
+        let c5 = ChangeId::new(1, 5, 5);
+        let mut clients = FixedClientMapper::default();
+        clients.add(1, Client::UUID(Uuid::new_v4()));
+
+        list.insert_root(&c1);
+
+        list.insert(&c3, &c1, 0, &clients);
+        list.insert(&c2, &c1, 0, &clients);
+        list.insert(&c4, &c3, 0, &clients);
+        list.insert(&c5, &c3, 0, &clients);
+
+        // println!("index c1: {:?}", list.index_of(&c1));
+        // println!("index c2: {:?}", list.index_of(&c2));
+        // println!("index c3: {:?}", list.index_of(&c3));
+        // println!("index c4: {:?}", list.index_of(&c4));
+        // println!("index c5: {:?}", list.index_of(&c5));
+
+        assert_eq!(list.changes.len(), 5);
+        assert_eq!(list.index_of(&c1), Some(0));
+        assert_eq!(list.index_of(&c2), Some(1));
+        assert_eq!(list.index_of(&c3), Some(2));
+        assert_eq!(list.index_of(&c4), Some(3));
+        assert_eq!(list.index_of(&c5), Some(4));
     }
 }

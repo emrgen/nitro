@@ -30,21 +30,21 @@ pub fn sync_docs(d1: &Doc, d2: &Doc, direction: SyncDirection) {
 
     if direction == SyncDirection::LeftToRight {
         println!("sync_docs: d1 -> d2");
-        d2.apply(diff1);
+        d2.apply(&diff1);
     } else if direction == SyncDirection::RightToLeft {
-        d1.apply(diff2);
+        d1.apply(&diff2);
     } else {
         println!("sync_docs: d1 -> d2");
-        d1.apply(diff2);
+        d1.apply(&diff2);
         println!("sync_docs: d2 -> d1");
-        d2.apply(diff1);
+        d2.apply(&diff1);
         println!("sync_docs: done");
     }
 }
 
 pub fn sync_first_doc(d1: &Doc, d2: &Doc) {
     let diff1 = d2.diff(d1);
-    d1.apply(diff1);
+    d1.apply(&diff1);
 }
 
 #[cfg(test)]
@@ -57,7 +57,7 @@ mod test {
     use serde_json::json;
 
     #[test]
-    fn test_sync1() {
+    fn test_sync_lr() {
         let d1 = Doc::default();
         let d2 = d1.clone_deep();
         d2.update_client();
@@ -67,9 +67,22 @@ mod test {
         // d2.set("b", d2.string("world"));
         // d2.commit();
 
-        println!("------------------");
-
         sync_docs(&d1, &d2, SyncDirection::LeftToRight);
+        assert!(equal_docs(&d1, &d2));
+    }
+
+    #[test]
+    fn test_sync_rl() {
+        let d1 = Doc::default();
+        let d2 = d1.clone_deep();
+        d2.update_client();
+
+        // d1.set("a", d1.string("hello"));
+        // d1.commit();
+        d2.set("b", d2.string("world"));
+        d2.commit();
+
+        sync_docs(&d1, &d2, SyncDirection::RightToLeft);
         assert!(equal_docs(&d1, &d2));
     }
 
@@ -86,8 +99,6 @@ mod test {
         d1.commit();
         list.append(d1.atom("b"));
         d1.commit();
-
-        println!("------------------");
 
         sync_docs(&d1, &d2, SyncDirection::default());
         assert!(equal_docs(&d1, &d2));
@@ -165,6 +176,7 @@ mod test {
 
         list1.append(doc1.string("a"));
         list1.append(doc1.string("b"));
+        doc1.commit();
 
         let list2 = doc2.list();
         doc2.set("list2", list2.clone());
@@ -176,6 +188,7 @@ mod test {
 
         let list1 = doc2.get("list1").unwrap().as_list().unwrap();
         list1.append(doc2.string("c"));
+        doc2.commit();
 
         sync_docs(&doc1, &doc2, SyncDirection::default());
 

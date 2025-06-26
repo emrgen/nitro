@@ -43,21 +43,21 @@ impl Client {
         #[cfg(feature = "uuid-client")]
         return Client::UUID(uuid);
         #[cfg(not(feature = "uuid-client"))]
-        panic!("UUID client is not enabled");
+        panic!("UUID client is not implemented");
     }
 
     pub fn from_string(string: String) -> Client {
         #[cfg(feature = "string-client")]
         return Client::String(string);
         #[cfg(not(feature = "string-client"))]
-        panic!("String client is not enabled");
+        panic!("String client is not implemented");
     }
 
     pub(crate) fn from_u64(u64: u64) -> Client {
         #[cfg(feature = "u64-client")]
         return Client::U64(u64);
         #[cfg(not(feature = "u64-client"))]
-        panic!("U64 client is not enabled");
+        panic!("U64 client is not implemented");
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Client {
@@ -88,6 +88,7 @@ impl Client {
         if let Client::UUID(uuid) = self {
             return *uuid;
         }
+
         panic!("Client is not a UUID");
     }
 
@@ -96,6 +97,7 @@ impl Client {
         if let Client::String(string) = self {
             return string.clone();
         }
+
         panic!("Client is not a String");
     }
 
@@ -104,6 +106,7 @@ impl Client {
         if let Client::U64(u64) = self {
             return *u64;
         }
+
         panic!("Client is not a U64");
     }
 

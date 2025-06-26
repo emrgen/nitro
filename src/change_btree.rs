@@ -627,7 +627,7 @@ mod tests {
         // split should occur here
         tree.insert(22, "G");
 
-        tree.print();
+        // tree.print();
 
         assert_eq!(tree.find(&10), Some(&"A"));
         assert_eq!(tree.find(&5), Some(&"D"));

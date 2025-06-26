@@ -460,6 +460,12 @@ impl ChangeStore {
             .flatten()
     }
 
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.map
+            .get(&id.client)
+            .map_or(false, |store| store.contains(id))
+    }
+
     /// find all previous changes for a given dependencies
     pub(crate) fn deps(&self, change: &Vec<Id>) -> HashSet<ChangeId> {
         let mut deps = HashSet::new();
@@ -559,6 +565,10 @@ impl ClientChangeStore {
         self.set.remove(&id.into());
     }
 
+    pub(crate) fn contains(&self, id: &Id) -> bool {
+        self.set.contains(&id.into())
+    }
+
     pub(crate) fn get(&self, id: &Id) -> Option<&ChangeId> {
         self.set.get(&id.into())
     }
@@ -619,6 +629,19 @@ mod tests {
     use crate::Type::Atom;
 
     #[test]
+    fn test_find_change_by_id() {
+        let mut cs = ChangeStore::default();
+        cs.insert(ChangeId::new(1, 0, 1));
+        cs.insert(ChangeId::new(1, 2, 6));
+        cs.insert(ChangeId::new(1, 7, 12));
+
+        assert_eq!(cs.get(&Id::new(1, 1)), Some(&ChangeId::new(1, 0, 1)));
+        assert_eq!(cs.get(&Id::new(1, 3)), Some(&ChangeId::new(1, 2, 6)));
+        assert_eq!(cs.get(&Id::new(1, 7)), Some(&ChangeId::new(1, 7, 12)));
+        assert_eq!(cs.get(&Id::new(1, 9)), Some(&ChangeId::new(1, 7, 12)));
+    }
+
+    #[test]
     fn test_find_change_by_item_id() {
         let mut cs = ChangeStore::default();
         cs.insert(ChangeId::new(1, 0, 1)); // [0,1]
@@ -637,13 +660,13 @@ mod tests {
         let mut cs = ChangeStore::default();
         cs.insert(ChangeId::new(1, 0, 1)); // [0,1]
         cs.insert(ChangeId::new(1, 2, 3)); // [1,2]
-        cs.insert(ChangeId::new(1, 4, 4)); // [1,2]
+        cs.insert(ChangeId::new(1, 4, 6)); // [1,2]
 
         let changes = cs.deps(&vec![Id::new(1, 0), Id::new(1, 2), Id::new(1, 4)]);
         assert_eq!(changes.len(), 3);
         assert!(changes.contains(&ChangeId::new(1, 0, 1)));
         assert!(changes.contains(&ChangeId::new(1, 2, 3)));
-        assert!(changes.contains(&ChangeId::new(1, 4, 4)));
+        assert!(changes.contains(&ChangeId::new(1, 4, 6)));
     }
 
     #[test]

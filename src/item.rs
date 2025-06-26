@@ -40,6 +40,7 @@ impl ItemRef {
     }
 
     /// Get the item depth in the document tree.
+    /// as most of the nodes in a document is at shallow level this function should be very fast
     #[inline]
     pub(crate) fn depth(&self) -> u32 {
         if let Some(parent) = &self.item.borrow().parent {
@@ -417,16 +418,17 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub struct Item {
-    pub(crate) data: ItemData,         // data for the item
-    pub(crate) parent: Option<Type>,   // parent link
-    pub(crate) target: Option<Type>,   // target link
-    pub(crate) left: Option<Type>,     // left link
-    pub(crate) right: Option<Type>,    // right link
-    pub(crate) start: Option<Type>,    // linked children start
-    pub(crate) end: Option<Type>,      // linked children end
-    pub(crate) container: Option<Id>,  // container id
-    pub(crate) marks: Option<Type>,    // linked marks
-    pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list
+    pub(crate) data: ItemData,        // data for the item
+    pub(crate) parent: Option<Type>,  // parent link
+    pub(crate) target: Option<Type>,  // target link
+    pub(crate) left: Option<Type>,    // left link
+    pub(crate) right: Option<Type>,   // right link
+    pub(crate) start: Option<Type>,   // linked children start
+    pub(crate) end: Option<Type>,     // linked children end
+    pub(crate) container: Option<Id>, // container id
+    pub(crate) marks: Option<Type>,   // linked marks
+    // TODO: move the index to list to avoid per item allocation
+    pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list,
     pub(crate) flags: u8,
 }
 
@@ -482,6 +484,7 @@ impl Item {
         field.map(|s| s.to_string())
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         match &self.data.content {
             Content::String(s) => s.len() as u32,

@@ -71,16 +71,22 @@ impl NText {
 
     pub fn append(&self, item: impl Into<Type>) {
         let item = item.into();
+        assert!(item.kind().is_string());
         self.item.append(item.clone());
         item.set_parent(Some(self.into()));
     }
 
     pub fn prepend(&self, item: impl Into<Type>) {
-        self.item.prepend(item.into());
+        let item = item.into();
+        assert!(item.kind().is_string());
+        self.item.prepend(item);
     }
 
+    /// Insert string in text
     pub fn insert(&self, offset: u32, item: impl Into<Type>) {
         let item = item.into();
+
+        assert!(item.kind().is_string());
 
         if offset == 0 {
             self.prepend(item);
@@ -103,6 +109,7 @@ impl NText {
         }
     }
 
+    // find item string child at offset
     fn find_at_offset(&self, offset: u32) -> (Option<Type>, u32) {
         let items = self.borrow().as_list();
         let mut target_offset = 0;
@@ -139,6 +146,7 @@ impl NText {
         items.into()
     }
 
+    // raw un marked text content
     pub(crate) fn text_content(&self) -> String {
         self.visible_item_iter()
             .map(|item| item.text_content())

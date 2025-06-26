@@ -136,9 +136,7 @@ impl Type {
             _ => None,
         }
     }
-}
 
-impl Type {
     #[inline]
     pub(crate) fn store(&self) -> WeakStoreRef {
         self.item_ref().store.clone()
@@ -359,9 +357,7 @@ impl Type {
             _ => -1,
         }
     }
-}
 
-impl Type {
     #[inline]
     pub fn kind(&self) -> ItemKind {
         self.item_ref().kind()
@@ -635,15 +631,7 @@ impl Type {
             _ => false,
         }
     }
-}
 
-impl WithIndex for Type {
-    fn index(&self) -> FractionalIndex {
-        self.item_ref().index()
-    }
-}
-
-impl Type {
     pub(crate) fn on_insert(&self, child: &Type) {
         match self {
             Type::List(n) => {
@@ -660,10 +648,7 @@ impl Type {
     }
 
     pub(crate) fn add_frac_index(&self) {
-        let left = self.left();
-        let right = self.right();
-
-        let index = match (left, right) {
+        let index = match (self.left(), self.right()) {
             (Some(left), Some(right)) => {
                 FractionalIndex::new_between(&left.index(), &right.index()).unwrap()
             }
@@ -672,14 +657,25 @@ impl Type {
             (None, None) => FractionalIndex::default(),
         };
 
-        self.item_ref().borrow_mut().index = (index);
+        self.item_ref().borrow_mut().index = index;
     }
+
+    //
+    pub(crate) fn rollback(&self) {}
 
     pub(crate) fn on_delete(&self, child: &Type) {}
 
     pub(crate) fn on_undelete(&self, child: &Type) {}
 
     pub(crate) fn on_move(&self, child: &Type) {}
+
+    pub(crate) fn on_unmove(&self, child: &Type) {}
+}
+
+impl WithIndex for Type {
+    fn index(&self) -> FractionalIndex {
+        self.item_ref().index()
+    }
 }
 
 impl Linked for Type {

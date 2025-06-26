@@ -30,10 +30,12 @@ impl NString {
         }
     }
 
+    #[inline]
     pub(crate) fn content(&self) -> Content {
         self.borrow().content()
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         match self.borrow().content {
             Content::String(ref s) => s.len() as u32,
@@ -66,6 +68,7 @@ impl NString {
         self.item_ref().add_mark(mark);
     }
 
+    #[inline]
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }

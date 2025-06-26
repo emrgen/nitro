@@ -30,10 +30,12 @@ impl NMove {
         Self { item }
     }
 
+    #[inline]
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
 
+    #[inline]
     pub(crate) fn content(&self) -> Content {
         if let Some(target) = self.get_target().as_ref() {
             target.content()
@@ -42,6 +44,7 @@ impl NMove {
         }
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         if let Some(target) = self.get_target().as_ref() {
             target.size()
@@ -50,6 +53,7 @@ impl NMove {
         }
     }
 
+    #[inline]
     fn get(&self, key: ItemKey) -> Option<Type> {
         if let Some(target) = self.get_target().as_ref() {
             target.get(key)
@@ -58,46 +62,54 @@ impl NMove {
         }
     }
 
+    #[inline]
     fn set(&self, key: String, item: Type) {
         if let Some(target) = self.get_target().as_ref() {
             target.set(key, item);
         }
     }
 
+    #[inline]
     fn delete(&self) {
         self.item_ref().delete(1);
     }
 
+    #[inline]
     fn prepend(&self, item: Type) {
         if let Some(target) = self.get_target().as_ref() {
             target.prepend(item);
         }
     }
 
+    #[inline]
     fn append(&self, item: Type) {
         if let Some(target) = self.get_target().as_ref() {
             target.append(item);
         }
     }
 
+    #[inline]
     fn insert(&self, offset: u32, item: Type) {
         if let Some(target) = self.get_target().as_ref() {
             target.insert(offset, item);
         }
     }
 
+    #[inline]
     fn remove(&self, key: ItemKey) {
         if let Some(target) = self.get_target().as_ref() {
             target.remove(key);
         }
     }
 
+    #[inline]
     fn clear(&self) {
         if let Some(target) = self.get_target().as_ref() {
             target.clear();
         }
     }
 
+    #[inline]
     pub(crate) fn to_json(&self) -> serde_json::Value {
         if let Some(target) = self.get_target().as_ref() {
             serde_json::Value::Null
@@ -125,6 +137,7 @@ impl WithId for NMove {
 }
 
 impl WithIdRange for NMove {
+    #[inline]
     fn range(&self) -> IdRange {
         self.borrow().id().range(1)
     }

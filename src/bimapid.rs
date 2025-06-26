@@ -125,26 +125,6 @@ impl<T: EncoderMapEntry> Add<&EncoderMap<T>> for &EncoderMap<T> {
     }
 }
 
-// impl<T: PartialEq + Default + Eq + Hash + Clone + Encode + Decode> PartialEq for EncoderMap<T> {
-//     fn eq(&self, other: &Self) -> bool {
-//         return true;
-//         let self_keys: Vec<&T> = self.map.left_values().collect();
-//         let other_keys: Vec<&T> = other.map.left_values().collect();
-//
-//         if self_keys.len() != other_keys.len() {
-//             return false;
-//         }
-//
-//         for key in self_keys {
-//             if !other.map.contains_left(key) {
-//                 return false;
-//             }
-//         }
-//
-//         true
-//     }
-// }
-
 impl Encode for EncoderMap<Client> {
     fn encode<E: Encoder>(&self, e: &mut E, _ctx: &mut EncodeContext) {
         e.u32(self.size() as u32);
@@ -237,6 +217,7 @@ impl Decode for EncoderMap<Mark> {
     }
 }
 
+// ClientMapper maps client <=> client-id
 pub(crate) trait ClientMapper {
     fn get_client_id(&self, client_id: &Client) -> Option<&ClientId>;
     fn get_client(&self, client: &ClientId) -> Option<&Client>;

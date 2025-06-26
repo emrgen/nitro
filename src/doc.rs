@@ -92,7 +92,7 @@ impl Doc {
                     props: content.props.clone().into_kv_map(),
                 });
 
-                doc.apply(diff.clone());
+                doc.apply(&diff);
 
                 return Some(doc);
             }
@@ -128,9 +128,9 @@ impl Doc {
     }
 
     /// Apply a diff to the document from remote client
-    pub fn apply(&self, diff: Diff) {
+    pub fn apply(&self, diff: &Diff) {
         // adjust the diff to the current state of the document
-        let diff = {
+        let mut diff = {
             let store_ref = self.store.borrow_mut();
             diff.adjust(&store_ref)
         };
@@ -484,7 +484,7 @@ impl CloneDeep for Doc {
         let doc = Doc::new(self.meta.clone());
         let diff = self.diff(ClientState::default());
 
-        doc.apply(diff);
+        doc.apply(&diff);
 
         doc
     }

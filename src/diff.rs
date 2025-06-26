@@ -1,10 +1,3 @@
-use hashbrown::{HashMap, HashSet};
-use serde::ser::SerializeStruct;
-use serde::{Serialize, Serializer};
-use std::cell::RefMut;
-use std::cmp::max;
-use std::ops::Add;
-
 use crate::bimapid::{ClientId, ClientMapper, FieldMap};
 use crate::change::{ChangeData, ChangeId, ChangeStore};
 use crate::decoder::{Decode, DecodeContext, Decoder};
@@ -15,6 +8,13 @@ use crate::item::{ItemData, Optimize};
 use crate::state::ClientState;
 use crate::store::{DeleteItemStore, DocStore, IdDiff, ItemDataStore, ItemStore};
 use crate::Client;
+use hashbrown::{HashMap, HashSet};
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
+use serde_columnar::Itertools;
+use std::cell::RefMut;
+use std::cmp::max;
+use std::ops::Add;
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct Diff {
@@ -213,6 +213,16 @@ impl Diff {
                 deletes.insert(adjust);
             }
         }
+
+        // drop the changes which are already integrated to the document
+        let mut changes = self.changes.clone();
+        self.changes.iter().for_each(|(id, change_store)| {
+            change_store.iter().for_each(|change| {
+                if store.changes.contains(&change.id()) {
+                    changes.remove(&change.id());
+                }
+            })
+        });
 
         Diff::from(
             self.doc_id.clone(),

@@ -7,6 +7,7 @@ use crate::id::{Id, IdRange, WithId, WithIdRange};
 use crate::item::{Content, ItemData, ItemKind, ItemRef};
 use crate::store::WeakStoreRef;
 
+// Atom is a holds a fixed Content
 #[derive(Clone, Debug)]
 pub struct NAtom {
     pub(crate) item: ItemRef,
@@ -27,34 +28,42 @@ impl NAtom {
         }
     }
 
+    #[inline]
     pub(crate) fn container(&self) -> Option<ItemRef> {
         self.container.clone()
     }
 
+    #[inline]
     pub(crate) fn set_container(&mut self, container: ItemRef) {
         self.container = Some(container);
     }
 
+    #[inline]
     pub(crate) fn depth(&self) -> u32 {
         self.item.depth()
     }
 
+    #[inline]
     pub(crate) fn size(&self) -> u32 {
         1
     }
 
+    #[inline]
     pub(crate) fn content(&self) -> Content {
         self.borrow().content()
     }
 
+    #[inline]
     pub(crate) fn delete(&self) {
         self.item.delete(1);
     }
 
+    #[inline]
     pub(crate) fn item_ref(&self) -> ItemRef {
         self.item.clone()
     }
 
+    #[inline]
     pub(crate) fn to_json(&self) -> serde_json::Value {
         self.content().to_json()
     }
@@ -83,6 +92,7 @@ impl WithId for NAtom {
 }
 
 impl WithIdRange for NAtom {
+    #[inline]
     fn range(&self) -> IdRange {
         self.borrow().id().range(1)
     }

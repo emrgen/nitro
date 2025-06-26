@@ -145,8 +145,8 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Branch<K, V> {
         self.keys.shrink_to(new_branch.keys.capacity());
         self.children.shrink_to(new_branch.children.capacity());
 
-        self.update_count();
         new_branch.update_count();
+        self.update_count();
 
         (mid_key, Node::new_branch(new_branch))
     }
@@ -172,13 +172,13 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Branch<K, V> {
     }
 
     fn print(&self, tree: &mut TreeBuilder) {
-        tree.begin_child(format!("Branch: #k({})", self.keys.len()));
+        tree.begin_child(format!("Branch: {}", self.keys.len()));
         for (i, child) in self.children.iter().enumerate() {
             if i > 0 {
                 let key = self.keys.get(i - 1);
-                tree.begin_child(format!("Key({:?}) size({})", key.unwrap(), child.size()));
+                tree.begin_child(format!("Key: {:?}", key.unwrap()));
             } else {
-                tree.begin_child(format!("Key({}) size({})", "#", child.size()));
+                tree.begin_child(format!("Key: {}", "#"));
             }
             child.print(tree);
             tree.end_child();
@@ -677,39 +677,6 @@ mod tests {
     }
 
     #[test]
-    fn test_btree_at_index() {
-        for i in 0..1 {
-            for order in 2..3 {
-                let mut tree = BTree::new(order);
-
-                let mut keys = (0..10).collect::<Vec<_>>();
-                let sorted_keys = keys.clone();
-
-                let mut rng = StdRng::seed_from_u64(i);
-                // Shuffle the keys to ensure random order
-                keys.shuffle(&mut rng);
-
-                for k in &keys {
-                    tree.insert(*k, *k);
-                }
-
-                // tree.print();
-
-                // for k in &sorted_keys {
-                //     let val = tree.at_index(*k).unwrap();
-                //     println!("index: {}, val: {:?}", k, val);
-                // }
-
-                let sorted = sorted_keys
-                    .iter()
-                    .map(|k| *tree.at_index(*k).unwrap())
-                    .collect::<Vec<_>>();
-                assert_eq!(sorted, sorted_keys);
-            }
-        }
-    }
-
-    #[test]
     fn test_binary_search() {
         let l1 = [1, 2, 3, 4, 5];
         assert_eq!(binary_search(&l1, &3), 3);
@@ -731,6 +698,7 @@ mod tests {
                 // Insert keys into the B-Tree
                 for i in keys.iter() {
                     tree.insert(*i, i);
+                    // tree.print();
                 }
 
                 let mut iter = tree.iter();

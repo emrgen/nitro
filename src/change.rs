@@ -272,6 +272,10 @@ impl ChangeId {
     pub(crate) fn contains(&self, id: &Id) -> bool {
         self.client == id.client && self.start <= id.clock && id.clock <= self.end
     }
+
+    pub(crate) fn tuple(&self) -> (ClientId, ClockTick) {
+        (self.client, self.start)
+    }
 }
 
 #[derive(Debug, Clone, Default, Hash)]

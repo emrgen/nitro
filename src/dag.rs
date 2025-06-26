@@ -5,7 +5,7 @@ use crate::decoder::{Decode, Decoder};
 use crate::encoder::{Encode, Encoder};
 use crate::frontier::Frontier;
 use crate::id::{IdComp, WithId};
-use crate::{Client, Id};
+use crate::{Client, ClockTick, Id};
 use bitflags::bitflags;
 use rand::prelude::{SliceRandom, StdRng};
 use rand::{Rng, SeedableRng};
@@ -320,6 +320,19 @@ pub(crate) struct RandomDag {
 impl RandomDag {
     fn default() -> Self {
         Self::with_clients(1, 0)
+    }
+
+    pub(crate) fn children(&self) -> HashMap<(ClientId, ClockTick), Vec<(ClientId, ClockTick)>> {
+        let children = self
+            .children
+            .iter()
+            .map(|(k, v)| {
+                let children = v.iter().map(|id| (id.client, id.start)).collect::<Vec<_>>();
+                ((k.client, k.start), children)
+            })
+            .collect::<HashMap<_, _>>();
+
+        children
     }
 
     pub(crate) fn parents(&self, child: &ChangeId) -> Vec<ChangeId> {

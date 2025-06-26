@@ -92,10 +92,10 @@ impl ItemRef {
         self.item.borrow().field(self.store.clone())
     }
 
-    #[inline]
-    pub(crate) fn add_mark(&self, mark: NMark) {
-        self.borrow_mut().add_mark(mark);
-    }
+    // #[inline]
+    // pub(crate) fn add_mark(&self, mark: NMark) {
+    //     self.borrow_mut().add_mark(mark);
+    // }
 
     pub(crate) fn append(&self, value: impl Into<Type>) {
         let end = self.borrow().end.clone();
@@ -205,18 +205,18 @@ impl ItemRef {
             s.serialize_field("right_id", &right.id().to_string())?;
         }
 
-        let marks_map = self.borrow().get_marks();
-        let mut map = serde_json::Map::new();
-        for mark in marks_map.iter() {
-            if let Content::Mark(mark) = mark.content() {
-                let (k, v) = mark.get_key_value();
-                map.insert(k, v);
-            }
-        }
-        if !map.is_empty() {
-            let marks = serde_json::to_value(map).unwrap_or_default();
-            s.serialize_field("marks", &marks)?;
-        }
+        // let marks_map = self.borrow().get_marks();
+        // let mut map = serde_json::Map::new();
+        // for mark in marks_map.iter() {
+        //     if let Content::Mark(mark) = mark.content() {
+        //         let (k, v) = mark.get_key_value();
+        //         map.insert(k, v);
+        //     }
+        // }
+        // if !map.is_empty() {
+        //     let marks = serde_json::to_value(map).unwrap_or_default();
+        //     s.serialize_field("marks", &marks)?;
+        // }
 
         Ok(())
     }
@@ -418,15 +418,14 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub struct Item {
-    pub(crate) data: ItemData,        // data for the item
-    pub(crate) parent: Option<Type>,  // parent link
-    pub(crate) target: Option<Type>,  // target link
-    pub(crate) left: Option<Type>,    // left link
-    pub(crate) right: Option<Type>,   // right link
-    pub(crate) start: Option<Type>,   // linked children start
-    pub(crate) end: Option<Type>,     // linked children end
-    pub(crate) container: Option<Id>, // container id
-    pub(crate) marks: Option<Type>,   // linked marks
+    pub(crate) data: ItemData,       // data for the item
+    pub(crate) parent: Option<Type>, // parent link
+    pub(crate) target: Option<Type>, // target link
+    pub(crate) left: Option<Type>,   // left link
+    pub(crate) right: Option<Type>,  // right link
+    pub(crate) start: Option<Type>,  // linked children start
+    pub(crate) end: Option<Type>,    // linked children end
+    // pub(crate) marks: Option<Type>,   // linked marks
     // TODO: move the index to list to avoid per item allocation
     pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list,
     pub(crate) flags: u8,
@@ -493,10 +492,10 @@ impl Item {
         }
     }
 
-    #[inline]
-    pub(crate) fn container_id(&self) -> Option<Id> {
-        self.container
-    }
+    // #[inline]
+    // pub(crate) fn container_id(&self) -> Option<Id> {
+    //     self.container
+    // }
 
     #[inline]
     pub(crate) fn parent(&self, store: &WeakStoreRef) -> Option<Type> {
@@ -551,19 +550,19 @@ impl Item {
     pub(crate) fn set(&mut self, _key: &ItemKey, _ref: ItemRef) {}
 
     /// add mark to the item, see PeriText paper for details
-    pub(crate) fn add_mark(&mut self, mark: impl Into<Type>) {
-        let mark = mark.into();
-        if let Some(ref marks) = self.marks {
-            let mut end = marks.clone();
-            while end.right().is_some() {
-                end = end.right().unwrap();
-            }
-
-            end.set_right(mark)
-        } else {
-            self.marks = Some(mark);
-        }
-    }
+    // pub(crate) fn add_mark(&mut self, mark: impl Into<Type>) {
+    //     let mark = mark.into();
+    //     if let Some(ref marks) = self.marks {
+    //         let mut end = marks.clone();
+    //         while end.right().is_some() {
+    //             end = end.right().unwrap();
+    //         }
+    //
+    //         end.set_right(mark)
+    //     } else {
+    //         self.marks = Some(mark);
+    //     }
+    // }
 
     #[inline]
     pub(crate) fn content(&self) -> Content {
@@ -597,37 +596,37 @@ impl Item {
         map
     }
 
-    pub(crate) fn get_marks(&self) -> Vec<Type> {
-        let mark_list = self.get_all_marks();
-        let mut marks = HashMap::new();
-
-        for mark in mark_list {
-            if let Content::Mark(mark_type) = mark.content() {
-                marks.insert(mark_type.get_key(), mark);
-            }
-        }
-
-        for (field, mark) in marks.clone().iter() {
-            if !mark.is_visible() {
-                marks.remove(field);
-            }
-        }
-
-        marks.values().cloned().collect()
-    }
+    // pub(crate) fn get_marks(&self) -> Vec<Type> {
+    //     let mark_list = self.get_all_marks();
+    //     let mut marks = HashMap::new();
+    //
+    //     for mark in mark_list {
+    //         if let Content::Mark(mark_type) = mark.content() {
+    //             marks.insert(mark_type.get_key(), mark);
+    //         }
+    //     }
+    //
+    //     for (field, mark) in marks.clone().iter() {
+    //         if !mark.is_visible() {
+    //             marks.remove(field);
+    //         }
+    //     }
+    //
+    //     marks.values().cloned().collect()
+    // }
 
     // all marks need to match for adjacent string items to be merged into a single string
-    pub(crate) fn get_all_marks(&self) -> Vec<Type> {
-        let mut mark_list: Vec<Type> = vec![];
-        let mut mark = self.marks.clone();
-
-        while mark.is_some() {
-            mark_list.push(mark.clone().unwrap());
-            mark = mark.and_then(|m| m.right().clone());
-        }
-
-        mark_list
-    }
+    // pub(crate) fn get_all_marks(&self) -> Vec<Type> {
+    //     let mut mark_list: Vec<Type> = vec![];
+    //     let mut mark = self.marks.clone();
+    //
+    //     while mark.is_some() {
+    //         mark_list.push(mark.clone().unwrap());
+    //         mark = mark.and_then(|m| m.right().clone());
+    //     }
+    //
+    //     mark_list
+    // }
 
     pub(crate) fn as_list(&self) -> Vec<Type> {
         let items = self.items();
@@ -688,28 +687,28 @@ impl Item {
     {
         self.data.serialize_with(s)?;
 
-        let marks_map = self.get_marks();
-        let mut map = serde_json::Map::new();
-        for mark in marks_map.iter() {
-            if let Content::Mark(mark) = mark.content() {
-                let (k, v) = mark.get_key_value();
-                map.insert(k, v);
-            }
-        }
-        if !map.is_empty() {
-            let marks = serde_json::to_value(map).unwrap_or_default();
-            s.serialize_field("marks", &marks)?;
-        }
+        // let marks_map = self.get_marks();
+        // let mut map = serde_json::Map::new();
+        // for mark in marks_map.iter() {
+        //     if let Content::Mark(mark) = mark.content() {
+        //         let (k, v) = mark.get_key_value();
+        //         map.insert(k, v);
+        //     }
+        // }
+        // if !map.is_empty() {
+        //     let marks = serde_json::to_value(map).unwrap_or_default();
+        //     s.serialize_field("marks", &marks)?;
+        // }
 
         Ok(())
     }
 
     pub(crate) fn serialize_size(&self) -> usize {
         let mut size = self.data.serialize_size();
-        let marks = self.get_marks();
-        if !marks.is_empty() {
-            size += 1;
-        }
+        // let marks = self.get_marks();
+        // if !marks.is_empty() {
+        //     size += 1;
+        // }
 
         size
     }
@@ -1700,3 +1699,23 @@ impl Decode for Any {
 }
 
 impl Eq for Any {}
+
+#[cfg(test)]
+mod tests {
+    use crate::nlist::NList;
+    use crate::nmap::NMap;
+    use crate::*;
+    use std::rc::Rc;
+
+    #[test]
+    fn test_option_size() {
+        let item: Option<Type> = None;
+        println!("{:?}", size_of::<Doc>());
+        println!("{:?}", size_of::<Type>());
+        println!("{:?}", size_of::<[Type; 6]>());
+        println!("{:?}", size_of::<Item>());
+        println!("{:?}", size_of::<ItemData>());
+        println!("{:?}", size_of::<NList>());
+        println!("{:?}", size_of::<NMap>());
+    }
+}

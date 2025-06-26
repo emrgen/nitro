@@ -24,7 +24,7 @@ use crate::{print_yaml, Client};
 /// Type is a wrapper around the different item types in the store.
 #[derive(Debug, Clone, Default)]
 pub enum Type {
-    Doc(Doc),        // container
+    // Doc(Doc),        // container
     List(NList),     // container
     Map(NMap),       // container
     Text(NText),     // container
@@ -132,7 +132,7 @@ impl Type {
     #[inline]
     pub(crate) fn as_doc(&self) -> Option<Doc> {
         match self {
-            Type::Doc(n) => Some(n.clone()),
+            // Type::Doc(n) => Some(n.clone()),
             _ => None,
         }
     }
@@ -300,35 +300,35 @@ impl Type {
             Type::Atom(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
-            Type::Doc(n) => n.root.item_ref(),
+            // Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("item_ref: not implemented"),
         }
     }
 
     // get the container of the item
     // the container contains the item
-    pub(crate) fn container(&self) -> Option<Type> {
-        if let Some(container_id) = self.container_id() {
-            let typ = self.store().upgrade().and_then(|store| {
-                let container = store.borrow().items.get(&container_id);
-                return container.map_or(None, |container| Some(container.clone()));
-            });
+    // pub(crate) fn container(&self) -> Option<Type> {
+    //     if let Some(container_id) = self.container_id() {
+    //         let typ = self.store().upgrade().and_then(|store| {
+    //             let container = store.borrow().items.get(&container_id);
+    //             return container.map_or(None, |container| Some(container.clone()));
+    //         });
+    //
+    //         return typ;
+    //     }
+    //
+    //     None
+    // }
 
-            return typ;
-        }
-
-        None
-    }
-
-    #[inline]
-    pub(crate) fn container_id(&self) -> Option<Id> {
-        self.item_ref().borrow().container.clone()
-    }
-
-    #[inline]
-    pub(crate) fn set_container_id(&self, container_id: impl Into<Option<Id>>) {
-        self.item_ref().borrow_mut().container = container_id.into();
-    }
+    // #[inline]
+    // pub(crate) fn container_id(&self) -> Option<Id> {
+    //     self.item_ref().borrow().container.clone()
+    // }
+    //
+    // #[inline]
+    // pub(crate) fn set_container_id(&self, container_id: impl Into<Option<Id>>) {
+    //     self.item_ref().borrow_mut().container = container_id.into();
+    // }
 
     #[inline]
     pub(crate) fn is_moved(&self) -> bool {
@@ -397,7 +397,7 @@ impl Type {
     #[inline]
     pub(crate) fn remove_mark(&self, mark: Mark) {
         let id = self.store().upgrade().unwrap().borrow_mut().next_id();
-        let marks = self.item_ref().borrow().get_marks();
+        // let marks = self.item_ref().borrow().get_marks();
         let item = DeleteItem::new(id, self.range());
     }
 
@@ -578,7 +578,7 @@ impl Type {
             Type::Atom(n) => n.to_json(),
             Type::Move(n) => n.to_json(),
             Type::Mark(n) => n.to_json(),
-            Type::Doc(n) => n.to_json(),
+            // Type::Doc(n) => n.to_json(),
             Type::Identity => panic!("to_json: not implemented for identity"),
         }
     }
@@ -769,7 +769,7 @@ impl WithIdRange for Type {
             Type::Atom(n) => n.range(),
             Type::Move(n) => n.range(),
             Type::Mark(n) => n.range(),
-            Type::Doc(n) => n.root.range(),
+            // Type::Doc(n) => n.root.range(),
             Type::Identity => panic!("range: not implemented for identity"),
         }
     }
@@ -783,16 +783,16 @@ impl From<NList> for Type {
 
 impl From<NMap> for Type {
     fn from(n: NMap) -> Self {
-        if let Content::Doc(d) = n.content() {
-            Type::Doc(Doc::new(DocMeta {
-                id: d.id,
-                created_at: d.created_at,
-                crated_by: Client::from(d.created_by),
-                props: d.props.into_kv_map(),
-            }))
-        } else {
-            Self::Map(n)
-        }
+        // if let Content::Doc(d) = n.content() {
+        //     Type::Doc(Doc::new(DocMeta {
+        //         id: d.id,
+        //         created_at: d.created_at,
+        //         crated_by: Client::from(d.created_by),
+        //         props: d.props.into_kv_map(),
+        //     }))
+        // } else {
+        Self::Map(n)
+        // }
     }
 }
 
@@ -852,7 +852,7 @@ impl From<Type> for ItemRef {
             Type::Atom(n) => n.item_ref(),
             Type::Move(n) => n.item_ref(),
             Type::Mark(n) => n.item_ref(),
-            Type::Doc(n) => n.root.item_ref(),
+            // Type::Doc(n) => n.root.item_ref(),
             Type::Identity => panic!("Type::into(ItemRef): not implemented"),
         }
     }

@@ -75,7 +75,7 @@ impl NMap {
 
         let mark = NMark::new(id, Content::Mark(content), self.store.clone());
 
-        self.item_ref().add_mark(mark);
+        // self.item_ref().add_mark(mark);
     }
 
     pub(crate) fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {

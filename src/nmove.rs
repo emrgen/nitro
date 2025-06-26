@@ -21,6 +21,7 @@ impl NMove {
         let data = ItemData {
             id,
             kind: ItemKind::Move,
+            content: Content::Id(target.id()),
             ..ItemData::default()
         };
 

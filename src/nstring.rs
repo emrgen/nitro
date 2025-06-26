@@ -65,7 +65,7 @@ impl NString {
 
         let mark = NMark::new(id, Content::Mark(content), self.store.clone());
 
-        self.item_ref().add_mark(mark);
+        // self.item_ref().add_mark(mark);
     }
 
     #[inline]
@@ -90,21 +90,21 @@ impl Split for NString {
         let data = self.item_ref().borrow().data.clone();
         let (ld, rd) = data.split(offset).unwrap();
 
-        let split_marks: Vec<(Type, Type)> = self
-            .item_ref()
-            .borrow()
-            .get_marks()
-            .iter()
-            .map(|mark| mark.split(offset))
-            .collect();
+        // let split_marks: Vec<(Type, Type)> = self
+        //     .item_ref()
+        //     .borrow()
+        //     .get_marks()
+        //     .iter()
+        //     .map(|mark| mark.split(offset))
+        //     .collect();
 
         let left_item: Type = ItemRef::new(ld.into(), self.store.clone()).into();
         let right_item: Type = ItemRef::new(rd.into(), self.store.clone()).into();
 
-        for (l, r) in split_marks {
-            left_item.item_ref().borrow_mut().add_mark(l);
-            right_item.item_ref().borrow_mut().add_mark(r);
-        }
+        // for (l, r) in split_marks {
+        //     left_item.item_ref().borrow_mut().add_mark(l);
+        //     right_item.item_ref().borrow_mut().add_mark(r);
+        // }
 
         left_item.set_right(right_item.clone());
         right_item.set_left(left_item.clone());

@@ -168,6 +168,7 @@ impl DocStore {
 
         let mut deps = HashSet::new();
 
+        // track if change has a move item
         let mut moves = false;
         // update the deps for the inserted items
         self.items.get_by_range(change_id).iter().map(|item| {
@@ -187,7 +188,10 @@ impl DocStore {
         let mut change_ids = HashSet::new();
         for dep in deps {
             if let Some(change) = self.changes.get(&dep) {
-                change_ids.insert(change.clone());
+                // avoid creating self circular dependency
+                if change != &change_id {
+                    change_ids.insert(change.clone());
+                }
             }
         }
 

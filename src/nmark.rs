@@ -34,9 +34,9 @@ impl NMark {
     }
 
     pub(crate) fn size(&self) -> u32 {
-        let marks = self.borrow().get_marks();
+        // let marks = self.borrow().get_marks();
 
-        marks.len() as u32
+        1 //marks.len() as u32
     }
 
     pub(crate) fn item_ref(&self) -> ItemRef {
@@ -123,10 +123,10 @@ mod tests {
 
         let yaml = serde_yaml::to_string(&doc).unwrap();
         println!("{}", yaml);
-        let marks = doc.root.borrow().get_marks();
+        // let marks = doc.root.borrow().get_marks();
 
-        let yaml = serde_yaml::to_string(&marks).unwrap();
-        println!("{}", yaml);
+        // let yaml = serde_yaml::to_string(&marks).unwrap();
+        // println!("{}", yaml);
     }
 
     #[test]

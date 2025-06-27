@@ -25,16 +25,23 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Leaf<K, V> {
             .binary_search_by_key(&key, |k| k.clone())
             .unwrap_or_else(|e| e);
 
-        // If leaf is full, we need to handle splitting
+        // If leaf is full, we need to handle by splitting the leaf node
         if self.keys.len() == self.keys.capacity() {
             Some(self.insert_and_split(pos, key, value))
         } else {
-            self.keys.insert(pos, key);
-            self.values.insert(pos, value);
+            // if the key is already present, overwrite the value
+            if self.keys.get(pos).map_or(false, |v| v == &key) {
+                self.values[pos] = value;
+            } else {
+                self.keys.insert(pos, key);
+                self.values.insert(pos, value);
+            }
+
             None
         }
     }
 
+    // returns the (split key and new node)
     fn insert_and_split(&mut self, pos: usize, key: K, value: V) -> (K, (Node<K, V>)) {
         let mid = self.keys.len() / 2;
 

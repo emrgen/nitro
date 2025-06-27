@@ -11,7 +11,6 @@ use crate::store::WeakStoreRef;
 #[derive(Clone, Debug)]
 pub struct NAtom {
     pub(crate) item: ItemRef,
-    pub(crate) container: Option<ItemRef>,
 }
 
 impl NAtom {
@@ -24,18 +23,7 @@ impl NAtom {
         };
         Self {
             item: ItemRef::new(data.into(), store),
-            container: None,
         }
-    }
-
-    #[inline]
-    pub(crate) fn container(&self) -> Option<ItemRef> {
-        self.container.clone()
-    }
-
-    #[inline]
-    pub(crate) fn set_container(&mut self, container: ItemRef) {
-        self.container = Some(container);
     }
 
     #[inline]
@@ -108,9 +96,6 @@ impl Deref for NAtom {
 
 impl From<ItemRef> for NAtom {
     fn from(item: ItemRef) -> Self {
-        Self {
-            item,
-            container: None,
-        }
+        Self { item }
     }
 }

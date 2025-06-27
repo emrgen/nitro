@@ -418,6 +418,7 @@ impl Ord for ItemRef {
 
 #[derive(Debug, Clone, Default)]
 pub struct Item {
+    pub(crate) flags: u8,
     pub(crate) data: ItemData,       // data for the item
     pub(crate) parent: Option<Type>, // parent link
     pub(crate) target: Option<Type>, // target link
@@ -428,7 +429,6 @@ pub struct Item {
     // pub(crate) marks: Option<Type>,   // linked marks
     // TODO: move the index to list to avoid per item allocation
     pub(crate) index: FractionalIndex, // runtime index for quick index lookup in a large list,
-    pub(crate) flags: u8,
 }
 
 impl PartialEq<Content> for &Content {
@@ -1702,20 +1702,42 @@ impl Eq for Any {}
 
 #[cfg(test)]
 mod tests {
+    use crate::natom::NAtom;
     use crate::nlist::NList;
     use crate::nmap::NMap;
+    use crate::nmark::NMark;
+    use crate::nmove::NMove;
     use crate::*;
+    use fractional_index::FractionalIndex;
     use std::rc::Rc;
 
     #[test]
     fn test_option_size() {
         let item: Option<Type> = None;
-        println!("{:?}", size_of::<Doc>());
-        println!("{:?}", size_of::<Type>());
-        println!("{:?}", size_of::<[Type; 6]>());
         println!("{:?}", size_of::<Item>());
         println!("{:?}", size_of::<ItemData>());
+        println!("{:?}", size_of::<Type>());
+        println!("{:?}", size_of::<[Type; 6]>());
+        println!("{:?}", size_of::<Content>());
+        println!("{:?}", size_of::<FractionalIndex>());
+        println!("{:?}", size_of::<ItemRef>());
+        println!("{:?}", size_of::<ItemSide>());
+        println!("{:?}", size_of::<Id>());
+        println!("{:?}", size_of::<ItemKind>());
+
         println!("{:?}", size_of::<NList>());
         println!("{:?}", size_of::<NMap>());
+        println!("{:?}", size_of::<NString>());
+        println!("{:?}", size_of::<NMark>());
+        println!("{:?}", size_of::<NMove>());
+        println!("{:?}", size_of::<NAtom>());
+        println!("{:?}", size_of::<NText>());
+
+        enum Num {
+            U32(u32),
+            U64(u64),
+        }
+        println!("{:?}", size_of::<Num>());
+        println!("{:?}", size_of::<Vec<u32>>());
     }
 }

@@ -24,7 +24,6 @@ use crate::{print_yaml, Client};
 /// Type is a wrapper around the different item types in the store.
 #[derive(Debug, Clone, Default)]
 pub enum Type {
-    // Doc(Doc),        // container
     List(NList),     // container
     Map(NMap),       // container
     Text(NText),     // container

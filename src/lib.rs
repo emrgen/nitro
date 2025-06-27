@@ -61,7 +61,6 @@ mod ntree;
 mod persist;
 mod queue_store;
 mod richtext;
-mod skiplist;
 mod state;
 mod store;
 mod sync;

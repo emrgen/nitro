@@ -130,7 +130,6 @@ impl<K: Ord + Clone + Debug, V: Clone + Debug> Branch<K, V> {
         new_key: K,
         new_node: Node<K, V>,
     ) -> (K, Node<K, V>) {
-        std::io::stdout().flush().unwrap();
         let mid = self.keys.len() / 2;
 
         let mut new_branch = Branch::new(self.order);

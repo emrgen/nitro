@@ -4,6 +4,8 @@ use crate::index_map::{IndexMapper, IndexRef};
 use crate::Id;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::io::Write;
+use std::mem;
 
 // ChangeTree is a BTree like append-only structure
 // It has a simplified vector like API for efficient insertion by index.
@@ -11,7 +13,7 @@ use std::hash::Hash;
 struct ChangeTree<V: Hash + Eq> {
     root: Node<V>,
     order: usize,
-    dirty: HashSet<IndexRef>,
+    dirty: HashSet<V>,
     refs: HashMap<V, IndexRef>,
     mapper: IndexMapper,
 }
@@ -31,8 +33,32 @@ impl<V: Hash + Eq> ChangeTree<V> {
         }
     }
 
+    // compress the index mappers
+    fn compress(&mut self) {
+        for id in &self.dirty {
+            // update the index_ref with current index
+            if let Some(idx_ref) = self.refs.get_mut(&id) {
+                idx_ref.index = self.mapper.map_ref(idx_ref);
+                idx_ref.mapper = 0;
+            }
+        }
+
+        self.dirty.clear()
+    }
+
     pub(crate) fn insert(&mut self, index: usize, value: V) {
-        // self.root.insert(index, value);
+        if let Some(node) = self.root.insert(index, value) {
+            let mut new_root = Node::Branch(Branch::new(self.order));
+            let old_root = mem::replace(&mut self.root, new_root);
+            match self.root {
+                Node::Branch(ref mut branch) => {
+                    branch.children.push(old_root);
+                    branch.children.push(node);
+                    branch.update_count();
+                }
+                _ => unreachable!(),
+            }
+        }
     }
 
     pub(crate) fn index_of(&self, value: &V) -> Option<usize> {
@@ -44,15 +70,25 @@ impl<V: Hash + Eq> ChangeTree<V> {
     }
 
     pub(crate) fn at_index(&self, index: usize) -> Option<&V> {
+        if index >= self.root.size() {
+            return None;
+        }
         self.root.at_index(index)
     }
 
     pub(crate) fn at_index_mut(&mut self, index: usize) -> Option<&mut V> {
+        if index >= self.root.size() {
+            return None;
+        }
         self.root.at_index_mut(index)
     }
 
     pub(crate) fn contains(&self, value: &V) -> bool {
         self.refs.contains_key(value)
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.root.size()
     }
 }
 
@@ -101,59 +137,101 @@ impl<V> Node<V> {
 
 struct Branch<V> {
     children: Vec<Node<V>>,
-    total: usize,
+    counts: Vec<usize>,
 }
 
 impl<V> Branch<V> {
     fn new(order: usize) -> Self {
         Branch {
             children: Vec::with_capacity(order),
-            total: 0,
+            counts: Vec::with_capacity(order),
         }
     }
 
     pub(crate) fn insert(&mut self, index: usize, value: V) -> Option<Node<V>> {
+        if let Some((pos, index)) = self.get_child_with_index(index) {
+            if let Some(child) = self.children.get_mut(pos) {
+                if let Some(new_node) = child.insert(index, value) {
+                    if self.is_full() {
+                        return Some(self.insert_and_split(pos, new_node));
+                    } else {
+                        self.children.insert(pos + 1, new_node);
+                        self.update_count();
+                    }
+                }
+            }
+        }
+
         None
+    }
+
+    fn insert_and_split(&mut self, pos: usize, new_child: Node<V>) -> Node<V> {
+        let order = self.children.capacity();
+        let mid = order / 2;
+
+        let mut new_branch = Branch::new(self.children.capacity());
+
+        self.children.insert(pos + 1, new_child);
+
+        // TODO: potential BUG might be here
+        new_branch.children.extend(self.children.drain(mid..));
+
+        self.children.truncate(mid);
+
+        new_branch.children.shrink_to(order);
+        self.children.shrink_to(order);
+
+        new_branch.update_count();
+        self.update_count();
+
+        Node::Branch(new_branch)
     }
 
     pub(crate) fn at_index(&self, index: usize) -> Option<&V> {
-        if index >= self.size() {
-            return None;
+        if let Some((pos, index)) = self.get_child_with_index(index) {
+            self.children
+                .get(pos)
+                .map(|node| node.at_index(index))
+                .flatten()
+        } else {
+            None
         }
-
-        let mut current_index = index;
-        let sizes = self.children.iter().map(|c| c.size()).collect::<Vec<_>>();
-        for (i, child) in self.children.iter().enumerate() {
-            if i > 0 {
-                current_index -= sizes[i - 1];
-            }
-
-            if current_index < child.size() {
-                return child.at_index(current_index);
-            }
-        }
-
-        None
     }
 
     pub(crate) fn at_index_mut(&mut self, index: usize) -> Option<&mut V> {
-        if index >= self.size() {
-            return None;
+        if let Some((pos, index)) = self.get_child_with_index(index) {
+            self.children
+                .get_mut(pos)
+                .map(|node| node.at_index_mut(index))
+                .flatten()
+        } else {
+            None
         }
+    }
 
-        let mut current_index = index;
-        let sizes = self.children.iter().map(|c| c.size()).collect::<Vec<_>>();
-        for (i, child) in self.children.iter_mut().enumerate() {
-            if i > 0 {
-                current_index -= sizes[i - 1];
-            }
+    #[inline]
+    fn get_child_with_index(&self, index: usize) -> Option<(usize, usize)> {
+        let pos = self
+            .counts
+            .partition_point(|&n| n <= index)
+            .max(self.children.len() - 1);
 
-            if current_index < child.size() {
-                return child.at_index_mut(current_index);
-            }
+        let index = if pos == 0 {
+            index
+        } else {
+            index - self.counts[pos - 1]
+        };
+
+        Some((pos, index))
+    }
+
+    #[inline]
+    fn update_count(&mut self) {
+        let mut count = 0;
+        for (index, child) in self.children.iter().enumerate() {
+            count += child.size();
+            self.counts[index] += count;
         }
-
-        None
     }
 
     fn is_full(&self) -> bool {
@@ -161,7 +239,7 @@ impl<V> Branch<V> {
     }
 
     fn size(&self) -> usize {
-        self.total
+        self.counts.last().copied().unwrap_or(0)
     }
 }
 
@@ -204,5 +282,28 @@ impl<V> Leaf<V> {
 
     fn size(&self) -> usize {
         self.values.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partition() {
+        let p = vec![10, 20, 40];
+        println!("{}", p.partition_point(|&n| n <= 9));
+        println!("{}", p.partition_point(|&n| n < 11));
+    }
+
+    #[test]
+    fn test_btree_insert() {
+        let mut tree = ChangeTree::new();
+        tree.insert(0, 0);
+        tree.insert(0, 1);
+        tree.insert(0, 2);
+        tree.insert(0, 3);
+
+        assert_eq!(tree.size(), 4)
     }
 }

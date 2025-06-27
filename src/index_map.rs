@@ -3,12 +3,12 @@ use std::ops::{AddAssign, Range};
 // IndexRef holds an index that needs to be mapped to get the actual index
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct IndexRef {
-    index: u32,
-    mapper: u16,
+    pub(crate) index: usize,
+    pub(crate) mapper: u16,
 }
 
 impl IndexRef {
-    pub(crate) fn new(index: u32, mapper: u16) -> IndexRef {
+    pub(crate) fn new(index: usize, mapper: u16) -> IndexRef {
         IndexRef { index, mapper }
     }
 }

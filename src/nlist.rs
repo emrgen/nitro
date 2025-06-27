@@ -1,3 +1,4 @@
+use crate::cycle::creates_cycle;
 use crate::id::{Id, IdRange, WithId, WithIdRange, WithTarget};
 use crate::index::{BTreeIndex, IBTree, ItemIndexMap};
 use crate::item::{
@@ -51,6 +52,11 @@ impl NList {
 
     /// move the item to the offset position in the new parent list
     pub(crate) fn move_to(&self, offset: u32, target: &Type) {
+        if creates_cycle(&self.into(), target) {
+            warn!("can not move nodes within, creates cycle");
+            return;
+        }
+
         let id = self.store.upgrade().unwrap().borrow_mut().next_id();
         let mover: Type = NMove::new(id, target.clone(), self.store.clone()).into();
 
@@ -95,7 +101,7 @@ impl NList {
 
     #[inline]
     pub(crate) fn field(&self) -> Option<String> {
-        self.borrow().field(self.item_ref().store.clone())
+        self.borrow().field(&self.item_ref().store)
     }
 
     #[inline]

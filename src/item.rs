@@ -89,7 +89,7 @@ impl ItemRef {
 
     #[inline]
     pub(crate) fn field(&self) -> Option<String> {
-        self.item.borrow().field(self.store.clone())
+        self.item.borrow().field(&self.store)
     }
 
     // #[inline]
@@ -476,7 +476,7 @@ impl Item {
         self.flags & 0x04 == 0x04
     }
 
-    pub(crate) fn field(&self, store: WeakStoreRef) -> Option<String> {
+    pub(crate) fn field(&self, store: &WeakStoreRef) -> Option<String> {
         let store = store.upgrade().unwrap();
         let store = store.borrow();
         let field = store.get_field(&self.data.field.unwrap());
@@ -574,13 +574,13 @@ impl Item {
         &mut self.data.content
     }
 
-    pub(crate) fn as_map(&self, store: WeakStoreRef) -> HashMap<String, Type> {
+    pub(crate) fn as_map(&self, store: &WeakStoreRef) -> HashMap<String, Type> {
         // TODO: use visible iterator for performance
         let items = self.items();
         let mut map = HashMap::new();
 
         for item in items.clone() {
-            if let Some(field) = item.item_ref().borrow().field(store.clone()) {
+            if let Some(field) = item.item_ref().borrow().field(store) {
                 // println!("field: {}, id: {:?}", field, item.id());
                 map.insert(field, item.clone());
             }
@@ -589,7 +589,7 @@ impl Item {
         // remove items that are moved or deleted
         for item in items.iter() {
             if !item.is_visible() {
-                map.remove(&item.item_ref().borrow().field(store.clone()).unwrap());
+                map.remove(&item.item_ref().borrow().field(store).unwrap());
             }
         }
 
@@ -1222,6 +1222,12 @@ impl ItemKey {
             Self::String(s) => s.clone(),
             Self::Number(n) => n.to_string(),
         }
+    }
+}
+
+impl From<&str> for ItemKey {
+    fn from(s: &str) -> Self {
+        Self::String(String::from(s))
     }
 }
 

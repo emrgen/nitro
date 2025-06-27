@@ -5,7 +5,7 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 
 use crate::id::{Id, IdRange, WithId, WithIdRange};
-use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked};
+use crate::item::{Content, ItemData, ItemIterator, ItemKey, ItemKind, ItemRef, Linked, StartEnd};
 use crate::mark::{Mark, MarkContent};
 use crate::nmark::NMark;
 use crate::store::WeakStoreRef;
@@ -23,6 +23,7 @@ impl NMap {
             id,
             ..ItemData::default()
         };
+
         let item_ref = ItemRef::new(data.into(), store);
 
         Self { item: item_ref }
@@ -31,13 +32,13 @@ impl NMap {
     /// size of the map
     pub(crate) fn size(&self) -> u32 {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone());
+        let map = item.as_map(&self.store);
         map.len() as u32
     }
 
     /// item field value used in kv entry as key
     fn field(&self) -> Option<String> {
-        self.borrow().field(self.item_ref().store.clone())
+        self.borrow().field(&self.item_ref().store)
     }
 
     pub(crate) fn content(&self) -> Content {
@@ -80,11 +81,10 @@ impl NMap {
 
     pub(crate) fn get(&self, key: impl Into<ItemKey>) -> Option<Type> {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone());
-
         let key = key.into().as_string();
-
+        let map = self.visible_children();
         let item = map.get(&key);
+
         item.cloned()
     }
 
@@ -99,7 +99,7 @@ impl NMap {
     }
 
     pub(crate) fn remove(&self, key: ItemKey) {
-        let map = self.borrow().as_map(self.store.clone());
+        let map = self.visible_children();
         let value = map.get(&key.as_string());
         if let Some(value) = value {
             value.delete();
@@ -110,24 +110,37 @@ impl NMap {
         child.item_ref().disconnect();
     }
 
+    //
     pub(crate) fn keys(&self) -> Vec<String> {
-        let item = self.borrow();
-        let map = item.as_map(self.store.clone());
-        map.keys().cloned().collect()
+        self.visible_children().keys().cloned().collect()
     }
 
     pub(crate) fn values(&self) -> Vec<Type> {
-        let item = self.borrow();
-        let map = item.as_map(self.store.clone());
-        map.values().cloned().collect()
+        self.visible_children().values().cloned().collect()
     }
 
     pub(crate) fn clear(&self) {
         let item = self.borrow();
-        let map = item.as_map(self.store.clone());
+        let map = item.as_map(&self.store);
         for item in map.values() {
             item.delete();
         }
+    }
+
+    fn visible_children(&self) -> HashMap<String, Type> {
+        let mut curr = self.start();
+        let mut map = HashMap::new();
+        while let Some(item) = curr {
+            if item.is_visible() {
+                if let Some(field) = item.field() {
+                    map.insert(field, Type::from(item.clone()));
+                }
+            }
+
+            curr = item.right();
+        }
+
+        map
     }
 
     #[inline]
@@ -137,8 +150,8 @@ impl NMap {
 
     pub(crate) fn to_json(&self) -> serde_json::Value {
         let mut json = self.borrow().to_json();
-        let item = self.borrow();
-        let map = item.as_map(self.store.clone());
+
+        let map = self.visible_children();
         let mut content = serde_json::Map::new();
         for (key, value) in map.iter() {
             content.insert(key.clone(), value.to_json());
@@ -200,6 +213,7 @@ impl From<ItemRef> for NMap {
 mod tests {
     use crate::doc::Doc;
     use crate::print_yaml;
+    use serde_json::json;
 
     #[test]
     fn test_map() {
@@ -252,8 +266,8 @@ mod tests {
         map.set("children", list.clone());
 
         let p1 = doc.map();
-        // p1.set("kind", doc.atom("node"));
         // p1.set("id", doc.atom("2"));
+        // p1.set("kind", doc.atom("node"));
         p1.set("name", doc.atom("paragraph"));
 
         let t1 = doc.text();
@@ -261,9 +275,17 @@ mod tests {
         p1.set("children", t1.clone());
 
         let p2 = doc.map();
-        // p2.set("kind", doc.atom("node"));
-        // p2.set("id", doc.atom("3"));
+        p2.set("id", doc.atom("3"));
+        p2.set("kind", doc.atom("node"));
         p2.set("name", doc.atom("paragraph"));
+
+        assert_eq!(p2.get("id").unwrap().text_content(), "3");
+        assert_eq!(p2.get("kind").unwrap().text_content(), "node");
+        assert_eq!(p2.get("name").unwrap().text_content(), "paragraph");
+        assert_eq!(
+            p2.to_json(),
+            json!({"id":"3","kind":"node","name":"paragraph"})
+        );
 
         let t2 = doc.text();
         t2.insert(0, doc.string("Goodbye, world!"));
@@ -273,9 +295,11 @@ mod tests {
         list.append(p2.clone());
         // let yaml = serde_json::to_string(&doc).unwrap();
         // println!("---\n{}", yaml);
-        //
+
+        assert_eq!(list.size(), 2);
+
         let json = doc.to_json();
-        println!("---\n{}", serde_json::to_string_pretty(&json).unwrap());
+        // println!("---\n{}", serde_json::to_string_pretty(&json).unwrap());
         // print_yaml(&doc);
     }
 }

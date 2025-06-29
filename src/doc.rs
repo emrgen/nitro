@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::{Timestamp, Uuid};
 
-use crate::change::{sort_changes, Change, ChangeData, ChangeId, ChangeStore};
+use crate::change::{sort_changes, ChangeData, ChangeId, ChangeStore};
 use crate::cycle::creates_cycle;
 use crate::dag::{ChangeNode, ChangeNodeFlags};
 use crate::decoder::{Decode, DecodeContext, Decoder};

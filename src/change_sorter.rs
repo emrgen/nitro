@@ -12,7 +12,7 @@ use std::mem;
 
 // ChangeTree is a BTree like append-only structure
 // It has a simplified vector like API for efficient insertion by index.
-// Support index look up and slice api
+// Support index look up and iter api
 struct ChangeTree<V: Clone + Hash + Eq + Debug> {
     root: Node<V>,
     order: usize,
@@ -52,7 +52,7 @@ impl<V: Clone + Hash + Eq + Debug> ChangeTree<V> {
     pub(crate) fn insert(&mut self, index: usize, value: V) {
         self.refs.insert(
             value.clone(),
-            IndexRef::new(index, self.mapper.len() as u16),
+            IndexRef::new(index, self.mapper.len() as u32),
         );
         self.mapper.push(IndexMap::insert(index));
 

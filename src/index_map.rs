@@ -4,11 +4,11 @@ use std::ops::{AddAssign, Range};
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct IndexRef {
     pub(crate) index: usize,
-    pub(crate) mapper: u16,
+    pub(crate) mapper: u32,
 }
 
 impl IndexRef {
-    pub(crate) fn new(index: usize, mapper: u16) -> IndexRef {
+    pub(crate) fn new(index: usize, mapper: u32) -> IndexRef {
         IndexRef { index, mapper }
     }
 }
@@ -40,7 +40,7 @@ impl IndexMapper {
         self.map(index_ref.mapper, index_ref.index as usize)
     }
 
-    fn map(&self, after: u16, index: usize) -> usize {
+    fn map(&self, after: u32, index: usize) -> usize {
         let mut pos = index;
 
         self.map[(after as usize + 1)..]
@@ -89,23 +89,61 @@ impl IndexMap {
         IndexMap { index: at }
     }
 
+    pub(crate) fn remove(at: usize) -> IndexMap {
+        IndexMap {
+            index: at | 1 << 31,
+        }
+    }
+
+    #[inline]
     fn last_index(&self) -> usize {
         self.index
     }
 
+    #[inline]
+    fn is_insert(&self) -> bool {
+        self.index & (1 << 31) == 0
+    }
+
+    #[inline]
+    fn is_remove(&self) -> bool {
+        self.index & (1 << 31) != 0
+    }
+
+    #[inline]
+    fn index(&self) -> usize {
+        self.index & (1 << 31 - 1)
+    }
+
     fn map(&self, index: usize) -> usize {
-        if self.index <= index {
-            index + 1
+        if self.is_insert() {
+            if self.index <= index {
+                index + 1
+            } else {
+                index
+            }
         } else {
-            index
+            if self.index <= index {
+                index - 1
+            } else {
+                index
+            }
         }
     }
 
     fn unmap(&self, pos: usize) -> usize {
-        if self.index < pos {
-            pos - 1
+        if self.is_insert() {
+            if self.index < pos {
+                pos - 1
+            } else {
+                pos
+            }
         } else {
-            pos
+            if self.index < pos {
+                pos + 1
+            } else {
+                pos
+            }
         }
     }
 }

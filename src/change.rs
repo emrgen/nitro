@@ -80,65 +80,26 @@ pub(crate) fn sort_changes(parents: HashMap<ChangeId, Vec<ChangeId>>) -> Vec<Cha
 /// Change represents a set of changes made to a document by one client in a single transaction.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub(crate) struct Change {
-    pub(crate) id: ChangeId,
     pub(crate) flag: u8,
-    // if the change contains any move operations
-    pub(crate) items: Vec<ItemData>,
-    pub(crate) deletes: Vec<DeleteItem>,
-    pub(crate) deps: Vec<ChangeId>,
+    pub(crate) id: ChangeId,
+    pub(crate) parents: Vec<Change>,
 }
 
 impl Change {
-    pub(crate) fn new(
-        id: ChangeId,
-        items: Vec<ItemData>,
-        deletes: Vec<DeleteItem>,
-        deps: Vec<ChangeId>,
-    ) -> Change {
-        Change {
-            id,
-            flag: 0,
-            items,
-            deletes,
-            deps,
-        }
-    }
-
-    pub(crate) fn from_id(id: ChangeId) -> Change {
-        Change {
-            id,
-            ..Self::default()
-        }
-    }
-
-    pub(crate) fn with_deps(id: ChangeId, deps: Vec<ChangeId>) -> Change {
-        Change {
-            id,
-            deps,
-            ..Self::default()
-        }
-    }
-
-    pub(crate) fn moves(&self) -> Vec<ItemData> {
-        self.items
-            .iter()
-            .filter(|item| item.kind == ItemKind::Move)
-            .cloned()
-            .collect()
-    }
-
-    pub(crate) fn add_item(&mut self, item: ItemData) {
-        self.items.push(item);
-    }
-
-    pub(crate) fn add_delete(&mut self, item: DeleteItem) {
-        self.deletes.push(item);
-    }
-
-    // apply the changes to the document through the store
-    pub(crate) fn try_apply(&mut self, store: WeakStoreRef) -> Result<(), String> {
-        Ok(())
-    }
+    // pub(crate) fn new(
+    //     id: ChangeId,
+    //     items: Vec<ItemData>,
+    //     deletes: Vec<DeleteItem>,
+    //     deps: Vec<ChangeId>,
+    // ) -> Change {
+    //     Change {
+    //         id,
+    //         flag: 0,
+    //         items,
+    //         deletes,
+    //         deps,
+    //     }
+    // }
 }
 
 /// ChangeData represents a set of changes made to a document by one client in a single transaction.

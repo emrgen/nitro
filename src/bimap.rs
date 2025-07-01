@@ -15,3 +15,14 @@ impl <L,R> BiMap<L,R> {
 
   fn entry(&self) {}
 }
+
+#[derive(Default, Clone)]
+struct ClientMap {
+  clients: Vec<Client>,
+  ids: HashMap<Client, usize>,
+}
+
+impl ClientMap {
+  fn get_client(&self, client_id: ClientId) -> Option<Client> {}
+  fn get_client_id(&self, client: Client) -> Option<ClientId> {}
+}

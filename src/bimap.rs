@@ -1,25 +1,35 @@
-struct BiMap<L,R> {
-  items: Vec<(L,R)>,
-  left: HashMap<L, usize>,
-  right: HashMap<R, usize>,
+struct EncoderMap<T: Clone + Hash> {
+  items: Vec<T>,
+  ids: HashMap<T, usize>,
 }
 
-impl <L,R> BiMap<L,R> {
+impl <T> EncoderMap<T> {
   fn new() -> Self {
     BiMap {
       items: Vec::new(),
-      left: HashMap::new(),
-      right: HashMap::new(),
+      ids: HashMap::new(),
     }
   }
 
-  fn entry(&self) {}
+  fn encode(&self, item: &T) -> u32 {
+      if let Some(entry) = self.ids.get(item) {
+          return entry;
+      } else {
+          let index = self.items.len();
+          self.items.push(item.clone());
+          self.ids.insert(item.clone(), index);
+          return index;
+      }
+  }
+
+  fn decode(&self, index: u32) -> Option<T> {
+    self.items.get(index as usize)
+  }
 }
 
 #[derive(Default, Clone)]
 struct ClientMap {
-  clients: Vec<Client>,
-  ids: HashMap<Client, usize>,
+  inner: EncoderMap<Client>,
 }
 
 impl ClientMap {
